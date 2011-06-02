@@ -1,0 +1,103 @@
+=======
+textadv
+=======
+by Kyle Miller, 2011
+
+The textadv package is a system written in python for creating
+interactive fiction (also known as text adventures) in Python.  Where
+most interactive fiction engines seem to have their own programming
+language in which to write the games, the approach taken here was to
+create a domain-specific language for Python which makes writing these
+games easy.  And, an added benefit is that we get to program in
+Python, so all of the standard libraries are included.
+
+
+------------
+Requirements
+------------
+
+I implemented the system with Python 2.7, and assumed no other
+libraries.  I don't know if it works in other versions of Python.
+
+
+----------------
+Directory layout
+----------------
+
+The root directory contains two test games, testgame.py (which is just
+silly), and isleadv.py (which is silly, but a very large test of the
+system).  I would recommend trying isleadv.py and seeing its source
+code to get an idea of what this DSL is like.
+
+Inside this folder is also the main textadv package (I'll label things
+as python packages now):
+
+* textadv.basiclibrary
+
+This imports everything you probably need.  See isleadv.py for an
+example.
+
+* textadv.core
+
+This package contains everything the main game system uses, which
+includes a pattern-matching system (patterns), a database system
+(database) which uses patterns for lookups, an event system (events)
+which can be used to run event handlers based on a pattern, and a
+world model (world).
+
+The world model is an important datastructure of the system, and it
+consists of a relation database (for handling "x is in y", for
+instance) and an object database.  The objects are kind of weird, and
+I'm not completely sure they have to be this way (but there are some
+puzzles I want to try implementing where I think this structure will
+make it really easy).  For understanding how to use this world system,
+it might be easiest to find instances of context.world in isleadv.
+
+* textadv.gamesystem
+
+This package contains the parser and the idea of a "game context."
+This package uses textadv.core heavily.
+
+The module eventsystem is the definition of how an event is checked
+and executed.  See run_action in that module for more details.
+
+The idea with contexts is that modal changes may occur in the game,
+and the hope is that these will help with these switches (for
+instance, it'll probably be possible to play a game inside the game
+without much difficulty.  I haven't tried it yet).
+
+The utilities module contains many useful utilities, including
+eval_str, which evaluates if statements within strings, among other
+things.
+
+* textadv.gameworld
+
+This package contains the definitions of basic game objects like
+rooms, doors, and actors, and it contains the definitions of all the
+basic actions a player may attempt on these objects.
+
+
+-----------
+Future work
+-----------
+
+There will be a way to take games written in this system and then play
+them from within a web browser with the game being server side.  There
+will also be support for multimedia (partly because then the game
+writer can use HTML).
+
+There are classes like Readable and Container which are readily
+composible.  It should be possible to add classes together so that one
+could create a new object of type Readable+Container, and then make
+sure the setup methods are sequenced.
+
+
+-------
+History
+-------
+
+Jun 2011 - Implemented a new engine working and got a small game
+           working
+
+Oct 2008 - Made an engine in Python, there were problems which made
+           game definition much too complicated

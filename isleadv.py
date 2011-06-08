@@ -219,9 +219,10 @@ old_rope = world.new_obj("old_rope", Scenery, "worn old rope",
 """It's just hanging in there keeping the dock together.""")
 old_rope.move_to(room_the_dock)
 old_rope["no_take_msg"] = """The driftwood is attached to the dock
-with the rope."  Instead of taking the old rope when the old rope is
-joined to the driftwood, say "It seems to be knotted up with no
-beginning nor end.  It's a mobius rope."""
+with the rope."""
+#  Instead of taking the old rope when the old rope is
+#joined to the driftwood, say "It seems to be knotted up with no
+# beginning nor end.  It's a mobius rope."""
 
 driftwood = world.new_obj("driftwood", BObject, "long piece of driftwood",
 """[if [when driftwood attachedto old_rope]]If it weren't attached to
@@ -238,7 +239,7 @@ def _before_cut_rope_default(actor, context) :
 
 @before(CutWith(actor, old_rope, BObject(y)))
 def _before_cutwith_rope_default(actor, y, context) :
-    raise AbortAction(str_with_obj("[the $y] isn't sharp enough to cut cooked pasta.", y=y))
+    raise AbortAction(str_with_objs("[the $y] isn't sharp enough to cut cooked pasta.", y=y))
 
 @before(CutWith(actor, old_rope, "knife"))
 def _before_cutwith_rope_knife(actor, context) :
@@ -628,7 +629,7 @@ def _before_cut_rope_default(actor, context) :
 
 @before(CutWith(actor, new_rope, BObject(y)))
 def _before_cutwith_rope_default(actor, y, context) :
-    raise AbortAction(str_with_obj("[the $y] isn't sharp enough to cut cooked pasta.", y=y))
+    raise AbortAction(str_with_objs("[the $y] isn't sharp enough to cut cooked pasta.", y=y))
 
 @before(CutWith(actor, new_rope, "knife"))
 def _before_cutwith_rope_knife(actor, context) :

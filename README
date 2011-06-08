@@ -96,8 +96,7 @@ sure the setup methods are sequenced.
 History
 -------
 
-Jun 2011 - Implemented a new engine working and got a small game
-           working
+Jun 2011 - Implemented a new engine and got a small game working
 
 Oct 2008 - Made an engine in Python, there were problems which made
            game definition much too complicated

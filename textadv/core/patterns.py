@@ -34,6 +34,12 @@ class AbstractPattern(object) :
         """Try to use the replacements dictionary to modify the
         pattern.  By default returns self."""
         return self
+    def file_under(self) :
+        return type(self)
+    def __le__(self, b) :
+        return PatternRequires(self, b)
+    def __hash__(self) :
+        return hash(repr(self))
 
 class VarPattern(AbstractPattern) :
     """Creates a pattern which matches anything, but binds the result
@@ -93,22 +99,48 @@ class BasicPattern(AbstractPattern) :
             else :
                 newargs.append(arg)
         return type(self)(*newargs)
+    def __and__(self, b) :
+        if not isinstance(b, BasicPattern) :
+            raise Exception("Not anding with a basicpattern")
+        return PatternConjunction(self, b)
     def __repr__(self) :
         return "%s(%s)" % (self.__class__.__name__, ",".join(repr(a) for a in self.args))
+    def __eq__(self, other) :
+        return type(other) == type(self) and self.args == other.args
 
-# maybe delete this
-class Require(AbstractPattern) :
-    def __init__(self, pattern, *support) :
+class PatternRequires(AbstractPattern) :
+    def __init__(self, pattern, support) :
         self.pattern = pattern
         self.support = support
     def match(self, input, matches=None, data=None) :
         matches = self.pattern.match(input, matches, data)
-        for s in self.support :
-            try :
-                if not data["world"][s.expand_pattern(matches)] :
-                    raise NoMatchException(self, s)
-            except KeyError :
-                raise NoMatchException(self, s)
+        try :
+            if type(self.support) == PatternConjunction :
+                self.support.expand_patterns(matches).test(data["world"])
+            elif not data["world"][self.support.expand_pattern(matches)] :
+                raise NoMatchException(self, self.support)
+            return matches
+        except KeyError :
+            raise NoMatchException(self, self.support)
+    def file_under(self) :
+        return self.pattern.file_under()
+    def __repr__(self) :
+        return "%r <= %r" % (self.pattern, self.support)
+
+class PatternConjunction(object) :
+    def __init__(self, *support) :
+        self.support = support
+    def test(self, world) :
+        if not all(world[s] for s in self.support) :
+            raise NoMatchException(self)
+    def expand_patterns(self, matches) :
+        return PatternConjunction(*[s.expand_pattern(matches) for s in self.support])
+    def __and__(self, b) :
+        if not isinstance(BasicPattern) :
+            raise Exception("Not anding with a BasicPattern")
+        return PatternConjunction(*(self.support+[b]))
+    def __repr__(self) :
+        return " & ".join(repr(s) for s in self.support)
 
 ###
 ### Tests

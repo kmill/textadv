@@ -5,11 +5,10 @@
 import string
 import itertools
 import re
-from textadv.core.patterns import PVar
-from textadv.gamesystem.relations import In, Has
 
 def list_append(xs) :
-    return itertools.chain.from_iterable(xs)
+    #return itertools.chain.from_iterable(xs)
+    return [a for x in xs for a in x]
 
 def serial_comma(nouns, conj="and", comma=",", force_comma=False) :
     conj = " " + conj + " "
@@ -24,8 +23,11 @@ def serial_comma(nouns, conj="and", comma=",", force_comma=False) :
         comma_sp = comma + " "
         return comma_sp.join(nouns[:-1]) + comma + conj + nouns[-1]
 
-def is_are_list(context, objs, conj="and", prop="indefinite_name") :
-    objs = [context.world[o][prop] for o in objs]
+def is_are_list(context, objs, conj="and", prop=None) :
+    if prop is None :
+        from textadv.gameworld.basicrules import IndefiniteName
+        prop = IndefiniteName
+    objs = [context.world[prop(o)] for o in objs]
     if len(objs) == 0 :
         return "is nothing"
     elif len(objs) == 1 :
@@ -45,10 +47,6 @@ DIRECTION_INVERSES = {"north" : "south",
 def inverse_direction(direction) :
     return DIRECTION_INVERSES[direction]
 
-def remove_obj(obj) :
-    """Removes an object from play by moving it to nowhere."""
-    obj.world.delete("relations", Has(PVar("x"), obj))
-    obj.world.delete("relations", In(obj, PVar("x")))
 
 
 ###
@@ -73,10 +71,8 @@ def str_with_objs(input, **kwarg) :
             newkwarg[key] = value.id
     return string.Template(input).safe_substitute(newkwarg)
 
-def as_actor(input, actor) :
-    if type(actor) != str :
-        actor = actor.id
-    return "[as %s]%s[endas]" % (actor, input)
+def as_actor(input, actorname) :
+    return "[as %s]%s[endas]" % (actorname, input)
 
 
 ###
@@ -115,12 +111,13 @@ def eval_str(input, context) :
         print "eval_str: Offending input is"
         print input
         raise x
-    evaled = _eval(code, context, context.actor)
+    evaled = _eval(code, context, context.actorname)
     return "".join([str(o) for o in evaled])
 
 def _eval_parse(input, i=0, in_code=False) :
     """Pulls out [] and {} expressions, labeling them as such.  Also
-    makes it so [] expressions split by whitespace."""
+    makes it so [] expressions split by whitespace.  The characters <
+    and > delimit strings when in_code."""
     parsed = []
     j = i
     while i < len(input) :
@@ -146,6 +143,12 @@ def _eval_parse(input, i=0, in_code=False) :
             j = i
         elif input[i] == "}" :
             raise Exception("Unmatched '}' in "+input)
+        elif input[i] == "<" and in_code :
+            start = i+1
+            while input[i] != ">" : i += 1
+            parsed.append(input[start:i])
+            i += 1
+            j = i
         elif in_code and input[i] in string.whitespace :
             if i-1 > j :
                 parsed.append(input[j:i])
@@ -229,6 +232,11 @@ def _eval(expr, context, actor) :
             return _eval(expr[3], context, actor)
     elif expr[0] == "as" :
         return _eval(expr[2], context, expr[1])
+    elif expr[0] == "current_actor_is" :
+        if len(expr) == 1 :
+            return [actor]
+        else :
+            return [actor == _eval(expr[1], context, actor)]
     elif _str_eval_functions.has_key(expr[0]) :
         try :
             args = [_eval(x, context, actor) for x in expr[1:]]
@@ -254,52 +262,50 @@ _str_eval_functions["true"] = lambda context : [True]
 _str_eval_functions["false"] = lambda context : [False]
 # negates arg
 _str_eval_functions["not"] = lambda context, x : [not x[0]]
-# get ob prop => gets property from object
-_str_eval_functions["get"] = lambda context, ob, prop : [context.world[ob][prop]]
+# gets prop(*args) property from world
+_str_eval_functions["get"] = lambda context, prop, *args : [context.world.get_property(prop,*args)]
 # gets definite_name property
-_str_eval_functions["the"] = lambda context, ob : [context.world[ob]["definite_name"]]
+_str_eval_functions["the"] = lambda context, ob : [context.world.get_property("DefiniteName", ob)]
 # gets indefinite_name property
-_str_eval_functions["a"] = lambda context, ob : [context.world[ob]["indefinite_name"]]
+_str_eval_functions["a"] = lambda context, ob : [context.world.get_property("IndefiniteName", ob)]
 # gets definite_name property, capitalized
-_str_eval_functions["The"] = lambda context, ob : [_cap(context.world[ob]["definite_name"])]
+_str_eval_functions["The"] = lambda context, ob : [_cap(context.world.get_property("DefiniteName", ob))]
 # gets indefinite_name property, capitalized
-_str_eval_functions["A"] = lambda context, ob : [_cap(context.world[ob]["indefinite_name"])]
+_str_eval_functions["A"] = lambda context, ob : [_cap(context.world.get_property("IndefiniteName", ob))]
 # capitalizes a word
 _str_eval_functions["cap"] = lambda context, s : [_cap(s[0])+s[1:]]
 # number to char
 _str_eval_functions["char"] = lambda context, s : [chr(int(s))]
 
 # gets subject_pronoun property
-_str_eval_functions["he"] = lambda context, ob : [context.world[ob]["subject_pronoun"]]
+_str_eval_functions["he"] = lambda context, ob : [context.world.get_property("SubjectPronoun", ob)]
 # gets object_pronoun property
-_str_eval_functions["him"] = lambda context, ob : [context.world[ob]["object_pronoun"]]
+_str_eval_functions["him"] = lambda context, ob : [context.world.get_property("ObjectPronoun", ob)]
 # gets subject_pronoun property, capitalized
-_str_eval_functions["He"] = lambda context, ob : [_cap(context.world[ob]["subject_pronoun"])]
+_str_eval_functions["He"] = lambda context, ob : [_cap(context.world.get_property("SubjectPronoun", ob))]
 # gets object_pronoun property, capitalized
-_str_eval_functions["Him"] = lambda context, ob : [_cap(context.world[ob]["object_pronoun"])]
+_str_eval_functions["Him"] = lambda context, ob : [_cap(context.world.get_property("ObjectPronoun", ob))]
+
+# text formatting
+_str_eval_functions["newline"] = lambda context : ["\n\n"]
 
 def _cap(string) :
     return string[0].upper()+string[1:]
 
-# if no first object, then default to actor (so one can write [when in
-# box] instead of [when actor in box]
+# if no first object, then first defaults to actor (so one can write
+# [when In box] box] instead of [when actor In box])
 @add_str_eval_func("when")
 def _str_eval_fn_when(context, *obs) :
     if len(obs) == 2 :
-        ob1, relation, ob2 = context.actor, obs[0], obs[1]
+        ob1, relation, ob2 = context.actorname, obs[0], obs[1]
     else :
         ob1, relation, ob2 = obs
-    relation = relation.lower()
-    return [context.world[ob1].s_R_x(_str_eval_fn_when_relations[relation], ob2)]
+    return [context.world.query_relation(context.world.get_relation(relation)(ob1, ob2))]
 
 # concatenates list of objects, getting indefinite names, and puts proper is/are in front
 @add_str_eval_func("is_are_list")
 def _str_eval_fn_is_are_list(context, *obs) :
     return [is_are_list(context, list_append(o[0] for o in obs))]
-
-_str_eval_fn_when_relations = {"in" : In, "has" : Has}
-def str_eval_register_relation(code, relation) :
-    _str_eval_fn_when_relations[code] = relation
 
 ###
 ### Reworder.  Makes is/are work out depending on context
@@ -318,9 +324,9 @@ def str_eval_register_relation(code, relation) :
 def reword(args, context, actor) :
     word = args[0]
     flags = args[1:]
-    is_me = context.actor == actor
+    is_me = (context.actorname == actor)
     capitalized = word[0] in string.uppercase
-    rewritten = _reword(word.lower(), flags, context.world[actor], is_me)
+    rewritten = _reword(word.lower(), flags, context.world, actor, is_me)
     if capitalized or "cap" in flags:
         return _cap(rewritten)
     else :
@@ -339,31 +345,31 @@ _reword_replacements = {"is" : "are",
                         "switches" : "switch",
                         }
 
-def _reword(word, flags, actor, is_me) :
+def _reword(word, flags, world, actor, is_me) :
     if is_me :
         if word == "he" :
-            return actor["subject_pronoun_if_me"]
+            return world.get_property("SubjectPronounIfMe", actor)
         elif word == "him" :
-            return actor["object_pronoun_if_me"]
+            return world.get_property("ObjectPronounIfMe", actor)
         elif word == "bob" :
             if "obj" in flags :
-                return actor["object_pronoun_if_me"]
+                return world.get_property("ObjectPronounIfMe", actor)
             else :
-                return actor["subject_pronoun_if_me"]
+                return world.get_property("SubjectPronounIfMe", actor)
         elif word == "bob's" :
-            return actor["possessive_if_me"]
+            return world.get_property("PossessiveIfMe", actor)
         elif _reword_replacements.has_key(word) :
             return _reword_replacements[word]
         else : # assume it's a verb, take off s
             return word[0:-1]
     else :
         if word == "he" :
-            return actor["subject_pronoun"]
+            return world.get_property("SubjectPronoun", actor)
         elif word == "him" :
-            return actor["object_pronoun"]
+            return world.get_property("ObjectPronoun", actor)
         elif word == "bob" :
-            return actor["printed_name"]
+            return world.get_property("PrintedName", actor)
         elif word == "bob's" :
-            return actor["possessive"]
+            return world.get_property("Possessive", actor)
         else : # we assume the word should stay as-is
             return word

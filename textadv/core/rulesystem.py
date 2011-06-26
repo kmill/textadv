@@ -3,11 +3,10 @@
 # rule- and event-based programming
 #
 # What's here:
-# Exceptions: IrrelevantEventException, AbortAction, ActionHandled
-# Classes: ActionTable
-# Decorators: add_action, makeEventDecorator, makeEventPatternDecorator
+# Exceptions: NotHandled, AbortAction, ActionHandled, MultipleResults, FinishWith
+# Classes: ActionTable, PropertyTable, EventTable
 
-from patterns import NoMatchException, BasicPattern
+from patterns import NoMatchException, AbstractPattern, BasicPattern
 
 class AbortAction(Exception) :
     """Raised when a handler wants to stop the action from being
@@ -51,20 +50,20 @@ class PropertyTable(object) :
         self.properties = dict() # dict for some optimization
         self.default_handler = None
     def set_property(self, item, value, call=False) :
-        if not isinstance(item, BasicPattern) :
-            raise Exception("The only properties may be BasicPatterns.")
-        if not self.properties.has_key(type(item)) :
-            self.properties[type(item)] = [(item, value, call)]
+        if not isinstance(item, AbstractPattern) :
+            raise Exception("The only properties may be AbstractPatterns.")
+        if not self.properties.has_key(item.file_under()) :
+            self.properties[item.file_under()] = [(item, value, call)]
         else :
-            self.properties[type(item)].insert(0, (item, value, call))
+            self.properties[item.file_under()].insert(0, (item, value, call))
     def __setitem__(self, item, value) :
         self.set_property(item, value)
     def get_property(self, item, data) :
         if not isinstance(item, BasicPattern) :
             raise Exception("The only properties may be BasicPatterns.")
-        if not self.properties.has_key(type(item)) :
+        if not self.properties.has_key(item.file_under()) :
             raise KeyError(item)
-        for key,value,call in self.properties[type(item)] :
+        for key,value,call in self.properties[item.file_under()] :
             try :
                 matches = key.match(item, data=data)
                 if call :
@@ -172,6 +171,18 @@ class EventTable(object) :
             except AbortAction :
                 return None
         return self.accumulator(accum)
+
+##
+## A class for holding ActionTables (see World)
+##
+
+class ActionHelperObject(object) :
+    def __init__(self, handler) :
+        self.__handler__ = handler
+    def __getattr__(self, name) :
+        def _caller(*args) :
+            return self.__handler__.call(name, *args)
+        return _caller
 
 ###
 ### Tests

@@ -2,6 +2,9 @@
 #
 # a parser engine for interactive fiction
 
+# The main parser in this file is assumed to be for an ActorContext
+# or something like that.
+
 # Interface:
 # class: Parser, Something, Anything
 # exceptions: NoSuchWord, NoUnderstand
@@ -23,6 +26,7 @@ import re
 import itertools
 from textadv.core.patterns import VarPattern
 from textadv.core.rulesystem import ActionTable, ActionHandled
+from textadv.gamesystem.utilities import list_append
 
 ###
 ### Parser exceptions
@@ -46,9 +50,6 @@ class Ambiguous(Exception) :
 ###
 ### Useful functions
 ###
-
-def append(xs) :
-    return [a for x in xs for a in x]
 
 def product(xs, ys) :
     out = []
@@ -105,7 +106,7 @@ class MatchedObject(object) :
 ### Basic thing parser
 ###
 
-parse_thing = ActionTable(accumulator=append)
+parse_thing = ActionTable(accumulator=list_append)
 @parse_thing.add_handler
 def default_parse_thing(name, words, input, i, ctxt, next) :
     def match_adjs_nouns(curr_adjs, i2) :
@@ -142,24 +143,32 @@ def default_parse_thing(name, words, input, i, ctxt, next) :
 ### Parser action tables
 ###
 
-parse_something = ActionTable(accumulator=append)
+parse_something = ActionTable(accumulator=list_append)
 @parse_something.add_handler
 def default_something(input, i, ctxt, next) :
-    return append([parse_thing.notify([name,words,input,i,ctxt,next],{})
-                   for name,words in zip(CURRENT_OBJECTS, CURRENT_WORDS)])
+    return list_append([parse_thing.notify([name,words,input,i,ctxt,next],{})
+                        for name,words in zip(CURRENT_OBJECTS, CURRENT_WORDS)])
 
-main_parser = ActionTable(accumulator=append)
+main_parser = ActionTable(accumulator=list_append)
 
 CURRENT_OBJECTS = []
 CURRENT_WORDS = []
 
-def run_parser(parser, input, world) :
+def init_current_objects(ctxt) :
     global CURRENT_OBJECTS, CURRENT_WORDS
-    CURRENT_OBJECTS = world.actions.referenceable_objects()
-    CURRENT_WORDS = [separate_object_words(world.actions.get_words(o)) for o in CURRENT_OBJECTS]
+    CURRENT_OBJECTS = ctxt.world.actions.referenceable_objects()
+    CURRENT_WORDS = [separate_object_words(ctxt.world.actions.get_words(o)) for o in CURRENT_OBJECTS]
+
+def run_parser(parser, input, ctxt) :
     def _end(input, i) :
         if len(input) == i :
             return [[]]
         else :
             return []
-    return parser.notify([input, 0, None, _end], {})
+    return parser.notify([input, 0, ctxt, _end], {})
+
+def handle_all(input, ctxt) :
+    words = input.lower().split()
+    init_current_objects(ctxt)
+    results = run_parser(main_parser, words, ctxt)
+    return results

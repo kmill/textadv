@@ -3,7 +3,7 @@
 # rule- and event-based programming
 #
 # What's here:
-# Exceptions: NotHandled, AbortAction, ActionHandled, MultipleResults, FinishWith
+# Exceptions: NotHandled, AbortAction, ActionHandled, MultipleResults, FinishWith, RestartWith
 # Classes: ActionTable, PropertyTable, EventTable
 
 from patterns import NoMatchException, AbstractPattern, BasicPattern
@@ -27,8 +27,14 @@ class MultipleResults(Exception) :
 
 class FinishWith(Exception) :
     """Raised when a handler wants to return multiple values and also
-    use the accumulated values (ActionHandled ignores the accumulated
-    values)."""
+    use the values accumulated so far (ActionHandled ignores the
+    accumulated values)."""
+    pass
+
+class RestartWith(Exception) :
+    """Raised when a handler wants to return multiple values and also
+    overwrite the values accumulated so far (ActionHandled ignores the
+    accumulated values)."""
     pass
 
 class NotHandled(Exception) :
@@ -117,10 +123,10 @@ class ActionTable(object) :
                 return self.accumulator(ix.args)
             except MultipleResults as ix :
                 acc.extend(ix.args)
+            except RestartWith as ix :
+                acc = list(ix.args)
             except FinishWith as ix :
                 return self.accumulator(acc + ix.args)
-            except AbortAction :
-                return None
         return self.accumulator(acc)
     def add_handler(self, item) :
         """A function (which can be used as a decorator) which adds
@@ -140,7 +146,10 @@ class EventTable(object) :
 
     Actions are executed in reverse order.  That way, actions which
     are given later (and which are assumed to be more specific) get
-    executed first."""
+    executed first.
+
+    This is basically an ActionTable which also first pattern
+    matches."""
     def __init__(self, accumulator=None, reverse=True) :
         self.actions = []
         self.accumulator = accumulator or (lambda x : x)
@@ -166,14 +175,14 @@ class EventTable(object) :
                 return self.accumulator(ix.args)
             except MultipleResults as ix :
                 acc.extend(ix.args)
+            except RestartWith as ix :
+                acc = list(ix.args)
             except FinishWith as ix :
                 return self.accumulator(acc + ix.args)
-            except AbortAction :
-                return None
         return self.accumulator(accum)
 
 ##
-## A class for holding ActionTables (see World)
+## A class for helping have many ActionTables (see World)
 ##
 
 class ActionHelperObject(object) :

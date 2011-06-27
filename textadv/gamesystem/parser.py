@@ -85,10 +85,23 @@ def parser_valid_description(myadjs, mynouns, objadjs, objnouns) :
     return True
 
 ###
+### Known words
+###
+# Helps let the user know which word was not recognized when they make a typo
+
+KNOWN_WORDS = []
+
+def add_known_words(*words) :
+    KNOWN_WORDS.extend(words)
+
+
+###
 ### Basically constant constants
 ###
 
 PARSER_ARTICLES = ["a", "an", "the"]
+
+add_known_words(*PARSER_ARTICLES)
 
 ###
 ### Matched objects
@@ -111,7 +124,7 @@ class Matched(object) :
 
 parse_thing = ActionTable(accumulator=list_append)
 @parse_thing.add_handler
-def default_parse_thing(var, name, words, input, i, ctxt, next) :
+def default_parse_thing(var, name, words, input, i, ctxt, next, multiplier=1) :
     def match_adjs_nouns(curr_adjs, i2) :
         poss = []
         if i2 < len(input) :
@@ -123,13 +136,13 @@ def default_parse_thing(var, name, words, input, i, ctxt, next) :
             # or try concluding with a noun
             if input[i2] in nouns :
                 # already a match
-                poss.extend(product([[Matched(input[i:i2+1], name, 2, var)]],
-                                    next(input, i2+1)))
+                poss.extend(product([[Matched(input[i:i2+1], name, 2*multiplier, var)]],
+                                    next(i2+1)))
         # or just try concluding
         if len(curr_adjs) > 0 :
             # already a match
-            poss.extend(product([[Matched(input[i:i2], name, 1, var)]],
-                                next(input, i2)))
+            poss.extend(product([[Matched(input[i:i2], name, 1*multiplier, var)]],
+                                next(i2)))
         return poss
     adjs,nouns = words
     poss = []
@@ -171,9 +184,31 @@ def default_something(var, input, i, ctxt, actor, next) :
     return list_append([parse_thing.notify([var, name,words,input,i,ctxt,next],{})
                         for name,words in zip(CURRENT_OBJECTS, CURRENT_WORDS)])
 
+
+define_subparser("object", "A parser which uses its variable as an object id, instead.")
+
+@add_subparser("object")
+def default_object(var, input, i, ctxt, actor, next) :
+    """Tries to parse the input so that the var is the name of the object."""
+    words = separate_object_words(ctxt.world.get_property("Words", var))
+    return parse_thing.notify([None,var,words,input,i,ctxt,next,2],{})
+
 define_subparser("action", """A parser to match against entire
 actions.  The resulting Match.value should be something which can be
 run.  This is the main parser.""")
+
+
+define_subparser("text", """Just matches against any sequence of words.""")
+
+@add_subparser("text")
+def default_parse_text(var, input, i, ctxt, actor, next) :
+    """Parses any number of words, stopping at or before the end of
+    the input."""
+    out = []
+    for i2 in xrange(i+1,len(input)+1) :
+        out.extend(product([[Matched(input[i:i2], " ".join(input[i:i2]), 1, var)]],
+                           next(i2)))
+    return out
 
 ### Adding things to the tables
 
@@ -182,6 +217,8 @@ class CallSubParser(object) :
     def __init__(self, name, var=None) :
         self.name = name
         self.var = var
+    def __repr__(self) :
+        return "CallSubParser(%r, %r)" % (self.name, self.var)
 
 def understand(text, result=None, dest="action") :
     """Takes a textual form of a command and adds it to the parser so
@@ -195,6 +232,11 @@ def understand(text, result=None, dest="action") :
     immediately access, where "anything" refers to anything in the
     game world.
 
+    One can give multiple options for a word by using a slash.  For
+    instance:
+
+    take/get [something x]
+
     Other nonterminals:
     - [direction x] for a cardinal direction
     
@@ -206,29 +248,40 @@ def understand(text, result=None, dest="action") :
 
     parts = []
     lastindex = 0
-    for match in re.finditer(r"\[([A-Za-z]+)\s+([A-Za-z0-9_]+)\]", text) :
-        parts.extend(text[lastindex:match.start()].split())
+    for match in re.finditer(r"\[([A-Za-z]+)\s+([^\]]+)\]", text) :
+        textparts = text[lastindex:match.start()].split()
+        for tp in textparts :
+            opts = tp.split("/")
+            parts.append(opts)
         lastindex = match.end()
         if subparsers.has_key(match.group(1).lower()) :
             csp = CallSubParser(match.group(1), match.group(2))
+            print csp
             parts.append(csp)
         else :
-            raise Exception("Bad subparser "+match.group(1))
+            raise Exception("No such subparser %r" % match.group(1))
     parts.extend(text[lastindex:].split())
     subparser_add_sequence(dest, parts, result)
 
 def subparser_add_sequence(dest, parts, result) :
+    """Takes a sequence (parts) and adds a parser to the dest
+    subparser which then returns result.  To be used with understand."""
+    # first let the parser know about the words
+    for part in parts :
+        if type(part) is list :
+            add_known_words(*part)
+    # then add the subparser
     @add_subparser(dest)
     def _handler_sequence(var, input, i, ctxt, actor, next) :
         def _handler_part(part_i, var, input, i2) :
-            def _next2(input, i3) :
+            def _next2(i3) :
                 return _handler_part(part_i+1, var, input, i3)
             if part_i == len(parts) :
-                return [[(i2, next(input, i2))]]
-            elif type(parts[part_i]) == CallSubParser :
+                return [[(i2, next(i2))]]
+            elif type(parts[part_i]) is CallSubParser :
                 csp = parts[part_i]
                 return run_subparser(csp.name, csp.var, input, i2, ctxt, actor, _next2)
-            elif parts[part_i] == input[i2] :
+            elif type(parts[part_i]) is list and input[i2] in parts[part_i] :
                 return _handler_part(part_i+1, var, input, i2+1)
             else :
                 return []
@@ -263,11 +316,12 @@ CURRENT_WORDS = []
 
 def init_current_objects(ctxt) :
     global CURRENT_OBJECTS, CURRENT_WORDS
-    CURRENT_OBJECTS = ctxt.world.actions.referenceable_objects()
+    CURRENT_OBJECTS = ctxt.world.actions.referenceable_things()
+    print CURRENT_OBJECTS
     CURRENT_WORDS = [separate_object_words(ctxt.world.actions.get_words(o)) for o in CURRENT_OBJECTS]
 
 def run_parser(name, input, ctxt) :
-    def _end(input, i) :
+    def _end(i) :
         if len(input) == i :
             return [[]]
         else :
@@ -281,8 +335,16 @@ def transform_text_to_words(text) :
         text = "ask "+actor+" to "+action
     return text.split()
 
-def handle_all(input, ctxt) :
+def disambiguate(results, ctxt, action_verifier) :
+    return results[0].value
+
+def handle_all(input, ctxt, action_verifier) :
     words = transform_text_to_words(input)
+    if not words :
+        raise NoInput()
     init_current_objects(ctxt)
-    results = run_parser("action", words, ctxt)
-    return results
+    results = [r[0] for r in run_parser("action", words, ctxt)]
+    if not results :
+        raise NoSuchWord("uhoh")
+    action = disambiguate(results, ctxt, action_verifier)
+    return (action, len(results) > 0)

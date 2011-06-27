@@ -47,7 +47,11 @@ DIRECTION_INVERSES = {"north" : "south",
 def inverse_direction(direction) :
     return DIRECTION_INVERSES[direction]
 
-
+def docstring(s) :
+    def _docstring(f) :
+        f.__doc__ = s
+        return f
+    return _docstring
 
 ###
 ### Object interface for fancy strings

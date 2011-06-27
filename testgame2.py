@@ -34,16 +34,11 @@ world.dump()
 
 from textadv.gamesystem.parser import *
 
-world.define_action("referenceable_objects", accumulator=list_append)
-@world.to("referenceable_objects")
-def referenceable_objects_Default(world) :
-    return world[Contents("room1")]
-
 @add_subparser("something")
 def my_something(var, input, i, ctxt, actor, next) :
     if i < len(input) and input[i] == "woo" :
-        return product([[MatchedObject(input[i:i+1], "whatchamacallit", 2, var)]],
-                       next(input, i+1))
+        return product([[Matched(input[i:i+1], "whatchamacallit", 2, var)]],
+                       next(i+1))
     return []
 
 print

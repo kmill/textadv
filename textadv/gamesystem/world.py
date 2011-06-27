@@ -40,9 +40,11 @@ class World(object) :
                     raise Exception("Property requires exactly "+str(numargs)+" arguments.")
                 self.args = args
         _NewProperty.__name__ = name
-        self.property_types[name] = _NewProperty
-        self.inv_property_types[_NewProperty] = name
-        return _NewProperty
+        return self.register_property(_NewProperty)
+    def register_property(self, prop) :
+        self.property_types[prop.__name__] = prop
+        self.inv_property_types[prop] = prop.__name__
+        return prop
     def set_property(self, name, *args, **kwargs) :
         """This is __setitem__ but by the registered name of the property."""
         self[self.property_types[name](*args)] = kwargs["value"]

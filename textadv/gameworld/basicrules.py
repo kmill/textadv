@@ -1,7 +1,7 @@
 # The basic definition of how the world works
 
 from textadv.core.patterns import VarPattern, BasicPattern
-from textadv.core.rulesystem import handler_requires, ActionHandled, MultipleResults
+from textadv.core.rulesystem import handler_requires, ActionHandled, MultipleResults, NotHandled, AbortAction
 from textadv.gamesystem.relations import *
 from textadv.gamesystem.world import *
 from textadv.gamesystem.gamecontexts import actoractions
@@ -9,6 +9,8 @@ from textadv.gamesystem.basicpatterns import *
 from textadv.gamesystem.utilities import *
 import textadv.gamesystem.parser as parser
 from textadv.gamesystem.parser import understand
+from textadv.gamesystem.eventsystem import BasicAction, verify, trybefore, before, when, report
+from textadv.gamesystem.eventsystem import VeryLogicalOperation, LogicalOperation, IllogicalOperation, IllogicalInaccessible, NonObviousOperation
 
 # The main game world!
 world = World()
@@ -99,9 +101,12 @@ world.add_relation(KindOf("door", "thing"))
 world.add_relation(KindOf("container", "thing"))
 world.add_relation(KindOf("person", "thing"))
 
+@world.register_property
 @world.define_relation
 class IsA(ManyToOneRelation) :
-    """Represents inheriting from a kind."""
+    """Represents inheriting from a kind.  As a relation, represents a
+    direct inheritence.  As a property, represents the transitive IsA
+    relation."""
 
 @world.handler(IsA(X,Y))
 def property_handler_IsA(x, y, world) :
@@ -112,6 +117,14 @@ def property_handler_IsA(x, y, world) :
         return False
     else :
         return world.r_path_to(KindOf, kind[0], y)
+
+world.define_action("referenceable_things", accumulator=list_append)
+@world.to("referenceable_things")
+def referenceable_things_Default(world) :
+    """Gets all things in the world."""
+    objects = world.query_relation(IsA(X, Y), var=X)
+    things = [o for o in objects if world[IsA(o, "thing")]]
+    return things
 
 #
 # connecting rooms together
@@ -171,7 +184,7 @@ def default_PrintedName(x, world) :
 
 DefiniteName = world.make_property(1, "DefiniteName")
 @world.handler(DefiniteName(X))
-def defaulte_DefiniteName(x, world) :
+def default_DefiniteName(x, world) :
     printed_name = world[PrintedName(x)]
     if world[InhibitArticle(x)] :
         return printed_name
@@ -180,7 +193,7 @@ def defaulte_DefiniteName(x, world) :
 
 IndefiniteName = world.make_property(1, "IndefiniteName")
 @world.handler(IndefiniteName(X))
-def defaulte_IndefiniteName(x, world) :
+def default_IndefiniteName(x, world) :
     printed_name = world[PrintedName(x)]
     if world[InhibitArticle(x)] :
         return printed_name
@@ -196,12 +209,54 @@ world[ObjectPronoun(X)] = "it"
 Possessive = world.make_property(1, "Possessive")
 world[Possessive(X)] = "its"
 
+Takeable = world.make_property(1, "Takeable")
+world[Takeable(X)] = True # by default, things are takeable
+NoTakeMsg = world.make_property(1, "NoTakeMsg")
+world[NoTakeMsg(X)] = "{Bob|cap} can't take that."
+
+AccessibleTo = world.make_property(2, "AccessibleTo")
+world[AccessibleTo(X, actor)] = False # by default, things aren't accessible
+@world.handler(AccessibleTo(X, actor))
+def rule_AccessibleTo_if_held(x, actor, world) :
+    if world.query_relation(Has(actor, x)) :
+        return True
+    else :
+        raise NotHandled()
+@world.handler(AccessibleTo(X, actor))
+def rule_AccessibleTo_if_in_same_room(x, actor, world) :
+    actor_room = world.query_relation(Contains(Y, actor), var=Y)
+    x_room = world.query_relation(Contains(Y, x), var=Y)
+    if actor_room and x_room and actor_room[0] == x_room[0] :
+        return True
+    raise NotHandled()
+@world.handler(AccessibleTo(X, actor))
+def rule_AccessibleTo_if_in_open_container(x, actor, world) :
+    x_location = world.query_relation(Contains(Y, x), var=Y)
+    if x_location and world[IsA(x_location[0], "container")] :
+        if world[IsOpen(x_location[0])] and world[AccessibleTo(x_location[0], actor)] :
+            return True
+    raise NotHandled()
+
+Owner = world.make_property(1, "Owner")
+@world.handler(Owner(X))
+def rule_Owner_default(x, world) :
+    poss_owner = world.query_relation(Has(Y, x), var=Y)
+    if poss_owner :
+        return poss_owner[0]
+    poss_container = world.query_relation(Contains(Y, x), var=Y)
+    if poss_container :
+        return world[Owner(poss_container[0])]
+    return None
+
 # Containers
 
 Contents = world.make_property(1, "Contents")
 @world.handler(Contents(X) <= IsA(X, "container"))
 def container_contents(x, world) :
     return [o["y"] for o in world.query_relation(Contains(x, Y))]
+
+IsOpen = world.make_property(1, "IsOpen")
+world[IsOpen(X)] = False # by default, containers are closed.
 
 # Rooms
 
@@ -298,19 +353,83 @@ world[Description("player")] = """{Bob|cap} {is} an ageless, faceless,
 gender-neutral, culturally-ambiguous adventure-person.  {Bob|cap}
 {does} stuff sometimes."""
 
-class Take(BasicPattern) :
-    pass
+###
+### Scenery
+###
+
+# scenery is not takeable
+world[Takeable(X) <= IsA(X, "scenery")] = False
+
+def require_xobj_accessible(action) :
+    """Adds a rule which ensures that x is accessible to the actor in
+    the action."""
+    @verify(action)
+    @docstring("Ensures the object x in "+repr(action)+" is accessible to the actor.  Added by require_xobj_accessible.")
+    def _verify_xobj_accessible(actor, x, ctxt, **kwargs) :
+        if not ctxt.world[AccessibleTo(x, actor)] :
+            return IllogicalOperation(as_actor("{Bob|cap} {can} see no such thing.", actor=actor))
+
+def hint_xobj_notheld(action) :
+    """Adds a rule which makes the action more logical if x is not
+    held by the actor of the action."""
+    @verify(action)
+    @docstring("Makes "+repr(action)+" more logical if object x is not held by the actor.  Added by hint_xobj_notheld.")
+    def _verify_xobj_notheld(actor, x, ctxt, **kwargs) :
+        if not ctxt.world.query_relation(Has(actor, x)) :
+            return VeryLogicalOperation()
+
+class Take(BasicAction) :
+    verb = "take"
+    gerund = "taking"
+    numargs = 2 # Take(actor, obj_to_take)
 understand("take [something x]", Take(actor, X))
+understand("get [something x]", Take(actor, X))
+
+require_xobj_accessible(Take(actor, X))
+hint_xobj_notheld(Take(actor, X))
+
+@before(Take(actor, X))
+def before_take_when_already_have(actor, x, ctxt) :
+    """One can only take what they don't have."""
+    if ctxt.world.query_relation(Has(actor, x)) :
+        raise AbortAction("{Bob|cap} already {has} that.", actor=actor)
+
+@before(Take(actor, X))
+def before_take_check_ownership(actor, x, ctxt) :
+    """One can only take what is not owned by anyone else."""
+    owner = ctxt.world[Owner(x)]
+    if owner and owner != actor :
+        raise AbortAction("That is not {bob's} to take.", actor=actor)
+
+@before(Take(actor, X))
+def before_take_check_takeable(actor, x, ctxt) :
+    """One cannot take what is not takeable."""
+    if not ctxt.world[Takeable(x)] :
+        raise AbortAction(ctxt.world[NoTakeMsg(x)], actor=actor)
+
+@when(Take(actor, X))
+def when_take_default(actor, x, ctxt) :
+    """Carry out the taking by giving it to the actor."""
+    ctxt.world.actions.give_to(x, actor)
+
+@report(Take(actor, X))
+def report_take_default(actor, x, ctxt) :
+    """Prints out the default "Taken." message."""
+    ctxt.write("Taken.")
 
 parser.define_subparser("direction")
 understand("north", "north", dest="direction")
 understand("n", "north", dest="direction")
 
-class Go(BasicPattern) :
-    pass
+class Go(BasicAction) :
+    verb = "go"
+    gerund = "going"
+    dereference_dobj = False
+    numargs = 2 # Go(actor, direction)
 understand("go [direction x]", Go(actor, X))
 understand("[direction x]", Go(actor, X))
 
 class AskTo(BasicPattern) :
     pass
 understand("ask [something x] to [action y]", AskTo(actor, X, Y))
+

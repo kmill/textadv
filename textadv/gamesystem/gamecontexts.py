@@ -12,6 +12,7 @@ from textadv.gamesystem.utilities import eval_str, as_actor
 from textadv.core.rulesystem import AbortAction, ActionHandled, ActionHelperObject, ActionTable
 #from textadv.gamesystem.eventsystem import event_notify, verify_action, run_action
 #from textadv.gamesystem.eventsystem import StartGame, StartTurn, GameIsEnding
+from textadv.gamesystem.eventsystem import verify_action, run_action
 from textadv.gamesystem.utilities import *
 from textadv.gamesystem import parser
 #from textadv.gamesystem.basicpatterns import X,Y,Z
@@ -88,34 +89,39 @@ class ActorContext(GameContext) :
                 input = self.io.get_input()
                 
                 try :
-                    print parser.handle_all(input, self)
+                    action, was_ambiguous = parser.handle_all(input, self, verify_action)
+                    print action
+                    if was_ambiguous :
+                        run_action(action, self, write_action=True)
+                    else :
+                        run_action(action, self)
                 except parser.NoSuchWord as ex :
                     esc = escape_str(ex.word)
-                    self.write_line("I don't know what you mean by %r." % esc)
+                    self.write("I don't know what you mean by %r." % esc)
                 except parser.NoUnderstand :
-                    self.write_line("Huh?")
+                    self.write("Huh?")
                 except parser.NoInput :
                     pass
                 except parser.Ambiguous as ex :
                     options = ex.options
                     if len(options) == 0 :
-                        self.write_line("That means too many things to me.")
+                        self.write("That means too many things to me.")
                     elif len(options) == 1 :
-                        res = serial_comma([self.world[o]["definite_name"]
+                        res = serial_comma([self.world.get_property("DefiniteName", o)
                                             for o in options[0]],
                                            conj="or")
-                        self.write_line("Do you mean "+res+"?")
+                        self.write("Do you mean "+res+"?")
                     else :
-                        res = ["do you mean "+serial_comma([self.world[o]["definite_name"]
+                        res = ["do you mean "+serial_comma([self.world.get_property("DefiniteName", o)
                                                             for o in ops],
                                                            conj="or")
                                for ops in options]
                         out = "I'm a bit confused: "+serial_comma(res, conj="and", comma=";",
                                                                   force_comma=True)+"?"
-                        self.write_line(out)
+                        self.write(out)
                 except AbortAction as ab :
                     if len(ab.args) > 0 :
-                        self.write_line(*ab.args, **ab.kwargs)
+                        self.write(*ab.args, **ab.kwargs)
                     #print "(aborted.)"
 #             except GameIsEnding as gis :
 #                 event_notify(gis.msg, context=self)

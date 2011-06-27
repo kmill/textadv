@@ -44,6 +44,7 @@ def my_something(var, input, i, ctxt, actor, next) :
 print
 print
 
+game_context.actions.describe_current_room()
 basic_begin_game()
 
 

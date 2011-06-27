@@ -347,6 +347,7 @@ _reword_replacements = {"is" : "are",
                         "can" : "can",
                         "can't" : "can't",
                         "switches" : "switch",
+                        "isn't" : "aren't"
                         }
 
 def _reword(word, flags, world, actor, is_me) :

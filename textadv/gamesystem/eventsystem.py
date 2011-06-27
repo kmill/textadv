@@ -4,7 +4,7 @@
 # these are assumed to be used in a player context.
 
 from textadv.core.patterns import BasicPattern
-from textadv.core.rulesystem import ActionTable, EventTable
+from textadv.core.rulesystem import ActionTable, EventTable, AbortAction
 
 ###
 ### Actions
@@ -56,7 +56,28 @@ class BasicAction(BasicPattern) :
             return (self.gerund[0] + " " + dobj + " " + self.gerund[1] + " " + iobj)
         else :
             raise Exception("Default gerund form only works with 1-3 args")
-
+    def infinitive_form(self, ctxt) :
+        """Doesn't prepend "to"."""
+        if len(self.args) == 1 :
+            return self.verb
+        elif len(self.args) == 2 :
+            if self.dereference_dobj :
+                dobj = ctxt.world.get_property("DefiniteName", self.args[1])
+            else :
+                dobj = self.args[1]
+            return self.verb + " " + dobj
+        elif len(self.args) == 3 :
+            if self.dereference_dobj :
+                dobj = ctxt.world.get_property("DefiniteName", self.args[1])
+            else :
+                dobj = self.args[1]
+            if self.dereference_iobj :
+                iobj = ctxt.world.get_property("DefiniteName", self.args[2])
+            else :
+                iobj = self.args[1]
+            return (self.verb[0] + " " + dobj + " " + self.verb[1] + " " + iobj)
+        else :
+            raise Exception("Default gerund form only works with 1-3 args")
 ###
 ### Handling actions
 ###

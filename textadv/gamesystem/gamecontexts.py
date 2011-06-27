@@ -19,10 +19,11 @@ from textadv.gamesystem import parser
 
 def execute_context(context) :
     """Takes a context and runs it.  If it returns anything, it is
-    treated to be a context, and that is run, and so on."""
-    ret = context.run()
+    treated to be a (context, nextargs), and that is run, and so
+    on."""
+    ret, args = context.run()
     while ret is not None :
-        ret = ret.run()
+        ret, args = ret.run(**args)
 
 class GameContext(object) :
     """Provides a way to look at the world.  Handles all user input in
@@ -36,8 +37,8 @@ class GameContext(object) :
         current context."""
         raise NotImplementedError("GameContext is abstract.")
 
-## the io object for ActorContext must implement get_input which
-## functions as "raw_input", and write which functions as "print x,"
+## the io object for ActorContext must implement "get_input" which
+## functions as "raw_input", and "write" which functions as "print x,"
 
 class ActorActions(object) :
     """This is a table of actions that all actors use."""
@@ -77,56 +78,61 @@ class ActorContext(GameContext) :
             stuff = [as_actor(s, kwargs["actor"]) for s in stuff]
         newstuff = [eval_str(s, self) for s in stuff]
         self.io.write(*newstuff)
-    def run(self) :
-        #event_notify(StartGame(), self)
-        self.actions.describe_current_room()
-
-        while True :
-            #event_notify(StartTurn(), self) # this had better work and not throw exceptions.
-
-            try :
-                print
+    def run(self, input=None, action=None) :
+        try :
+            if input is None and action is None:
                 input = self.io.get_input()
-                
-                try :
-                    action, was_ambiguous = parser.handle_all(input, self, verify_action)
-                    print action
-                    if was_ambiguous :
-                        run_action(action, self, write_action=True)
-                    else :
-                        run_action(action, self)
-                except parser.NoSuchWord as ex :
-                    esc = escape_str(ex.word)
-                    self.write("I don't know what you mean by %r." % esc)
-                except parser.NoUnderstand :
-                    self.write("Huh?")
-                except parser.NoInput :
-                    pass
-                except parser.Ambiguous as ex :
-                    options = ex.options
-                    if len(options) == 0 :
-                        self.write("That means too many things to me.")
-                    elif len(options) == 1 :
-                        res = serial_comma([self.world.get_property("DefiniteName", o)
-                                            for o in options[0]],
-                                           conj="or")
-                        self.write("Do you mean "+res+"?")
-                    else :
-                        res = ["do you mean "+serial_comma([self.world.get_property("DefiniteName", o)
-                                                            for o in ops],
-                                                           conj="or")
-                               for ops in options]
-                        out = "I'm a bit confused: "+serial_comma(res, conj="and", comma=";",
-                                                                  force_comma=True)+"?"
-                        self.write(out)
-                except AbortAction as ab :
-                    if len(ab.args) > 0 :
-                        self.write(*ab.args, **ab.kwargs)
-                    #print "(aborted.)"
+            try :
+                if action is None :
+                    action, disambiguated = parser.handle_all(input, self, verify_action)
+                else :
+                    disambiguated = True
+                if disambiguated :
+                    run_action(action, self, write_action=True)
+                else :
+                    run_action(action, self)
+            except parser.NoSuchWord as ex :
+                esc = escape_str(ex.word)
+                self.write("I don't know what you mean by %r." % esc)
+            except parser.NoUnderstand :
+                self.write("Huh?")
+            except parser.NoInput :
+                pass
+            except parser.Ambiguous as ex :
+                return (DisambiguationContext(self, ex), dict())
+            except AbortAction as ab :
+                if len(ab.args) > 0 : # the AbortAction may contain a message
+                    self.write(*ab.args, **ab.kwargs)
 #             except GameIsEnding as gis :
 #                 event_notify(gis.msg, context=self)
 #                 self.write_line("\n\n*** The game is over ***")
 #                 return None
-            except Exception :
-                import traceback
-                traceback.print_exc()
+            return (self, dict())
+        except Exception :
+            import traceback
+            traceback.print_exc()
+            return (self, dict())
+
+class DisambiguationContext(GameContext) :
+    def __init__(self, parent, amb) :
+        self.parent = parent
+        self.amb = amb
+    def run(self) :
+        repl = dict()
+        if len(self.amb.options) > 1 :
+            self.parent.write("I'm a bit confused by what you meant in a couple of places.")
+        for var, opts in self.amb.options.iteritems() :
+            res = serial_comma([self.parent.world.get_property("DefiniteName", o)
+                                for o in opts], conj="or")
+            self.parent.write("Did you mean "+res+"?")
+            input = self.parent.io.get_input(">>>")
+            res = parser.run_parser("something",
+                                    parser.transform_text_to_words(input), self.parent)
+            if len(res) == 0 :
+                return (self.parent, {"input" : input})
+            elif len(res) == 1 :
+                repl[var] = res[0][0].value
+            else :
+                self.parent.write("That didn't help me out at all.")
+                return (self.parent, dict())
+        return (self.parent, {"action" : self.amb.pattern.expand_pattern(repl)})

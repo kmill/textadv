@@ -147,6 +147,28 @@ def default_connect_rooms(room1, dir, room2, world, reverse=True) :
         world.add_relation(Adjacent(room2, room1))
         world.add_relation(Exit(room2, inverse_direction(dir), room1))
 
+#
+# Directions
+#
+
+
+parser.define_subparser("direction", "Represents one of the directions one may go.")
+
+def define_direction(direction, synonyms) :
+    for synonym in synonyms :
+        understand(synonym, direction, dest="direction")
+
+define_direction("north", ["north", "n"])
+define_direction("south", ["south", "s"])
+define_direction("east", ["east", "e"])
+define_direction("west", ["west", "w"])
+define_direction("northwest", ["northwest", "nw"])
+define_direction("southwest", ["southwest", "sw"])
+define_direction("northeast", ["northeast", "ne"])
+define_direction("southeast", ["southeast", "se"])
+define_direction("up", ["up", "u"])
+define_direction("down", ["down", "d"])
+
 ###
 ### Defining basic objects
 ###
@@ -360,6 +382,11 @@ gender-neutral, culturally-ambiguous adventure-person.  {Bob|cap}
 # scenery is not takeable
 world[Takeable(X) <= IsA(X, "scenery")] = False
 
+
+###
+### Oft-used requirements on actions
+###
+
 def require_xobj_accessible(action) :
     """Adds a rule which ensures that x is accessible to the actor in
     the action."""
@@ -368,6 +395,42 @@ def require_xobj_accessible(action) :
     def _verify_xobj_accessible(actor, x, ctxt, **kwargs) :
         if not ctxt.world[AccessibleTo(x, actor)] :
             return IllogicalOperation(as_actor("{Bob|cap} {can} see no such thing.", actor=actor))
+
+def require_xobj_held(action, only_hint=False, transitive=True) :
+    """Adds rules which check if the object x is held by the actor in
+    the action, and if only_hint is not true, then if the thing is not
+    already held, an attempt is made to take it."""
+    def __is_held(actor, x, ctxt) :
+        if transitive :
+            return actor == ctxt.world[Owner(x)] and ctxt.world[AccessibleTo(x, actor)]
+        else :
+            return ctxt.world.query_relation(Has(actor, x))
+    @verify(action)
+    @docstring("Makes "+repr(action)+" more logical if object x is held by the actor.  Also ensures that x is accessible to the actor. Added by require_xobj_held.")
+    def _verify_xobj_held(actor, x, ctxt, **kwargs) :
+        if ctxt.world.query_relation(Has(actor, x)) :
+            return VeryLogicalOperation()
+        elif not ctxt.world[AccessibleTo(x, actor)] :
+            return IllogicalOperation(as_actor("{Bob|cap} {can} see no such thing.", actor=actor))
+    if only_hint :
+        @before(action)
+        @docstring("A check that the actor is holding the x in "+repr(action)+".  The holding may be transitive.")
+        def _before_xobj_held(actor, x, ctxt, **kwargs) :
+            if not __is_held(actor, x, ctxt) :
+                raise AbortAction("{Bob|cap} {isn't} holding that.", actor=actor)
+    else :
+        @trybefore(action)
+        @docstring("An attempt is made to take the object x from "+repr(action)+" if the actor is not already holding it")
+        def _trybefore_xobj_held(actor, x, ctxt, **kwargs) :
+            if not __is_held(actor, x, ctxt) :
+                do_first(Take(actor, x), context=context)
+            # just in case it succeeds, but we don't yet have the object
+            if transitive :
+                can_do = (actor == ctxt.world[Owner(x)] and ctxt.world[AccessibleTo(x, actor)])
+            else :
+                can_do = ctxt.world.query_relation(Has(actor, x))
+            if not __is_held(actor, x, ctxt) :
+                raise AbortAction("{Bob|cap} {doesn't} have that.", actor=actor)
 
 def hint_xobj_notheld(action) :
     """Adds a rule which makes the action more logical if x is not
@@ -378,25 +441,33 @@ def hint_xobj_notheld(action) :
         if not ctxt.world.query_relation(Has(actor, x)) :
             return VeryLogicalOperation()
 
+###
+### Action definitions
+###
+
+##
+# Taking
+##
+
 class Take(BasicAction) :
+    """Take(actor, obj_to_take)"""
     verb = "take"
     gerund = "taking"
-    numargs = 2 # Take(actor, obj_to_take)
-understand("take [something x]", Take(actor, X))
-understand("get [something x]", Take(actor, X))
+    numargs = 2
+understand("take/get [something x]", Take(actor, X))
 
 require_xobj_accessible(Take(actor, X))
 hint_xobj_notheld(Take(actor, X))
 
 @before(Take(actor, X))
 def before_take_when_already_have(actor, x, ctxt) :
-    """One can only take what they don't have."""
+    """You can only take what you don't have."""
     if ctxt.world.query_relation(Has(actor, x)) :
         raise AbortAction("{Bob|cap} already {has} that.", actor=actor)
 
 @before(Take(actor, X))
 def before_take_check_ownership(actor, x, ctxt) :
-    """One can only take what is not owned by anyone else."""
+    """You can only take what is not owned by anyone else."""
     owner = ctxt.world[Owner(x)]
     if owner and owner != actor :
         raise AbortAction("That is not {bob's} to take.", actor=actor)
@@ -417,9 +488,32 @@ def report_take_default(actor, x, ctxt) :
     """Prints out the default "Taken." message."""
     ctxt.write("Taken.")
 
-parser.define_subparser("direction")
-understand("north", "north", dest="direction")
-understand("n", "north", dest="direction")
+##
+# Dropping
+##
+
+class Drop(BasicAction) :
+    """Drop(actor, obj_to_drop)"""
+    verb = "drop"
+    gerund = "dropping"
+    numargs = 2
+understand("drop [something x]", Drop(actor, X))
+
+require_xobj_held(Drop(actor, X), only_hint=True)
+
+@when(Drop(actor, X))
+def when_drop_default(actor, x, ctxt) :
+    """Carry out the dropping by moving the object to the location of the actor."""
+    ctxt.world.actions.move_to(x, ctxt.world[Location(actor)])
+
+@report(Drop(actor, X))
+def report_drop_default(actor, x, ctxt) :
+    """Prints the default "Dropped." message."""
+    ctxt.write("Dropped.")
+
+##
+# Going
+##
 
 class Go(BasicAction) :
     verb = "go"
@@ -429,7 +523,22 @@ class Go(BasicAction) :
 understand("go [direction x]", Go(actor, X))
 understand("[direction x]", Go(actor, X))
 
-class AskTo(BasicPattern) :
-    pass
+class AskTo(BasicAction) :
+    verb = ("ask", "to")
+    gerund = ("asking", "to")
+    numargs = 3
+    def gerund_form(self, ctxt) :
+        dobj = ctxt.world.get_property("DefiniteName", self.args[1])
+        comm = self.args[2].infinitive_form(ctxt)
+        return self.gerund[0] + " " + dobj + " to " + comm
+    def infinitive_form(self, ctxt) :
+        dobj = ctxt.world.get_property("DefiniteName", self.args[1])
+        comm = self.args[2].infinitive_form(ctxt)
+        return self.verb[0] + " " + dobj + " to " + comm
 understand("ask [something x] to [action y]", AskTo(actor, X, Y))
 
+class GiveTo(BasicAction) :
+    verb = ("give", "to")
+    gerund = ("giving", "to")
+    numargs = 3
+understand("give [something x] to [something y]", GiveTo(actor, X, Y))

@@ -21,8 +21,9 @@ import sys
 class TerminalGameIO(object) :
     """This class may be replaced in the GameContext by anything which
     implements the following two methods."""
-    def get_input(self) :
-        return raw_input("> ")
+    def get_input(self, prompt=">") :
+        print
+        return raw_input(prompt + " ")
     def write(self, *data) :
         for d in data :
             print d,

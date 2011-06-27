@@ -1,12 +1,14 @@
 # The basic definition of how the world works
 
-from textadv.core.patterns import VarPattern
+from textadv.core.patterns import VarPattern, BasicPattern
 from textadv.core.rulesystem import handler_requires, ActionHandled, MultipleResults
 from textadv.gamesystem.relations import *
 from textadv.gamesystem.world import *
 from textadv.gamesystem.gamecontexts import actoractions
 from textadv.gamesystem.basicpatterns import *
 from textadv.gamesystem.utilities import *
+import textadv.gamesystem.parser as parser
+from textadv.gamesystem.parser import understand
 
 # The main game world!
 world = World()
@@ -28,17 +30,17 @@ Global = world.make_property(1, "Global")
 # The following three are mutually exclusive relations which have to
 # do with position.
 
-# Contains(x,y) for "x Contains y"
-Contains = make_one_to_many_relation(name="Contains")
-world.define_relation(Contains)
+@world.define_relation
+class Contains(OneToManyRelation) :
+    """Contains(x,y) for "x Contains y"."""
 
-# Has(x,y) for "x Has y"
-Has = make_one_to_many_relation(name="Has")
-world.define_relation(Has)
+@world.define_relation
+class Has(OneToManyRelation) :
+    """Has(x,y) for "x Has y"."""
 
-# PartOf(x,y) for "x PartOf y"
-PartOf = make_many_to_one_relation(name="PartOf")
-world.define_relation(PartOf)
+@world.define_relation
+class PartOf(ManyToOneRelation) :
+    """PartOf(x,y) for "x PartOf y"."""
 
 #
 # some helper actions to make it easy to use these three
@@ -83,17 +85,23 @@ def object_location(x, world) :
     locs = world.query_relation(Contains(Y, x), var=Y)
     return locs[0] if locs else None
 
-# basically classes
-KindOf = make_many_to_one_relation(name="KindOf")
-world.define_relation(KindOf)
+#
+# Kinds and instances
+#
+
+@world.define_relation
+class KindOf(ManyToOneRelation) :
+    """Represents a class-like hierarchy."""
+
 world.add_relation(KindOf("room", "kind"))
 world.add_relation(KindOf("thing", "kind"))
 world.add_relation(KindOf("door", "thing"))
 world.add_relation(KindOf("container", "thing"))
 world.add_relation(KindOf("person", "thing"))
-# basically instances
-IsA = make_many_to_one_relation(name="IsA")
-world.define_relation(IsA)
+
+@world.define_relation
+class IsA(ManyToOneRelation) :
+    """Represents inheriting from a kind."""
 
 @world.handler(IsA(X,Y))
 def property_handler_IsA(x, y, world) :
@@ -105,12 +113,18 @@ def property_handler_IsA(x, y, world) :
     else :
         return world.r_path_to(KindOf, kind[0], y)
 
+#
 # connecting rooms together
-Adjacent = make_directed_many_to_many_relation(name="Adjacent")
-world.define_relation(Adjacent)
+#
 
-Exit = make_freeform_relation(3, "Exit")
-world.define_relation(Exit)
+@world.define_relation
+class Adjacent(DirectedManyToManyRelation) :
+    """Used for searching for paths between rooms."""
+
+@world.define_relation
+class Exit(FreeformRelation) :
+    """Used to denote an exit from one room to the next.  Exit(room1,
+    dir, room2)."""
 
 @world.to("connect_rooms")
 def default_connect_rooms(room1, dir, room2, world, reverse=True) :
@@ -283,3 +297,20 @@ world[Words("player")] = ["yourself", "self", "AFGNCAAP"]
 world[Description("player")] = """{Bob|cap} {is} an ageless, faceless,
 gender-neutral, culturally-ambiguous adventure-person.  {Bob|cap}
 {does} stuff sometimes."""
+
+class Take(BasicPattern) :
+    pass
+understand("take [something x]", Take(actor, X))
+
+parser.define_subparser("direction")
+understand("north", "north", dest="direction")
+understand("n", "north", dest="direction")
+
+class Go(BasicPattern) :
+    pass
+understand("go [direction x]", Go(actor, X))
+understand("[direction x]", Go(actor, X))
+
+class AskTo(BasicPattern) :
+    pass
+understand("ask [something x] to [action y]", AskTo(actor, X, Y))

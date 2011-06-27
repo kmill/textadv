@@ -182,6 +182,11 @@ class ManyToManyRelation(Relation) :
         for rel in data :
             print repr(r(*rel))
 
+class DirectedManyToManyRelation(ManyToManyRelation) :
+    @staticmethod
+    def is_commutative() :
+        return False
+
 class FreeformRelation(Relation) :
     def __init__(self, *args) :
         """There can be any number of arguments.  There are no

@@ -14,6 +14,7 @@ class World(object) :
         self.game_defined = False
         self.relations = dict()
         self.relation_handlers = []
+        self.name_to_relation = dict()
         self._actions = dict()
         self.actions = ActionHelperObject(self)
     def set_game_defined(self) :
@@ -58,7 +59,8 @@ class World(object) :
             raise Exception("Can't define new relation when game is defined.")
         self.relation_handlers.append(r)
         self.relations[r] = r.setup_table()
-        #self.name_to_relation
+        self.name_to_relation[r.__name__] = r
+        return r
     def query_relation(self, relation, var=None) :
         res = relation.query_relation(self.relations[type(relation)])
         if var is None :

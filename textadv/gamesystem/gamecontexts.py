@@ -86,15 +86,6 @@ class ActorContext(GameContext) :
             try :
                 print
                 input = self.io.get_input()
-                print self.world.get_property("Name", "player")
-                self.world.set_property("Name", "player", value="bob")
-                print self.world.get_property("Name", "player")
-                self.world.dump()
-                ser = self.world.serialize()
-                print len(ser)
-                world = self.world.deserialize(ser)
-                world.dump()
-                self.world = world
                 
                 try :
                     print parser.handle_all(input, self)

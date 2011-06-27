@@ -22,6 +22,9 @@ world[Description("red ball")] = "It's just a run-of-the-mill red ball."
 world[Words("red ball")] = ["run-of-the-mill", "red", "@ball"]
 world.actions.move_to("red ball", "room1")
 
+def_obj("blue ball", "thing")
+world.actions.move_to("blue ball", "room1")
+
 def_obj("whatchamacallit", "container")
 world.actions.move_to("whatchamacallit", "room1")
 
@@ -36,10 +39,10 @@ world.define_action("referenceable_objects", accumulator=list_append)
 def referenceable_objects_Default(world) :
     return world[Contents("room1")]
 
-@parse_something.add_handler
-def my_something(input, i, ctxt, next) :
+@add_subparser("something")
+def my_something(var, input, i, ctxt, actor, next) :
     if i < len(input) and input[i] == "woo" :
-        return product([[MatchedObject(input[i:i+1], "whatchamacallit", 2)]],
+        return product([[MatchedObject(input[i:i+1], "whatchamacallit", 2, var)]],
                        next(input, i+1))
     return []
 

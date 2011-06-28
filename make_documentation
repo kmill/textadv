@@ -1,8 +1,17 @@
 #!/usr/bin/env python
+
 import textadv.basiclibrary
 
 import sys
-sys.stdout = open("doc/doc.html", "w")
+
+docfor=""
+
+if len(sys.argv)>=2 :
+    print "Making documentation for "+sys.argv[1]
+    docfor = "_for_"+sys.argv[1].split(".")[0]
+    execfile(sys.argv[1])
+
+sys.stdout = open("doc/doc"+docfor+".html", "w")
 
 html_escape_table = {
     "&": "&amp;",

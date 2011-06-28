@@ -66,6 +66,22 @@ def default_move_to(x, y, world) :
     world.remove_relation(PartOf(x, X))
     world.add_relation(Contains(y, x))
 
+@world.to("put_in")
+def default_put_in(x, y, world) :
+    """A synonym for "move_to"."""
+    world.actions.move_to(x, y)
+
+# put X on Y (so then Y Supports X)
+@world.to("put_on")
+def default_put_on(x, y, world) :
+    """Called with put_on(x, y).  Puts x onto y, first removing all
+    Contains, Supports, Has, and PartOf relations."""
+    world.remove_relation(Contains(X, x))
+    world.remove_relation(Supports(X, x))
+    world.remove_relation(Has(X, x))
+    world.remove_relation(PartOf(x, X))
+    world.add_relation(Supports(y, x))
+
 # give X to Y (so then Y Has X)
 @world.to("give_to")
 def default_give_to(x, y, world) :
@@ -92,23 +108,43 @@ def default_make_part_of(x, y, world) :
 def default_remove_obj(obj, world) :
     """Effectively removes an object from play by making it have no
     positional location."""
-    world.remove_relation(Contains(X, x))
-    world.remove_relation(Supports(X, x))
-    world.remove_relation(Has(X, x))
-    world.remove_relation(PartOf(X, x))
+    world.remove_relation(Contains(X, obj))
+    world.remove_relation(Supports(X, obj))
+    world.remove_relation(Has(X, obj))
+    world.remove_relation(PartOf(obj, X))
 
 @world.define_property
 class Location(Property) :
     """Location(X) is the current immediate location in which X
-    resides (by containment).  Usually used to get the location of
-    the actor."""
+    resides.  Usually used to get the location of the actor."""
     numargs = 1
 
+world[Location(X)] = None
 @world.handler(Location(X))
-def object_location(x, world) :
+def object_location_Contains(x, world) :
     """Gets the location of an object by what currently contains it."""
     locs = world.query_relation(Contains(Y, x), var=Y)
-    return locs[0] if locs else None
+    if locs : return locs[0]
+    else : raise NotHandled()
+@world.handler(Location(X))
+def object_location_Has(x, world) :
+    """Gets the location of an object by what currently has it."""
+    locs = world.query_relation(Has(Y, x), var=Y)
+    if locs : return locs[0]
+    else : raise NotHandled()
+@world.handler(Location(X))
+def object_location_Supports(x, world) :
+    """Gets the location of an object by what currently supports it."""
+    locs = world.query_relation(Supports(Y, x), var=Y)
+    if locs : return locs[0]
+    else : raise NotHandled()
+@world.handler(Location(X))
+def object_location_PartOf(x, world) :
+    """Gets the location of an object by what it is currently part of."""
+    locs = world.query_relation(PartOf(x, Y), var=Y)
+    if locs : return locs[0]
+    else : raise NotHandled()
+
 
 @world.define_property
 class Owner(Property) :
@@ -275,6 +311,17 @@ def default_connect_rooms(room1, dir, room2, world, reverse=True) :
         world.add_relation(Exit(room2, inverse_direction(dir), room1))
 
 ##
+# Property: Visited
+##
+
+@world.define_property
+class Visited(Property) :
+    """Represents whether a room has been visited."""
+    numargs = 1
+
+world[Visited(X) <= IsA(X, "room")] = False
+
+##
 # Property: Contents
 ##
 
@@ -290,37 +337,80 @@ def contents_room(x, world) :
     return [o["y"] for o in world.query_relation(Contains(x, Y))]
 
 ##
-# Property: Enterable
+# Property: EffectiveContainer
 ##
+
 @world.define_property
-class Enterable(Property) :
-    """Is true if the object is something someone could enter."""
+class EffectiveContainer(Property) :
+    """Gets the object which effectively contains the object.
+    Specifically, if the object is in a closed box, then the box is
+    the effective container.  Otherwise, it's the effective container of the open box."""
     numargs = 1
 
-# By default it's false
-world[Enterable(X)] = False
-# But for rooms it's true.
-world[Enterable(X) <= IsA(X, "room")] = True
+@world.handler(EffectiveContainer(X))
+def rule_EffectiveContainer_if_x_in_room(x, world) :
+    """The effective container of something directly in a room is the room itself."""
+    l = world[Location(x)]
+    if world[IsA(l, "room")] :
+        return l
+    else : raise NotHandled()
 
+##
+# Property: ProvidesLight
+##
+@world.define_property
+class ProvidesLight(Property) :
+    """Represents whether the object is a source of light, and not
+    because of its contents."""
+    numargs = 1
+
+# rooms provide light by default
+world[ProvidesLight(X) <= IsA(X, "room")] = True
 
 ##
 # Property: IsLit
 ##
 @world.define_property
 class IsLit(Property) :
-    """A property which represents if a player could see anything in
-    something which is enterable."""
+    """Represents whether the object is lit from the inside, and not
+    whether some outside source is lighting it (for this, we must
+    instead look at the EffectiveContainer of the object)."""
     numargs = 1
 
-# Enterable things are lit by default
-world[IsLit(X) <= Enterable(X)] = True
+@world.handler(IsLit(X) <= IsA(X, "room"))
+def rul_IsLit_room_default_is_ProvidesLight(x, world) :
+    """A room, by default, is lit if it provides light itself."""
+    return world[ProvidesLight(x)]
 
+@world.handler(IsLit(X) <= IsA(X, "room"))
+def rule_IsLit_contents_can_light_room(x, world) :
+    """A room is lit if any of its contents are lit."""
+    if any(world[IsLit(o)] for o in world[Contents(x)]) :
+        return True
+    else : raise NotHandled()
 
 ###
 ### Defining: thing
 ###
 
 world[Description(X) <= IsA(X, "thing")] = "It does't seem that interesting."
+
+# Most things don't provide light
+world[ProvidesLight(X) <= IsA(X, "thing")] = False
+
+@world.handler(IsLit(X) <= IsA(X, "thing"))
+def rul_IsLit_thing_default_is_ProvidesLight(x, world) :
+    """By default, a thing is lit if it provides light."""
+    return world[ProvidesLight(x)]
+
+@world.handler(IsLit(X) <= IsA(X, "thing"))
+def rule_IsLit_if_parts_lit(x, world) :
+    """A thing provides light if any of its constituent parts are lit up."""
+    parts = world.query_relation(PartOf(Y, x), var=Y)
+    if any(world[IsLit(o)] for o in parts) :
+        return True
+    else : raise NotHandled()
+
 
 ##
 # Property: Report
@@ -455,24 +545,13 @@ def rule_AccessibleTo_if_held(x, actor, world) :
     else :
         raise NotHandled()
 @world.handler(AccessibleTo(X, actor))
-def rule_AccessibleTo_if_in_same_room(x, actor, world) :
-    """Anything in the same room as the actor is accessible if the
-    room is lit."""
-    actor_room = world.query_relation(Contains(Y, actor), var=Y)
-    x_room = world.query_relation(Contains(Y, x), var=Y)
-    if actor_room and x_room and actor_room[0] == x_room[0] and world[IsLit(actor_room[0])] :
+def rule_AccessibleTo_if_in_same_effective_container(x, actor, world) :
+    """Anything in the same effective container to the actor is
+    accessible if the effective container is lit."""
+    actor_eff_cont = world[EffectiveContainer(actor)]
+    x_eff_cont = world[EffectiveContainer(actor)]
+    if actor_eff_cont == x_eff_cont and world[IsLit(actor_eff_cont)] :
         return True
-    raise NotHandled()
-@world.handler(AccessibleTo(X, actor))
-def rule_AccessibleTo_if_in_open_container(x, actor, world) :
-    """If an object is in a container which is open (assumed true if
-    not openable), then the object is accessible if the container is
-    accessible."""
-    x_location = world.query_relation(Contains(Y, x), var=Y)
-    if x_location and world[IsA(x_location[0], "container")] :
-        open_not_matters = world[Openable(x_location[0])] and world[IsOpen(x_location[0])]
-        if open_not_matters and world[AccessibleTo(x_location[0], actor)] :
-            return True
     raise NotHandled()
 @world.handler(AccessibleTo(X, actor))
 def rule_AccessibleTo_if_part_of(x, actor, world) :
@@ -482,14 +561,30 @@ def rule_AccessibleTo_if_part_of(x, actor, world) :
     if x_assembly and world[AccessibleTo(x_assembly[0], actor)] :
         return True
     raise NotHandled()
-@world.handler(AccessibleTo(X, actor))
-def rule_AccessibleTo_if_on_supporter(x, actor, world) :
-    """If an object is on something, and that something is
-    accessible, then the object is accessible."""
-    x_supporter = world.query_relation(Supports(Y, x), var=Y)
-    if x_supporter and world[AccessibleTo(x_supporter[0], actor)] :
-        return True
-    raise NotHandled()
+
+##
+# Property: IsOpaque
+##
+
+@world.define_property
+class IsOpaque(Property) :
+    """Represents whether the object cannot transmit light."""
+    numargs = 1
+
+# And, let's just say that things are usually opaque.
+world[IsOpaque(X) <= IsA(X, "thing")] = True
+
+
+##
+# Property: Enterable
+##
+@world.define_property
+class Enterable(Property) :
+    """Is true if the object is something someone could enter."""
+    numargs = 1
+
+# By default it's false
+world[Enterable(X) <= IsA(X, "thing")] = False
 
 ###
 ### Defining: container
@@ -500,11 +595,106 @@ def container_contents(x, world) :
     """Gets the immediate contents of the container."""
     return [o["y"] for o in world.query_relation(Contains(x, Y))]
 
+##
+# Properties: Openable, IsOpen
+##
 
+@world.define_property
+class Openable(Property) :
+    """Represents whether an object is able to be opened and closed."""
+    numargs = 1
+
+world[Openable(X) <= IsA(X, "thing")] = False # by default, things aren't openable
+
+@world.define_property
+class IsOpen(Property) :
+    """Represents whether an openable object is open."""
+    numargs = 1
+
+world[IsOpen(X) <= Openable(X)] = False # by default, openable things are closed
+
+#
+# Lighting for container
+#
+
+world[IsOpaque(X) <= IsA(X, "container")] = False
+
+@world.handler(IsOpaque(X) <= IsA(X, "container"))
+def rule_IsOpaque_if_openable_container_is_closed(x, world) :
+    """A container is by default not opaque, but if it is openable,
+    then it depends on whether it is open."""
+    if world[Openable(X)] :
+        return not world[IsOpen(X)]
+    else :
+        raise NotHandled()
+
+@world.handler(IsLit(X) <= IsA(X, "container"))
+def rule_IsLit_for_container(x, world) :
+    """A container is lit if it is not opaque and one of its contents
+    is lit."""
+    if not world[IsOpaque(x)] and any(world[IsLit(o)] for o in world[Contents(x)]) :
+        return True
+    else : raise NotHandled()
+
+@world.handler(EffectiveContainer(X))
+def rule_EffectiveContainer_if_x_in_container(x, world) :
+    """The effective container of something directly in a container is
+    the container itself if it is closed, otherwise the effective
+    container of the container."""
+    l = world[Location(x)]
+    if world[IsA(l, "container")] :
+        if world[Openable(X)] and not world[IsOpen(X)] :
+            return l
+        else :
+            return world[EffectiveContainer(l)]
+    else : raise NotHandled()
+
+###
+### Defining: supporter
+###
+
+@world.handler(Contents(X) <= IsA(X, "supporter"))
+def supporter_contents(x, world) :
+    """Gets the things the supporter immediately supports."""
+    return [o["y"] for o in world.query_relation(Supports(x, Y))]
+
+
+#
+# Lighting for supporter
+#
+
+# A supporter doesn't block light.
+world[IsOpaque(X) <= IsA(X, "supporter")] = False
+
+@world.handler(IsLit(X) <= IsA(X, "supporter"))
+def rule_IsLit_for_supporter(x, world) :
+    """A supporter is lit if it is not opaque and one of its objects
+    is lit."""
+    if any(world[IsLit(o)] for o in world[Contents(x)]) :
+        return True
+    else : raise NotHandled()
+
+@world.handler(EffectiveContainer(X))
+def rule_EffectiveContainer_if_x_on_supporter(x, world) :
+    """The effective container of something directly on a supporter is
+    the effective container of the supporter."""
+    l = world[Location(x)]
+    if world[IsA(l, "supporter")] :
+        return l
+    else : raise NotHandled()
 
 ###
 ### Defining: person
 ###
+
+@world.handler(Contents(X) <= IsA(X, "person"))
+def supporter_contents(x, world) :
+    """Gets the things the person immediately has."""
+    return [o["y"] for o in world.query_relation(Has(x, Y))]
+
+##
+# Property: Gender
+##
 
 @world.define_property
 class Gender(Property) :
@@ -514,6 +704,9 @@ class Gender(Property) :
 
 world[Gender(X) <= IsA(X, "person")] = "unknown" # other options are male and female
 
+##
+# Property: Pronouns
+##
 
 @world.handler(SubjectPronoun(X) <= IsA(X, "person"))
 def person_SubjectPronoun(x, world) :
@@ -570,6 +763,17 @@ world[SubjectPronounIfMe(X) <= IsA(X, "person")] = "you"
 world[ObjectPronounIfMe(X) <= IsA(X, "person")] = "you"
 world[PossessivePronounIfMe(X) <= IsA(X, "person")] = "your"
 
+#
+# Light for a person
+#
+
+@world.handler(IsLit(X) <= IsA(X, "person"))
+def rule_IsLit_possessions_can_light_person(x, world) : # maybe should handle concealment at some point?
+    """A person is lit if any of its posessions are lit."""
+    if any(world[IsLit(o)] for o in world[Contents(x)]) :
+        return True
+    else : raise NotHandled()
+
 ##
 # The default player
 ##
@@ -581,28 +785,13 @@ world[Words("player")] = ["yourself", "self", "AFGNCAAP"]
 world[Description("player")] = """{Bob|cap} {is} an ageless, faceless,
 gender-neutral, culturally-ambiguous adventure-person.  {Bob|cap}
 {does} stuff sometimes."""
+world[Reported("player")] = False
 
 
 ###
 ### Other properties
 ###
 
-##
-# Properties: Openable, IsOpen
-
-@world.define_property
-class Openable(Property) :
-    """Represents whether an object is able to be opened and closed."""
-    numargs = 1
-
-world[Openable(X) <= IsA(X, "thing")] = False # by default, things aren't openable
-
-@world.define_property
-class IsOpen(Property) :
-    """Represents whether an openable object is open."""
-    numargs = 1
-
-world[IsOpen(X) <= Openable(X)] = False # by default, openable things are closed
 
 
 ###
@@ -625,50 +814,100 @@ world[Reported(X) <= IsA(X, "scenery")] = False
 ###*
 
 ###
-### Action: room descriptions
+### Action: location descriptions
 ###
 
-# action.describe_room
-@actoractions.to("describe_room")
-def describe_room_Heading(x, ctxt) :
-    """Runs describe_room_heading."""
-    ctxt.actions.describe_room_heading(x)
+__DESCRIBE_LOCATION_obj_mentioned = []
+
+@actoractions.to("describe_location")
+def describe_location_init_global_vars(loc, eff_cont, ctxt) :
+    """We have a global variable __DESCRIBE_LOCATION_obj_mentioned
+    which is a list of all objects that have already been mentioned.
+    This is cleared by this init function."""
+    global __DESCRIBE_LOCATION_obj_mentioned
+    __DESCRIBE_LOCATION_obj_mentioned = []
+
+@actoractions.to("describe_location")
+def describe_location_Heading(loc, eff_cont, ctxt) :
+    """Constructs the heading using describe_location_heading.  If the
+    room is in darkness, then, writes "Darkness"."""
+    if ctxt.world[IsLit(eff_cont)] :
+        ctxt.actions.describe_location_heading(loc, eff_cont)
+    else :
+        ctxt.write("Darkness")
     ctxt.write("[newline]")
 
-@actoractions.to("describe_room")
-def describe_room_Description(x, ctxt) :
-    """Prints the description property of the room."""
-    ctxt.write(ctxt.world[Description(x)])
+@actoractions.to("describe_location")
+def describe_location_Description(loc, eff_cont, ctxt) :
+    """Prints the description property of the effective container if
+    it is a room, unless the room is in darkness.  Darkness stops
+    further description of the location."""
+    if ctxt.world[IsLit(eff_cont)] :
+        if ctxt.world[IsA(eff_cont, "room")] :
+            ctxt.write(ctxt.world[Description(eff_cont)])
+    else :
+        ctxt.write("You can't see a thing; it's incredibly dark.")
+        raise ActionHandled()
 
-@actoractions.to("describe_room")
-def describe_room_Objects(x, ctxt) :
-    """Prints the contents of the room."""
-    obs = ctxt.world[Contents(x)]
+@actoractions.to("describe_location")
+def describe_location_Objects(loc, eff_cont, ctxt) :
+    """Prints the of the location by asking the effective
+    container to do so."""
+    obs = ctxt.world[Contents(eff_cont)]
+    obs = [o for o in obs if ctxt.world[Reported(o)]]
     if obs :
-        ctxt.write("[newline]You see "+serial_comma([ctxt.world[IndefiniteName(o)] for o in obs])+".")
+        ctxt.write("[newline]You see "+serial_comma([" ".join(ctxt.actions.object_description(o)) for o in obs])+".")
 
-# action.describe_room_heading
-@actoractions.to("describe_room_heading")
-def describe_room_heading_Name(x, ctxt) :
-    """Prints the name of the room."""
-    ctxt.write(ctxt.world[Name(x)])
+@actoractions.to("describe_location")
+def describe_location_set_visited(loc, eff_cont, ctxt) :
+    """If the effective container is a room, then we set it to being
+    visited."""
+    if ctxt.world[IsA(eff_cont, "room")] :
+        ctxt.world[Visited(eff_cont)] = True
 
-@actoractions.to("describe_room_heading")
-def describe_room_location(x, ctxt) :
-    """Prints the room's location, if it is contained in another room."""
-    r = ctxt.world.query_relation(Contains(Y, x), Y)
-    if r and ctxt.world[Enterable(r[0])]:
-        ctxt.write("(in",world[Name(r[0])]+")")
 
-# actions.describe_current_room
-@actoractions.to("describe_current_room")
-def describe_current_room_default(ctxt) :
-    """Calls describe_room using the location of the current actor."""
-    ctxt.actions.describe_room(ctxt.world[Location(ctxt.actorname)])
+@actoractions.to("describe_location_heading")
+def describe_location_heading_Name(loc, eff_cont, ctxt) :
+    """Prints the name of the effective container."""
+    ctxt.write(ctxt.world[Name(eff_cont)])
+
+@actoractions.to("describe_location_heading")
+def describe_location_property_heading_location(loc, eff_cont, ctxt) :
+    """Creates a description of where the location is with respect to
+    the effective container."""
+    while loc != eff_cont :
+        if ctxt.world[IsA(loc, "container")] :
+            ctxt.write("(in",world[DefiniteName(loc)]+")")
+        elif ctxt.world[IsA(loc, "supporter")] :
+            ctxt.write("(on",world[DefiniteName(loc)]+")")
+        else :
+            return
+        loc = ctxt.world[Location(loc)]
+
+@actoractions.to("object_description")
+def object_description_DefiniteName(o, ctxt) :
+    """Describes the object based on its indefinite name."""
+    return ctxt.world[IndefiniteName(o)]
+
+@actoractions.to("object_description")
+def object_description_container(o, ctxt) :
+    if ctxt.world[IsA(o, "container")] :
+        contents = ctxt.world[Contents(o)]
+        if contents :
+            return "(in which "+is_are_list([" ".join(ctxt.actions.object_description(x)) for x in contents])+")"
+        else : raise NotHandled()
+    else : raise NotHandled()
+
+
+@actoractions.to("describe_current_location")
+def describe_current_location_default(ctxt) :
+    """Calls describe_location using the Location and the
+    EffectiveContainer of the current actor."""
+    ctxt.actions.describe_location(ctxt.world[Location(ctxt.actorname)], ctxt.world[EffectiveContainer(ctxt.actorname)])
 
 
 ###*
-###* Actions by the actor
+###* Actions by a person
 ###*
 
 ###
@@ -742,7 +981,7 @@ understand("look/l", Look(actor))
 
 @when(Look(actor))
 def when_look_default(actor, ctxt) :
-    ctxt.actions.describe_current_room()
+    ctxt.actions.describe_current_location()
 
 ##
 # Taking
@@ -820,8 +1059,14 @@ require_xobj_held(Drop(actor, X), only_hint=True)
 
 @when(Drop(actor, X))
 def when_drop_default(actor, x, ctxt) :
-    """Carry out the dropping by moving the object to the location of the actor."""
-    ctxt.world.actions.move_to(x, ctxt.world[Location(actor)])
+    """Carry out the dropping by moving the object to the location of
+    the actor (if the location is a room or a container), but if the
+    location is a supporter, the object is put on the supporter."""
+    l = ctxt.world[Location(actor)]
+    if ctxt.world[IsA(l, "supporter")] :
+        ctxt.world.actions.put_on(x, ctxt.world[Location(actor)])
+    else :
+        ctxt.world.actions.move_to(x, ctxt.world[Location(actor)])
 
 @report(Drop(actor, X))
 def report_drop_default(actor, x, ctxt) :
@@ -859,3 +1104,17 @@ class GiveTo(BasicAction) :
     gerund = ("giving", "to")
     numargs = 3
 understand("give [something x] to [something y]", GiveTo(actor, X, Y))
+
+class Destroy(BasicAction) :
+    verb = "destroy"
+    gerund = "destroying"
+    numargs = 2
+understand("destroy [something x]", Destroy(actor, X))
+
+@when(Destroy(actor, X))
+def when_destroy(actor, x, ctxt) :
+    ctxt.world.actions.remove_obj(x)
+
+@report(Destroy(actor, X))
+def report_destroy(actor, x, ctxt) :
+    ctxt.write("*Poof*")

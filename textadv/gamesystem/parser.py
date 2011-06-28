@@ -282,11 +282,19 @@ def subparser_add_sequence(dest, parts, result, text) :
             def _next2(i3) :
                 return _handler_part(part_i+1, var, input, i3)
             if part_i == len(parts) :
+                # we've matched all of our parts, so return (with
+                # extra data at the end so we can construct the proper
+                # Matched object)
                 return [[(i2, next(i2))]]
             elif type(parts[part_i]) is CallSubParser :
+                # or, we have a subparser to execute
                 csp = parts[part_i]
                 return run_subparser(csp.name, csp.var, input, i2, ctxt, actor, _next2)
-            elif type(parts[part_i]) is list and input[i2] in parts[part_i] :
+            elif i2 < len(input) and type(parts[part_i]) is list and input[i2] in parts[part_i] :
+                # as in "if we haven't reached the end of input, and
+                # we have a list of options in parts, check to see if
+                # the input is currently one of these options." Then
+                # we go on.
                 return _handler_part(part_i+1, var, input, i2+1)
             else :
                 return []

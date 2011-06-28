@@ -23,17 +23,20 @@ def serial_comma(nouns, conj="and", comma=",", force_comma=False) :
         comma_sp = comma + " "
         return comma_sp.join(nouns[:-1]) + comma + conj + nouns[-1]
 
-def is_are_list(context, objs, conj="and", prop=None) :
+def is_are_list(nouns) :
+    if len(nouns) == 0 :
+        return "is nothing"
+    elif len(nouns) == 1 :
+        return "is "+nouns[0]
+    else :
+        return "are "+serial_comma(nouns)
+
+def obj_is_are_list(context, objs, prop=None) :
     if prop is None :
         from textadv.gameworld.basicrules import IndefiniteName
         prop = IndefiniteName
     objs = [context.world[prop(o)] for o in objs]
-    if len(objs) == 0 :
-        return "is nothing"
-    elif len(objs) == 1 :
-        return "is "+objs[0]
-    else :
-        return "are "+serial_comma(objs, conj=conj)
+    return is_are_list(objs)
 
 DIRECTION_INVERSES = {"north" : "south",
                       "south" : "north",
@@ -309,7 +312,7 @@ def _str_eval_fn_when(context, *obs) :
 # concatenates list of objects, getting indefinite names, and puts proper is/are in front
 @add_str_eval_func("is_are_list")
 def _str_eval_fn_is_are_list(context, *obs) :
-    return [is_are_list(context, list_append(o[0] for o in obs))]
+    return [obj_is_are_list(context, list_append(o[0] for o in obs))]
 
 ###
 ### Reworder.  Makes is/are work out depending on context

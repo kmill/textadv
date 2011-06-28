@@ -342,18 +342,17 @@ def contents_room(x, world) :
 
 @world.define_property
 class EffectiveContainer(Property) :
-    """Gets the object which effectively contains the object.
-    Specifically, if the object is in a closed box, then the box is
-    the effective container.  Otherwise, it's the effective container of the open box."""
+    """Gets the object which effectively contain an object which is
+    "inside" this one (change to "on top of" for supporters).
+    Specifically, if the object is a closed box, then the box is the
+    effective container.  Otherwise, it's the effective container of
+    the location of the open box."""
     numargs = 1
 
-@world.handler(EffectiveContainer(X))
+@world.handler(EffectiveContainer(X) <= IsA(X, "room"))
 def rule_EffectiveContainer_if_x_in_room(x, world) :
-    """The effective container of something directly in a room is the room itself."""
-    l = world[Location(x)]
-    if world[IsA(l, "room")] :
-        return l
-    else : raise NotHandled()
+    """The effective container for a room is the room itself."""
+    return x
 
 ##
 # Property: ProvidesLight
@@ -548,11 +547,23 @@ def rule_AccessibleTo_if_held(x, actor, world) :
 def rule_AccessibleTo_if_in_same_effective_container(x, actor, world) :
     """Anything in the same effective container to the actor is
     accessible if the effective container is lit."""
-    actor_eff_cont = world[EffectiveContainer(actor)]
-    x_eff_cont = world[EffectiveContainer(actor)]
+    actor_eff_cont = world[EffectiveContainer(world[Location(actor)])]
+    if actor_eff_cont == x :
+        # otherwise we'd be looking too many levels high
+        x_eff_cont = x
+    else :
+        x_eff_cont = world[EffectiveContainer(world[Location(x)])]
     if actor_eff_cont == x_eff_cont and world[IsLit(actor_eff_cont)] :
         return True
     raise NotHandled()
+@world.handler(AccessibleTo(X, actor))
+def rule_AccessibleTo_if_immediately_in_container(x, actor, world) :
+    """If the actor is immediately in the container x, then x is
+    accessible.  Prevents such things as closing a box around oneself
+    and then not being able to refer to the box anymore."""
+    if world[IsA(x, "container")] and world.query_relation(Contains(x, actor)) :
+        return True
+    else : raise NotHandled()
 @world.handler(AccessibleTo(X, actor))
 def rule_AccessibleTo_if_part_of(x, actor, world) :
     """If an object is part of something, and that something is
@@ -619,12 +630,13 @@ world[IsOpen(X) <= Openable(X)] = False # by default, openable things are closed
 
 world[IsOpaque(X) <= IsA(X, "container")] = False
 
+
 @world.handler(IsOpaque(X) <= IsA(X, "container"))
 def rule_IsOpaque_if_openable_container_is_closed(x, world) :
     """A container is by default not opaque, but if it is openable,
-    then it depends on whether it is open."""
-    if world[Openable(X)] :
-        return not world[IsOpen(X)]
+    then it is not opaque if it is open."""
+    if world[Openable(x)] and not world[IsOpen(x)]:
+        return True
     else :
         raise NotHandled()
 
@@ -636,18 +648,15 @@ def rule_IsLit_for_container(x, world) :
         return True
     else : raise NotHandled()
 
-@world.handler(EffectiveContainer(X))
+@world.handler(EffectiveContainer(X) <= IsA(X, "container"))
 def rule_EffectiveContainer_if_x_in_container(x, world) :
-    """The effective container of something directly in a container is
-    the container itself if it is closed, otherwise the effective
-    container of the container."""
-    l = world[Location(x)]
-    if world[IsA(l, "container")] :
-        if world[Openable(X)] and not world[IsOpen(X)] :
-            return l
-        else :
-            return world[EffectiveContainer(l)]
-    else : raise NotHandled()
+    """The effective container for a container is the container itself
+    if it is opaque, otherwise it is the effective container of the
+    location of the container."""
+    if world[IsOpaque(x)] :
+        return x
+    else :
+        return world[EffectiveContainer(world[Location(x)])]
 
 ###
 ### Defining: supporter
@@ -674,14 +683,11 @@ def rule_IsLit_for_supporter(x, world) :
         return True
     else : raise NotHandled()
 
-@world.handler(EffectiveContainer(X))
+@world.handler(EffectiveContainer(X) <= IsA(X, "supporter"))
 def rule_EffectiveContainer_if_x_on_supporter(x, world) :
-    """The effective container of something directly on a supporter is
-    the effective container of the supporter."""
-    l = world[Location(x)]
-    if world[IsA(l, "supporter")] :
-        return l
-    else : raise NotHandled()
+    """The effective container of a supporter is the effective
+    container of the location of the supporter."""
+    return world[EffectiveContainer(world[Location(x)])]
 
 ###
 ### Defining: person
@@ -893,6 +899,7 @@ def object_description_DefiniteName(o, ctxt) :
 def object_description_container(o, ctxt) :
     if ctxt.world[IsA(o, "container")] :
         contents = ctxt.world[Contents(o)]
+        contents = [o for o in contents if ctxt.world[Reported(o)]]
         if contents :
             return "(in which "+is_are_list([" ".join(ctxt.actions.object_description(x)) for x in contents])+")"
         else : raise NotHandled()
@@ -903,7 +910,9 @@ def object_description_container(o, ctxt) :
 def describe_current_location_default(ctxt) :
     """Calls describe_location using the Location and the
     EffectiveContainer of the current actor."""
-    ctxt.actions.describe_location(ctxt.world[Location(ctxt.actorname)], ctxt.world[EffectiveContainer(ctxt.actorname)])
+    loc = ctxt.world[Location(ctxt.actorname)]
+    eff_cont = ctxt.world[EffectiveContainer(loc)]
+    ctxt.actions.describe_location(loc, eff_cont)
 
 
 ###*
@@ -1118,3 +1127,19 @@ def when_destroy(actor, x, ctxt) :
 @report(Destroy(actor, X))
 def report_destroy(actor, x, ctxt) :
     ctxt.write("*Poof*")
+
+class Open(BasicAction) :
+    verb = "open"
+    gerund = "opening"
+    numargs = 2
+understand("open [something x]", Open(actor, X))
+
+require_xobj_accessible(Open(actor, X))
+
+@when(Open(actor, X))
+def when_open(actor, x, ctxt) :
+    ctxt.world[IsOpen(x)] = True
+
+@report(Open(actor, X))
+def report_open(actor, x, ctxt) :
+    ctxt.write("Opened.")

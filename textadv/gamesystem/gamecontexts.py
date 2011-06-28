@@ -82,6 +82,9 @@ class ActorContext(GameContext) :
         try :
             if input is None and action is None:
                 input = self.io.get_input()
+                if input == "dump" :
+                    self.world.dump()
+                    return (self, {})
             try :
                 if action is None :
                     action, disambiguated = parser.handle_all(input, self, verify_action)

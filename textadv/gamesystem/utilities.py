@@ -78,8 +78,8 @@ def str_with_objs(input, **kwarg) :
             newkwarg[key] = value.id
     return string.Template(input).safe_substitute(newkwarg)
 
-def as_actor(input, actorname) :
-    return "[as %s]%s[endas]" % (actorname, input)
+def as_actor(input, actor) :
+    return "[as %s]%s[endas]" % (actor, input)
 
 
 ###

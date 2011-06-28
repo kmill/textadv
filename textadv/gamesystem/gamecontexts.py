@@ -136,3 +136,13 @@ class DisambiguationContext(GameContext) :
                 self.parent.write("That didn't help me out at all.")
                 return (self.parent, dict())
         return (self.parent, {"action" : self.amb.pattern.expand_pattern(repl)})
+
+def make_documentation(escape, heading_level=1) :
+    hls = str(heading_level)
+    shls = str(heading_level+1)
+    print "<h"+hls+">Actor actions</h"+hls+">"
+    print "<p>This is the documentation for the actor actions attached to <tt>actoractions</tt> in <tt>gamecontexts.py</tt>.</p>"
+    for name, table in actoractions._actions.iteritems() :
+        print "<h"+shls+">to "+escape(name)+"</h"+shls+">"
+        table.make_documentation(escape, heading_level=heading_level+2)
+

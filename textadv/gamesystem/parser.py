@@ -198,8 +198,8 @@ def default_object(var, input, i, ctxt, actor, next) :
     return parse_thing.notify([None,var,words,input,i,ctxt,next,2],{})
 
 define_subparser("action", """A parser to match against entire
-actions.  The resulting Match.value should be something which can be
-run.  This is the main parser.""")
+actions.  The resulting Match.value should be a BasicAction.  This is
+the main parser.""")
 
 
 define_subparser("text", """Just matches against any sequence of words.""")
@@ -322,7 +322,7 @@ CURRENT_WORDS = []
 def init_current_objects(ctxt) :
     global CURRENT_OBJECTS, CURRENT_WORDS
     CURRENT_OBJECTS = ctxt.world.actions.referenceable_things()
-    CURRENT_WORDS = [separate_object_words(ctxt.world.actions.get_words(o)) for o in CURRENT_OBJECTS]
+    CURRENT_WORDS = [separate_object_words(ctxt.world.get_property("Words", o)) for o in CURRENT_OBJECTS]
 
 def __is_word_for_thing(word) :
     for adjs,nouns in CURRENT_WORDS :
@@ -433,3 +433,17 @@ def handle_all(input, ctxt, action_verifier) :
         raise NoUnderstand()
     action = disambiguate(results, ctxt, action_verifier)
     return (action, len(results) > 1)
+
+###
+### Construct documentation
+###
+
+def make_documentation(escape, heading_level=1) :
+    hls = str(heading_level)
+    shls = str(heading_level+1)
+    print "<h"+hls+">Parser</h"+hls+">"
+    print "<p>This is the documentation for the parser.</p>"
+    for spn in subparsers.iterkeys() :
+        print "<h"+shls+">"+escape(spn)+"</h"+shls+">"
+        print "<p><i>"+(escape(subparsers_doc[spn]) or "(No documentation)")+"</i></p>"
+        subparsers[spn].make_documentation(escape, heading_level=heading_level+2)

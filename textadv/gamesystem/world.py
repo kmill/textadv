@@ -5,6 +5,14 @@ from textadv.core.patterns import BasicPattern
 from textadv.core.rulesystem import ActionTable, PropertyTable, ActionHelperObject
 
 
+class Property(BasicPattern) :
+    """This is the main property class.  The numargs attribute must be
+    created."""
+    def __init__(self, *args) :
+        if len(args) != self.numargs :
+            raise Exception("Property requires exactly "+str(numargs)+" arguments.")
+        self.args = args
+
 class World(object) :
     def __init__(self) :
         self.properties = PropertyTable()
@@ -33,15 +41,17 @@ class World(object) :
     def handler(self, item) :
         return self.properties.handler(item)
 
-    def make_property(self, numargs, name) :
+    def _make_property(self, numargs, name) :
         class _NewProperty(BasicPattern) :
             def __init__(self, *args) :
                 if len(args) != numargs :
                     raise Exception("Property requires exactly "+str(numargs)+" arguments.")
                 self.args = args
         _NewProperty.__name__ = name
-        return self.register_property(_NewProperty)
-    def register_property(self, prop) :
+        return self.define_property(_NewProperty)
+    def define_property(self, prop) :
+        if self.property_types.has_key(prop.__name__) :
+            raise Exception("Property with name %r already defined" % prop.__name__)
         self.property_types[prop.__name__] = prop
         self.inv_property_types[prop] = prop.__name__
         return prop
@@ -115,4 +125,22 @@ class World(object) :
         for r in self.relation_handlers :
             print " * For %s *" % r.__name__
             r.dump(self.relations[r])
-
+    def make_documentation(self, escape, heading_level=1) :
+        hls = str(heading_level)
+        print "<h"+hls+">World</h"+hls+">"
+        print "<p>This is the documentation for the game world object.</p>"
+        shls = str(heading_level+1)
+        print "<h"+shls+">Property table</h"+shls+">"
+        self.properties.make_documentation(escape, heading_level=heading_level+2)
+        print "<h"+shls+">Relation tables</h"+shls+">"
+        sshls = str(heading_level+2)
+        for r in self.relation_handlers :
+            print "<h"+sshls+">"+escape(r.__name__)+"</h"+sshls+">"
+            print "<p><i>"+(escape(r.__doc__) or "(No documentation)")+"</i></p>"
+            print "<pre>"
+            r.dump(self.relations[r])
+            print "</pre>"
+        print "<h"+shls+">Action tables</h"+shls+">"
+        for name, table in self._actions.iteritems() :
+            print "<h"+sshls+">to "+escape(name)+"</h"+sshls+">"
+            table.make_documentation(escape, heading_level=heading_level+3)

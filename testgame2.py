@@ -28,8 +28,6 @@ world.actions.move_to("blue ball", "room1")
 def_obj("whatchamacallit", "container")
 world.actions.move_to("whatchamacallit", "room1")
 
-world.dump()
-
 #world.actions.describe_room("room1")
 
 from textadv.gamesystem.parser import *
@@ -45,7 +43,6 @@ print
 print
 
 game_context.actions.describe_current_room()
-basic_begin_game()
 
 
 #print run_parser(parse_something, ["the", "run-of-the-mill", "ball"], world)

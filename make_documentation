@@ -1,0 +1,32 @@
+#!/usr/bin/env python
+import textadv.basiclibrary
+
+import sys
+sys.stdout = open("doc/doc.html", "w")
+
+html_escape_table = {
+    "&": "&amp;",
+    '"': "&quot;",
+    "'": "&apos;",
+    ">": "&gt;",
+    "<": "&lt;",
+    }
+
+def html_escape(text):
+    """Produce entities within text."""
+    if text :
+        return "".join(html_escape_table.get(c,c) for c in text)
+    else :
+        return None
+
+print "<html><body><h1>TextAdv auto-documentation</h1>"
+print "<p>This is automagically generated documentation of the rules defined in the game engine.</p>"
+textadv.basiclibrary.world.make_documentation(html_escape, heading_level=1)
+import textadv.gamesystem.parser as parser
+parser.make_documentation(html_escape, heading_level=1)
+import textadv.gamesystem.eventsystem as eventsystem
+eventsystem.make_documentation(html_escape, heading_level=1)
+import textadv.gamesystem.gamecontexts as gamecontexts
+gamecontexts.make_documentation(html_escape, heading_level=1)
+
+print "</body></html>"

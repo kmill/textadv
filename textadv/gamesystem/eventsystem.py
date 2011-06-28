@@ -195,3 +195,23 @@ def run_action(action, ctxt, is_implied=False, write_action=False, silently=Fals
 
 def do_first(action, ctxt, silently=False) :
     run_action(action, ctxt=ctxt, is_implied=True, write_action="(first %s)", silently=False)
+
+def make_documentation(escape, heading_level=1) :
+    hls = str(heading_level)
+    print "<h"+hls+">Event system</h"+hls+">"
+    print "<p>This is the documentation for the event system.</p>"
+    def _make_action_docs(heading_level, table, heading, desc) :
+        shls = str(heading_level+1)
+        print "<h"+shls+">"+heading+"</h"+shls+">"
+        print "<p><i>"+desc+"</i></p>"
+        table.make_documentation(escape, heading_level=heading_level+2)
+    _make_action_docs(heading_level, action_verify, "action_verify",
+                      "Handles verifying actions for being at least somewhat logical. Should not change world state.")
+    _make_action_docs(heading_level, action_trybefore, "action_trybefore",
+                      "Handles a last attempt to make the action work (one shouldn't work with this table directly).")
+    _make_action_docs(heading_level, action_before, "action_before",
+                      "Checks an action to see if it is even possible (opening a door is logical, but it's not immediately possible to open a locked door)")
+    _make_action_docs(heading_level, action_when, "action_when",
+                      "Carries out the action.  Must not fail.")
+    _make_action_docs(heading_level, action_report, "action_report",
+                      "Explains what happened with this action.  Should not change world state.")

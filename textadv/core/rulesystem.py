@@ -54,7 +54,6 @@ class PropertyTable(object) :
     order, and the first successful result is returned."""
     def __init__(self) :
         self.properties = dict() # dict for some optimization
-        self.default_handler = None
     def set_property(self, item, value, call=False) :
         if not isinstance(item, AbstractPattern) :
             raise Exception("The only properties may be AbstractPatterns.")
@@ -82,10 +81,7 @@ class PropertyTable(object) :
                 pass
             except NotHandled :
                 pass
-        if self.default_handler is None :
-            raise KeyError(item)
-        else :
-            return self.default_handler(item, world)
+        raise KeyError(item)
     def handler(self, item) :
         """This is a decorator to add a function which should be
         called when getting a property."""
@@ -100,6 +96,26 @@ class PropertyTable(object) :
                     print repr(item)+" calls "+repr(value)
                 else :
                     print repr(item)+" = "+repr(value)
+    def make_documentation(self, escape, heading_level=1) :
+        hls = str(heading_level)
+        props = self.properties.keys()
+        props.sort(key=lambda x : x.__name__)
+        for property in props :
+            table = self.properties[property]
+            print "<h"+hls+">"+escape(property.__name__)+"</h"+hls+">"
+            print "<p>"+(escape(property.__doc__) or "<i>No documentation for property.</i>")+"</p>"
+            if table :
+                print "<ol>"
+                for key,value,call in table :
+                    print "<li><p>"+repr(key)
+                    print ("<b>calls</b> <tt>"+escape(value.__name__)+"</tt>") if call else ("= "+escape(repr(value)))
+                    print "</p>"
+                    if call :
+                        print "<p><i>"+(escape(value.__doc__) or "(No documentation)")+"</i></p>"
+                    print "</li>"
+                print "</ol>"
+            else :
+                print "<p><i>No entries</i></p>"
 
 class ActionTable(object) :
     """Runs the actions one at a time until an AbortAction is raised
@@ -136,6 +152,21 @@ class ActionTable(object) :
         else :
             self.actions.append(item)
         return item
+    def make_documentation(self, escape, heading_level=1) :
+        print "<p>"
+        if self.reverse : print "Runs in reverse-definition order."
+        else : print "Runs in definition order."
+        print "Accumulator: "
+        print "<tt>"+escape(self.accumulator.__name__)+"</tt></p>"
+        if self.actions :
+            print "<ol>"
+            for handler in self.actions :
+                print "<li><p><b>call</b> <tt>"+escape(handler.__name__)+"</tt></p>"
+                print "<p><i>"+(escape(handler.__doc__) or "(No documentation)")+"</i></p>"
+                print "</li>"
+            print "</ol>"
+        else :
+            print "<p><i>No entries</i></p>"
 
 class EventTable(object) :
     """The action table is a bunch of "actions" which are all
@@ -180,6 +211,23 @@ class EventTable(object) :
             except FinishWith as ix :
                 return self.accumulator(acc + ix.args)
         return self.accumulator(accum)
+    def make_documentation(self, escape, heading_level=1) :
+        print "<p>"
+        if self.reverse : print "Runs in reverse-definition order."
+        else : print "Runs in definition order."
+        print "Accumulator: "
+        print "<tt>"+escape(self.accumulator.__name__)+"</tt></p>"
+        if self.actions :
+            print "<ol>"
+            for key,value in self.actions :
+                print "<li><p>"+escape(repr(key))#+"<br>"
+                print "<b>calls</b> <tt>"+escape(value.__name__)+"</tt>"
+                print "</p>"
+                print "<p><i>"+(escape(value.__doc__) or "(No documentation)")+"</i></p>"
+                print "</li>"
+            print "</ol>"
+        else :
+            print "<p><i>No entries</i></p>"
 
 ##
 ## A class for helping have many ActionTables (see World)

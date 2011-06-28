@@ -1,0 +1,2 @@
+To generate the documentation, run make_documentation, which is in the
+root of the repository.  The result will end up in this directory.

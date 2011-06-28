@@ -23,18 +23,25 @@ def def_obj(name, type) :
 ### Global properties
 ###
 
-Global = world.make_property(1, "Global")
+@world.define_property
+class Global(Property) :
+    """Use Global("x") to get global variable "x"."""
+    numargs = 1
 
 ###
-### Basic relations
+### Basic position relations
 ###
 
-# The following three are mutually exclusive relations which have to
+# The following four are mutually exclusive relations which have to
 # do with position.
 
 @world.define_relation
 class Contains(OneToManyRelation) :
     """Contains(x,y) for "x Contains y"."""
+
+@world.define_relation
+class Supports(OneToManyRelation) :
+    """Supports(x,y) for "x Supports y"."""
 
 @world.define_relation
 class Has(OneToManyRelation) :
@@ -45,13 +52,16 @@ class PartOf(ManyToOneRelation) :
     """PartOf(x,y) for "x PartOf y"."""
 
 #
-# some helper actions to make it easy to use these three
+# some helper actions to make it easy to use these three relations
 #
 
 # move X to Y (so then Y Contains X)
 @world.to("move_to")
 def default_move_to(x, y, world) :
+    """Called with move_to(x, y).  Moves x to be contained by y, first
+    removing all Contains, Supports, Has, and PartOf relations."""
     world.remove_relation(Contains(X, x))
+    world.remove_relation(Supports(X, x))
     world.remove_relation(Has(X, x))
     world.remove_relation(PartOf(x, X))
     world.add_relation(Contains(y, x))
@@ -59,7 +69,10 @@ def default_move_to(x, y, world) :
 # give X to Y (so then Y Has X)
 @world.to("give_to")
 def default_give_to(x, y, world) :
+    """Called with give_to(x, y).  Gives x to y, first
+    removing all Contains, Supports, Has, and PartOf relations."""
     world.remove_relation(Contains(X, x))
+    world.remove_relation(Supports(X, x))
     world.remove_relation(Has(X, x))
     world.remove_relation(PartOf(x, X))
     world.add_relation(Has(y, x))
@@ -67,7 +80,10 @@ def default_give_to(x, y, world) :
 # make X part of Y (so then X PartOf Y)
 @world.to("make_part_of")
 def default_make_part_of(x, y, world) :
+    """Called with make_part_of(x, y).  Makes x a part of y, first
+    removing all Contains, Supports, Has, and PartOf relations."""
     world.remove_relation(Contains(X, x))
+    world.remove_relation(Supports(X, x))
     world.remove_relation(Has(X, x))
     world.remove_relation(PartOf(x, X))
     world.add_relation(PartOf(x, y))
@@ -77,19 +93,44 @@ def default_remove_obj(obj, world) :
     """Effectively removes an object from play by making it have no
     positional location."""
     world.remove_relation(Contains(X, x))
+    world.remove_relation(Supports(X, x))
     world.remove_relation(Has(X, x))
     world.remove_relation(PartOf(X, x))
 
-Location = world.make_property(1, "Location")
+@world.define_property
+class Location(Property) :
+    """Location(X) is the current immediate location in which X
+    resides (by containment).  Usually used to get the location of
+    the actor."""
+    numargs = 1
+
 @world.handler(Location(X))
 def object_location(x, world) :
     """Gets the location of an object by what currently contains it."""
     locs = world.query_relation(Contains(Y, x), var=Y)
     return locs[0] if locs else None
 
-#
-# Kinds and instances
-#
+@world.define_property
+class Owner(Property) :
+    """Gets the owner of the object."""
+    numargs = 1
+
+@world.handler(Owner(X))
+def rule_Owner_default(x, world) :
+    """We assume that the owner of an object is the first object which
+    Has some object which in some chain of containment (containment
+    optional).  Returns None if no owner was found."""
+    poss_owner = world.query_relation(Has(Y, x), var=Y)
+    if poss_owner :
+        return poss_owner[0]
+    poss_container = world.query_relation(Contains(Y, x), var=Y)
+    if poss_container :
+        return world[Owner(poss_container[0])]
+    return None
+
+###
+### Kinds and instances
+###
 
 @world.define_relation
 class KindOf(ManyToOneRelation) :
@@ -99,11 +140,12 @@ world.add_relation(KindOf("room", "kind"))
 world.add_relation(KindOf("thing", "kind"))
 world.add_relation(KindOf("door", "thing"))
 world.add_relation(KindOf("container", "thing"))
+world.add_relation(KindOf("supporter", "thing"))
 world.add_relation(KindOf("person", "thing"))
 
-@world.register_property
+@world.define_property
 @world.define_relation
-class IsA(ManyToOneRelation) :
+class IsA(ManyToOneRelation, Property) :
     """Represents inheriting from a kind.  As a relation, represents a
     direct inheritence.  As a property, represents the transitive IsA
     relation."""
@@ -121,35 +163,15 @@ def property_handler_IsA(x, y, world) :
 world.define_action("referenceable_things", accumulator=list_append)
 @world.to("referenceable_things")
 def referenceable_things_Default(world) :
-    """Gets all things in the world."""
+    """Gets all things in the world (that is, all objects which
+    inherit from "thing")."""
     objects = world.query_relation(IsA(X, Y), var=X)
     things = [o for o in objects if world[IsA(o, "thing")]]
     return things
 
-#
-# connecting rooms together
-#
-
-@world.define_relation
-class Adjacent(DirectedManyToManyRelation) :
-    """Used for searching for paths between rooms."""
-
-@world.define_relation
-class Exit(FreeformRelation) :
-    """Used to denote an exit from one room to the next.  Exit(room1,
-    dir, room2)."""
-
-@world.to("connect_rooms")
-def default_connect_rooms(room1, dir, room2, world, reverse=True) :
-    world.add_relation(Adjacent(room1, room2))
-    world.add_relation(Exit(room1, dir, room2))
-    if reverse :
-        world.add_relation(Adjacent(room2, room1))
-        world.add_relation(Exit(room2, inverse_direction(dir), room1))
-
-#
-# Directions
-#
+###
+### Directions
+###
 
 
 parser.define_subparser("direction", "Represents one of the directions one may go.")
@@ -169,53 +191,202 @@ define_direction("southeast", ["southeast", "se"])
 define_direction("up", ["up", "u"])
 define_direction("down", ["down", "d"])
 
+###*
+###* Property definitions
+###*
+
 ###
-### Defining basic objects
+### Defining: kind
 ###
 
-# All objects have a name
-Name = world.make_property(1, "Name")
-@world.handler(Name(X) <= IsA(X, "thing"))
+##
+# Property: Name
+##
+
+@world.define_property
+class Name(Property) :
+    """Represents the name of a kind.  Then, the id of a thing may be
+    differentiated from what the user will call it (for shorthand)."""
+    numargs = 1
+
+@world.handler(Name(X) <= IsA(X, "kind"))
 def default_Name(x, world) :
+    """The default name of a thing is its id, X."""
     return str(x)
 
-# All objects have a description
-Description = world.make_property(1, "Description")
-world[Description(X)] = "It does't seem that interesting."
+##
+# Property: Description
+##
 
-# All objects have a list of words which can describe them
-Words = world.make_property(1, "Words")
+@world.define_property
+class Description(Property) :
+    """Represents a textual description of a kind.  There is no
+    default value of this for kinds."""
+    numargs = 1
+
+##
+# Property: Words
+##
+
+@world.define_property
+class Words(Property) :
+    """This is a list of words which can describe the kind.  Words may
+    be prefixed with @ to denote that they are nouns (and matching a
+    noun gives higher priority to the disambiguator)."""
+    numargs = 1
+
 @world.handler(Words(X))
 def default_Words(x, world) :
+    """The default handler assumes that the words in Name(x) are
+    suitable for the object, and furthermore that the last word is a
+    noun (so "big red ball" returns ["big", "red", "@ball"])."""
     words = world[Name(x)].split()
     words[-1] = "@"+words[-1]
     return words
 
-@world.to("get_words")
-def get_words_Default(x, world) :
-    raise ActionHandled(*world[Words(x)])
+###
+### Defining: room
+###
 
-InhibitArticle = world.make_property(1, "InhibitArticle")
+world[Description(X) <= IsA(X, "room")] = "It's a place to be."
+
+#
+# connecting rooms together
+#
+
+@world.define_relation
+class Adjacent(DirectedManyToManyRelation) :
+    """Used for searching for paths between rooms."""
+
+@world.define_relation
+class Exit(FreeformRelation) :
+    """Used to denote an exit from one room to the next.  Exit(room1,
+    dir, room2)."""
+
+@world.to("connect_rooms")
+def default_connect_rooms(room1, dir, room2, world, reverse=True) :
+    """Called with connect_rooms(room1, dir, room2).  Gives room1 an
+    exit to room2 in direction dir.  By default, also adds in reverse
+    direction, unless the optional argument "reverse" is false."""
+    world.add_relation(Adjacent(room1, room2))
+    world.add_relation(Exit(room1, dir, room2))
+    if reverse :
+        world.add_relation(Adjacent(room2, room1))
+        world.add_relation(Exit(room2, inverse_direction(dir), room1))
+
+##
+# Property: Contents
+##
+
+@world.define_property
+class Contents(Property) :
+    """Gets a list of things which are the contents of the object.
+    Only goes one level deep."""
+    numargs = 1
+
+@world.handler(Contents(X) <= IsA(X, "room"))
+def contents_room(x, world) :
+    """Gets the immediate contents of a room."""
+    return [o["y"] for o in world.query_relation(Contains(x, Y))]
+
+##
+# Property: Enterable
+##
+@world.define_property
+class Enterable(Property) :
+    """Is true if the object is something someone could enter."""
+    numargs = 1
+
+# By default it's false
+world[Enterable(X)] = False
+# But for rooms it's true.
+world[Enterable(X) <= IsA(X, "room")] = True
+
+
+##
+# Property: IsLit
+##
+@world.define_property
+class IsLit(Property) :
+    """A property which represents if a player could see anything in
+    something which is enterable."""
+    numargs = 1
+
+# Enterable things are lit by default
+world[IsLit(X) <= Enterable(X)] = True
+
+
+###
+### Defining: thing
+###
+
+world[Description(X) <= IsA(X, "thing")] = "It does't seem that interesting."
+
+##
+# Property: Report
+##
+
+@world.define_property
+class Reported(Property) :
+    """Represents whether the object should be automatically reported
+    in room descriptions."""
+    numargs = 1
+
+world[Reported(X) <= IsA(X, "thing")] = True
+
+##
+# Properties: InhibitArticle, PrintedName, DefiniteName, IndefiniteName
+##
+
+@world.define_property
+class InhibitArticle(Property) :
+    """Tells the default DefiniteName and Indefinite name properties
+    whether to put the article in front.  For instance, we don't want
+    to be talking about the Bob."""
+    numargs = 1
+
 world[InhibitArticle(X) <= IsA(X, "thing")] = False
 
-# There's also the printed name of the object
-PrintedName = world.make_property(1, "PrintedName")
-@world.handler(PrintedName(X))
+@world.define_property
+class PrintedName(Property) :
+    """Gives a textual representation of an object which can then be
+    prefaced by an article (that is, unless InhibitArticle is true).
+    This is separate from Name because it might be dynamic in some
+    way.  (Note: it might be that this property isn't necessary)."""
+    numargs = 1
+
+@world.handler(PrintedName(X) <= IsA(X, "thing"))
 def default_PrintedName(x, world) :
+    """By default, PrintedName(X) is Name(X)."""
     return world[Name(x)]
 
-DefiniteName = world.make_property(1, "DefiniteName")
-@world.handler(DefiniteName(X))
+@world.define_property
+class DefiniteName(Property) :
+    """Gives the definite name of an object.  For instance, "the ball"
+    or "Bob"."""
+    numargs = 1
+
+@world.handler(DefiniteName(X) <= IsA(X, "thing"))
 def default_DefiniteName(x, world) :
+    """By default, DefiniteName is just the PrintedName with "the"
+    stuck in front, unless InhibitArticle is true."""
     printed_name = world[PrintedName(x)]
     if world[InhibitArticle(x)] :
         return printed_name
     else :
         return "the "+printed_name
 
-IndefiniteName = world.make_property(1, "IndefiniteName")
-@world.handler(IndefiniteName(X))
+@world.define_property
+class IndefiniteName(Property) :
+    """Gives the indefinite name of an object.  For instance, "a ball"
+    or "Bob"."""
+    numargs = 1
+
+@world.handler(IndefiniteName(X) <= IsA(X, "thing"))
 def default_IndefiniteName(x, world) :
+    """By default, IndefiniteName is the PrintedName with "a" or "an"
+    (depending on whether the PrintedName starts with a vowel) stuck
+    to the front, unless InhibitArticle is true."""
     printed_name = world[PrintedName(x)]
     if world[InhibitArticle(x)] :
         return printed_name
@@ -224,109 +395,124 @@ def default_IndefiniteName(x, world) :
     else :
         return "a "+printed_name
 
-SubjectPronoun = world.make_property(1, "SubjectPronoun")
-world[SubjectPronoun(X)] = "it"
-ObjectPronoun = world.make_property(1, "ObjectPronoun")
-world[ObjectPronoun(X)] = "it"
-Possessive = world.make_property(1, "Possessive")
-world[Possessive(X)] = "its"
+##
+# Properties: SubjectPronoun, ObjectPronoun, PossessivePronoun
+##
 
-Takeable = world.make_property(1, "Takeable")
-world[Takeable(X)] = True # by default, things are takeable
-NoTakeMsg = world.make_property(1, "NoTakeMsg")
-world[NoTakeMsg(X)] = "{Bob|cap} can't take that."
+@world.define_property
+class SubjectPronoun(Property) :
+    """Represents the pronoun for when the object is the subject of a
+    sentence."""
+    numargs = 1
 
-AccessibleTo = world.make_property(2, "AccessibleTo")
-world[AccessibleTo(X, actor)] = False # by default, things aren't accessible
+@world.define_property
+class ObjectPronoun(Property) :
+    """Represents the pronoun for when the object is the object of a
+    sentence."""
+    numargs = 1
+
+@world.define_property
+class PossessivePronoun(Property) :
+    """Represents the possesive pronoun of the object."""
+    numargs = 1
+
+world[SubjectPronoun(X) <= IsA(X, "thing")] = "it"
+world[ObjectPronoun(X) <= IsA(X, "thing")] = "it"
+world[PossessivePronoun(X) <= IsA(X, "thing")] = "its"
+
+
+##
+# FixedInPlace
+##
+
+@world.define_property
+class FixedInPlace(Property) :
+    """Represents something which can't be taken because it's fixed in
+    place.  For instance, scenery."""
+    numargs = 1
+
+# by default, things are not fixed in place
+world[FixedInPlace(X) <= IsA(X, "thing")] = False
+
+
+##
+# AccessibleTo
+##
+
+@world.define_property
+class AccessibleTo(Property) :
+    """AccessibleTo(X, actor) checks whether X is accessible to the
+    actor."""
+    numargs = 2
+
+# by default, things aren't accessible
+world[AccessibleTo(X, actor)] = False
 @world.handler(AccessibleTo(X, actor))
 def rule_AccessibleTo_if_held(x, actor, world) :
+    """Anything the actor has is accessible."""
     if world.query_relation(Has(actor, x)) :
         return True
     else :
         raise NotHandled()
 @world.handler(AccessibleTo(X, actor))
 def rule_AccessibleTo_if_in_same_room(x, actor, world) :
+    """Anything in the same room as the actor is accessible if the
+    room is lit."""
     actor_room = world.query_relation(Contains(Y, actor), var=Y)
     x_room = world.query_relation(Contains(Y, x), var=Y)
-    if actor_room and x_room and actor_room[0] == x_room[0] :
+    if actor_room and x_room and actor_room[0] == x_room[0] and world[IsLit(actor_room[0])] :
         return True
     raise NotHandled()
 @world.handler(AccessibleTo(X, actor))
 def rule_AccessibleTo_if_in_open_container(x, actor, world) :
+    """If an object is in a container which is open (assumed true if
+    not openable), then the object is accessible of the container is
+    accessible."""
     x_location = world.query_relation(Contains(Y, x), var=Y)
     if x_location and world[IsA(x_location[0], "container")] :
-        if world[IsOpen(x_location[0])] and world[AccessibleTo(x_location[0], actor)] :
+        open_not_matters = world[Openable(x_location[0])] and world[IsOpen(x_location[0])]
+        if open_not_matters and world[AccessibleTo(x_location[0], actor)] :
             return True
     raise NotHandled()
+@world.handler(AccessibleTo(X, actor))
+def rule_AccessibleTo_if_part_of(x, actor, world) :
+    """If an object is part of something, and that something is
+    accessible, then the object is accessible."""
+    x_assembly = world.query_relation(PartOf(x, Y), var=Y)
+    if x_assembly and world[AccessibleTo(x_assembly[0], actor)] :
+        return True
+    raise NotHandled()
+@world.handler(AccessibleTo(X, actor))
+def rule_AccessibleTo_if_on_supporter(x, actor, world) :
+    """If an object is on something, and that something is
+    accessible, then the object is accessible."""
+    x_supporter = world.query_relation(Supports(Y, x), var=Y)
+    if x_supporter and world[AccessibleTo(x_supporter[0], actor)] :
+        return True
+    raise NotHandled()
 
-Owner = world.make_property(1, "Owner")
-@world.handler(Owner(X))
-def rule_Owner_default(x, world) :
-    poss_owner = world.query_relation(Has(Y, x), var=Y)
-    if poss_owner :
-        return poss_owner[0]
-    poss_container = world.query_relation(Contains(Y, x), var=Y)
-    if poss_container :
-        return world[Owner(poss_container[0])]
-    return None
+###
+### Defining: container
+###
 
-# Containers
-
-Contents = world.make_property(1, "Contents")
 @world.handler(Contents(X) <= IsA(X, "container"))
 def container_contents(x, world) :
     return [o["y"] for o in world.query_relation(Contains(x, Y))]
 
-IsOpen = world.make_property(1, "IsOpen")
-world[IsOpen(X)] = False # by default, containers are closed.
 
-# Rooms
 
-Enterable = world.make_property(1, "Enterable")
-world[Enterable(X)] = False
+###
+### Defining: person
+###
 
-world[Enterable(X) <= IsA(X, "room")] = True
+@world.define_property
+class Gender(Property) :
+    """Represents the gender of a person.  Examples of options are
+    "male", "female", and "unknown"."""
+    numargs = 1
 
-@world.handler(Contents(X) <= IsA(X, "room"))
-def room_contents(x, world) :
-    return [o["y"] for o in world.query_relation(Contains(x, Y))]
-
-# action.describe_room
-@actoractions.to("describe_room")
-def describe_room_Heading(x, ctxt) :
-    ctxt.actions.describe_room_heading(x)
-    ctxt.write("[newline]")
-
-@actoractions.to("describe_room")
-def describe_room_Description(x, ctxt) :
-    ctxt.write(ctxt.world[Description(x)])
-
-@actoractions.to("describe_room")
-def describe_room_Objects(x, ctxt) :
-    obs = ctxt.world[Contents(x)]
-    if obs :
-        ctxt.write("[newline]You see "+serial_comma([ctxt.world[IndefiniteName(o)] for o in obs])+".")
-
-# action.describe_room_heading
-@actoractions.to("describe_room_heading")
-def describe_room_heading_Name(x, ctxt) :
-    ctxt.write(ctxt.world[Name(x)])
-
-@actoractions.to("describe_room_heading")
-def describe_room_location(x, ctxt) :
-    r = ctxt.world.query_relation(Contains(Y, x), Y)
-    if r and ctxt.world[Enterable(r[0])]:
-        ctxt.write("(in",world[Name(r[0])]+")")
-
-# actions.describe_current_room
-@actoractions.to("describe_current_room")
-def describe_current_room_default(ctxt) :
-    ctxt.actions.describe_room(ctxt.world[Location(ctxt.actorname)])
-
-# Persons
-
-Gender = world.make_property(1, "Gender")
 world[Gender(X) <= IsA(X, "person")] = "unknown" # other options are male and female
+
 
 @world.handler(SubjectPronoun(X) <= IsA(X, "person"))
 def person_SubjectPronoun(x, world) :
@@ -346,8 +532,8 @@ def person_ObjectPronoun(x, world) :
         return "her"
     else :
         return "them"
-@world.handler(Possessive(X) <= IsA(X, "person"))
-def person_Possessive(x, world) :
+@world.handler(PossessivePronoun(X) <= IsA(X, "person"))
+def person_PossessivePronoun(x, world) :
     gender = world[Gender(x)]
     if gender == "male" :
         return "him"
@@ -356,31 +542,125 @@ def person_Possessive(x, world) :
     else :
         return "their"
 
-# The default is 2nd person for pronouns
-SubjectPronounIfMe = world.make_property(1, "SubjectPronounIfMe")
+##
+# Properties: SubjectPronounIfMe, ObjectPronounIfMe, PossessivePronounIfMe
+##
+
+@world.define_property
+class SubjectPronounIfMe(Property) :
+    """Represents the subject pronoun, but when referring to the
+    current actor."""
+    numargs = 1
+@world.define_property
+class ObjectPronounIfMe(Property) :
+    """Represents the object pronoun, but when referring to the
+    current actor."""
+    numargs = 1
+@world.define_property
+class PossessivePronounIfMe(Property) :
+    """Represents the possessive pronoun, but when referring to the
+    current actor."""
+    numargs = 1
+
 world[SubjectPronounIfMe(X) <= IsA(X, "person")] = "you"
-
-ObjectPronounIfMe = world.make_property(1, "ObjectPronounIfMe")
 world[ObjectPronounIfMe(X) <= IsA(X, "person")] = "you"
+world[PossessivePronounIfMe(X) <= IsA(X, "person")] = "your"
 
-PossessiveIfMe = world.make_property(1, "PossessiveIfMe")
-world[PossessiveIfMe(X) <= IsA(X, "person")] = "your"
+##
+# The default player
+##
 
-# The player
 def_obj("player", "person")
-world[Name("player")] = "[if [current_actor_is <player>]]yourself[else]the player[endif]"
+world[PrintedName("player")] = "[if [current_actor_is player]]yourself[else]the player[endif]"
 world[InhibitArticle("player")] = True
 world[Words("player")] = ["yourself", "self", "AFGNCAAP"]
 world[Description("player")] = """{Bob|cap} {is} an ageless, faceless,
 gender-neutral, culturally-ambiguous adventure-person.  {Bob|cap}
 {does} stuff sometimes."""
 
+
 ###
-### Scenery
+### Other properties
 ###
 
-# scenery is not takeable
-world[Takeable(X) <= IsA(X, "scenery")] = False
+##
+# Properties: Openable, IsOpen
+
+@world.define_property
+class Openable(Property) :
+    """Represents whether an object is able to be opened and closed."""
+    numargs = 1
+
+world[Openable(X) <= IsA(X, "thing")] = False # by default, things aren't openable
+
+@world.define_property
+class IsOpen(Property) :
+    """Represents whether an openable object is open."""
+    numargs = 1
+
+world[IsOpen(X) <= Openable(X)] = False # by default, openable things are closed
+
+
+###
+### Other kinds
+###
+
+##
+## Scenery
+##
+
+world.add_relation(KindOf("scenery", "thing"))
+# scenery is fixed in place
+world[FixedInPlace(X) <= IsA(X, "scenery")] = True
+# scenery is not reported
+world[Reported(X) <= IsA(X, "scenery")] = False
+
+
+###*
+###* Actions
+###*
+
+###
+### Action: room descriptions
+###
+
+# action.describe_room
+@actoractions.to("describe_room")
+def describe_room_Heading(x, ctxt) :
+    """Runs describe_room_heading."""
+    ctxt.actions.describe_room_heading(x)
+    ctxt.write("[newline]")
+
+@actoractions.to("describe_room")
+def describe_room_Description(x, ctxt) :
+    """Prints the description property of the room."""
+    ctxt.write(ctxt.world[Description(x)])
+
+@actoractions.to("describe_room")
+def describe_room_Objects(x, ctxt) :
+    """Prints the contents of the room."""
+    obs = ctxt.world[Contents(x)]
+    if obs :
+        ctxt.write("[newline]You see "+serial_comma([ctxt.world[IndefiniteName(o)] for o in obs])+".")
+
+# action.describe_room_heading
+@actoractions.to("describe_room_heading")
+def describe_room_heading_Name(x, ctxt) :
+    """Prints the name of the room."""
+    ctxt.write(ctxt.world[Name(x)])
+
+@actoractions.to("describe_room_heading")
+def describe_room_location(x, ctxt) :
+    """Prints the room's location, if it is contained in another room."""
+    r = ctxt.world.query_relation(Contains(Y, x), Y)
+    if r and ctxt.world[Enterable(r[0])]:
+        ctxt.write("(in",world[Name(r[0])]+")")
+
+# actions.describe_current_room
+@actoractions.to("describe_current_room")
+def describe_current_room_default(ctxt) :
+    """Calls describe_room using the location of the current actor."""
+    ctxt.actions.describe_room(ctxt.world[Location(ctxt.actorname)])
 
 
 ###
@@ -445,6 +725,17 @@ def hint_xobj_notheld(action) :
 ### Action definitions
 ###
 
+class Look(BasicAction) :
+    """Look(actor)"""
+    verb = "look"
+    gerund = "looking"
+    numargs = 1
+understand("look/l", Look(actor))
+
+@when(Look(actor))
+def when_look_default(actor, ctxt) :
+    ctxt.actions.describe_current_room()
+
 ##
 # Taking
 ##
@@ -473,10 +764,16 @@ def before_take_check_ownership(actor, x, ctxt) :
         raise AbortAction("That is not {bob's} to take.", actor=actor)
 
 @before(Take(actor, X))
-def before_take_check_takeable(actor, x, ctxt) :
-    """One cannot take what is not takeable."""
-    if not ctxt.world[Takeable(x)] :
-        raise AbortAction(ctxt.world[NoTakeMsg(x)], actor=actor)
+def before_take_check_fixedinplace(actor, x, ctxt) :
+    """One cannot take what is fixed in place."""
+    if ctxt.world[FixedInPlace(x)] :
+        raise AbortAction("That's fixed in place.")
+
+@before(Take(actor, X))
+def before_take_check_not_self(actor, x, ctxt) :
+    """One cannot take oneself."""
+    if actor == x :
+        raise AbortAction("{Bob|cap} cannot take {himself}.", actor=actor)
 
 @when(Take(actor, X))
 def when_take_default(actor, x, ctxt) :

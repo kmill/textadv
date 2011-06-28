@@ -347,7 +347,8 @@ _reword_replacements = {"is" : "are",
                         "can" : "can",
                         "can't" : "can't",
                         "switches" : "switch",
-                        "isn't" : "aren't"
+                        "isn't" : "aren't",
+                        "himself" : "yourself"
                         }
 
 def _reword(word, flags, world, actor, is_me) :
@@ -362,7 +363,7 @@ def _reword(word, flags, world, actor, is_me) :
             else :
                 return world.get_property("SubjectPronounIfMe", actor)
         elif word == "bob's" :
-            return world.get_property("PossessiveIfMe", actor)
+            return world.get_property("PossessivePronounIfMe", actor)
         elif _reword_replacements.has_key(word) :
             return _reword_replacements[word]
         else : # assume it's a verb, take off s
@@ -373,8 +374,8 @@ def _reword(word, flags, world, actor, is_me) :
         elif word == "him" :
             return world.get_property("ObjectPronoun", actor)
         elif word == "bob" :
-            return world.get_property("PrintedName", actor)
+            return world.get_property("DefiniteName", actor)
         elif word == "bob's" :
-            return world.get_property("Possessive", actor)
+            return world.get_property("PossessivePronoun", actor)
         else : # we assume the word should stay as-is
             return word

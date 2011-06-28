@@ -9,7 +9,7 @@ from textadv.gamesystem.basicpatterns import *
 from textadv.gamesystem.utilities import *
 import textadv.gamesystem.parser as parser
 from textadv.gamesystem.parser import understand
-from textadv.gamesystem.eventsystem import BasicAction, verify, trybefore, before, when, report
+from textadv.gamesystem.eventsystem import BasicAction, verify, trybefore, before, when, report, do_first
 from textadv.gamesystem.eventsystem import VeryLogicalOperation, LogicalOperation, IllogicalOperation, IllogicalInaccessible, NonObviousOperation
 
 # The main game world!
@@ -466,7 +466,7 @@ def rule_AccessibleTo_if_in_same_room(x, actor, world) :
 @world.handler(AccessibleTo(X, actor))
 def rule_AccessibleTo_if_in_open_container(x, actor, world) :
     """If an object is in a container which is open (assumed true if
-    not openable), then the object is accessible of the container is
+    not openable), then the object is accessible if the container is
     accessible."""
     x_location = world.query_relation(Contains(Y, x), var=Y)
     if x_location and world[IsA(x_location[0], "container")] :
@@ -497,6 +497,7 @@ def rule_AccessibleTo_if_on_supporter(x, actor, world) :
 
 @world.handler(Contents(X) <= IsA(X, "container"))
 def container_contents(x, world) :
+    """Gets the immediate contents of the container."""
     return [o["y"] for o in world.query_relation(Contains(x, Y))]
 
 
@@ -516,6 +517,7 @@ world[Gender(X) <= IsA(X, "person")] = "unknown" # other options are male and fe
 
 @world.handler(SubjectPronoun(X) <= IsA(X, "person"))
 def person_SubjectPronoun(x, world) :
+    """Gives a default subject pronoun based on Gender."""
     gender = world[Gender(x)]
     if gender == "male" :
         return "he"
@@ -525,6 +527,7 @@ def person_SubjectPronoun(x, world) :
         return "they"
 @world.handler(ObjectPronoun(X) <= IsA(X, "person"))
 def person_ObjectPronoun(x, world) :
+    """Gives a default object pronoun based on Gender."""
     gender = world[Gender(x)]
     if gender == "male" :
         return "him"
@@ -534,6 +537,7 @@ def person_ObjectPronoun(x, world) :
         return "them"
 @world.handler(PossessivePronoun(X) <= IsA(X, "person"))
 def person_PossessivePronoun(x, world) :
+    """Gives a default possessive pronoun based on Gender."""
     gender = world[Gender(x)]
     if gender == "male" :
         return "him"
@@ -663,6 +667,10 @@ def describe_current_room_default(ctxt) :
     ctxt.actions.describe_room(ctxt.world[Location(ctxt.actorname)])
 
 
+###*
+###* Actions by the actor
+###*
+
 ###
 ### Oft-used requirements on actions
 ###
@@ -703,7 +711,7 @@ def require_xobj_held(action, only_hint=False, transitive=True) :
         @docstring("An attempt is made to take the object x from "+repr(action)+" if the actor is not already holding it")
         def _trybefore_xobj_held(actor, x, ctxt, **kwargs) :
             if not __is_held(actor, x, ctxt) :
-                do_first(Take(actor, x), context=context)
+                do_first(Take(actor, x), ctxt=ctxt)
             # just in case it succeeds, but we don't yet have the object
             if transitive :
                 can_do = (actor == ctxt.world[Owner(x)] and ctxt.world[AccessibleTo(x, actor)])
@@ -752,13 +760,13 @@ hint_xobj_notheld(Take(actor, X))
 
 @before(Take(actor, X))
 def before_take_when_already_have(actor, x, ctxt) :
-    """You can only take what you don't have."""
+    """You can't take what you already have."""
     if ctxt.world.query_relation(Has(actor, x)) :
         raise AbortAction("{Bob|cap} already {has} that.", actor=actor)
 
 @before(Take(actor, X))
 def before_take_check_ownership(actor, x, ctxt) :
-    """You can only take what is not owned by anyone else."""
+    """You can't take what is owned by anyone else."""
     owner = ctxt.world[Owner(x)]
     if owner and owner != actor :
         raise AbortAction("That is not {bob's} to take.", actor=actor)
@@ -774,6 +782,18 @@ def before_take_check_not_self(actor, x, ctxt) :
     """One cannot take oneself."""
     if actor == x :
         raise AbortAction("{Bob|cap} cannot take {himself}.", actor=actor)
+
+@before(Take(actor, X) <= IsA(X, "person"))
+def before_take_check_not_other_person(actor, x, ctxt) :
+    """One cannot take other people."""
+    if actor != x :
+        raise AbortAction(str_with_objs("[The $x] doesn't look like [he $x]'d appreciate that.", x=x))
+
+@before(Take(actor, X))
+def before_take_check_not_inside(actor, x, ctxt) :
+    """One cannot take what one is inside."""
+    if ctxt.world.r_path_to(Contains, x, actor) :
+        raise AbortAction(str_with_objs("{Bob|cap} {is} inside of that.", actor=actor))
 
 @when(Take(actor, X))
 def when_take_default(actor, x, ctxt) :

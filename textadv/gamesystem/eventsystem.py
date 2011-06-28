@@ -157,7 +157,9 @@ class DoInstead(Exception) :
 ##
 
 def verify_action(action, ctxt) :
-    reasons = action_verify.notify(action, {"ctxt" : ctxt})
+    """Returns either the best reason for doing the action, or, if
+    there is a reason not to do it, the worst."""
+    reasons = action_verify.notify(action, {"ctxt" : ctxt}, {"world" : ctxt.world})
     reasons = [r for r in reasons if r is not None]
     reasons.sort(key=lambda x : x.score)
     if len(reasons) == 0 :
@@ -168,30 +170,52 @@ def verify_action(action, ctxt) :
         else :
             return reasons[-1]
 
+def verify_instead(action, ctxt) :
+    """Used when it's necessary to verify another action because it's
+    known that a before handler is going to throw a DoInstead."""
+    raise ActionHandled(verify_action(action, ctxt))
+
 ##
 ## Running the action
 ##
 
 def run_action(action, ctxt, is_implied=False, write_action=False, silently=False) :
-    if write_action is True : write_action = "(%s)"
+    """Runs an action by the following steps:
+    * Verify - if the action is not reasonable, then the action fails
+    * Trybefore - just tries to make the world in the right state for Before to succeed.
+    * Before - checks if the action is possible.  May throw DoInstead to redirect execution.
+    * When - carries out the action.
+    * Report - reports the action.  Executes if the silently flag is False.
+
+    is_implied, if true forces a description of the action to be
+    printed.  Also (should) prevent possibly dangerous actions from
+    being carried out.
+
+    write_action is a boolean or a string such as "(first %s)".  If
+    considered to be true, then describes action.
+
+    silently, if true, prevents reporting the action.
+"""
     if (write_action or is_implied) and not silently :
+        if type(write_action) is not str : write_action = "(%s)"
         ctxt.write(write_action % action.gerund_form(ctxt))
         ctxt.write("[newline]")
     reasonable = verify_action(action, ctxt)
     if not reasonable.is_acceptible() :
         ctxt.write(reasonable.reason)
         raise AbortAction()
-    action_trybefore.notify(action, {"ctxt" : ctxt})
+    action_trybefore.notify(action, {"ctxt" : ctxt}, {"world" : ctxt.world})
     try :
-        action_before.notify(action, {"ctxt" : ctxt})
+        action_before.notify(action, {"ctxt" : ctxt}, {"world" : ctxt.world})
     except DoInstead as ix :
         msg = False if ix.suppress_message or silently else "(%s instead)"
         run_action(ix.instead, ctxt, write_action=msg)
         return
-    did_something = action_when.notify(action, {"ctxt" : ctxt})
+    did_something = action_when.notify(action, {"ctxt" : ctxt}, {"world" : ctxt.world})
     if not did_something :
         raise AbortAction("There was nothing to do.")
-    action_report.notify(action, {"ctxt" : ctxt})
+    if not silently :
+        action_report.notify(action, {"ctxt" : ctxt}, {"world" : ctxt.world})
 
 def do_first(action, ctxt, silently=False) :
     run_action(action, ctxt=ctxt, is_implied=True, write_action="(first %s)", silently=False)

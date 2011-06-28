@@ -144,14 +144,29 @@ class ActionTable(object) :
             except FinishWith as ix :
                 return self.accumulator(acc + ix.args)
         return self.accumulator(acc)
-    def add_handler(self, item) :
+    def add_handler(self, f, insert_first=None, insert_last=None, insert_before=None, insert_after=None) :
         """A function (which can be used as a decorator) which adds
-        the function to the table."""
-        if self.reverse :
-            self.actions.insert(0, item)
-        else :
-            self.actions.append(item)
-        return item
+        the function to the table.  At most one of the following may be set:
+        * insert_first: puts the handler in a position so it executes first
+        * insert_last: puts the handler in a position so it executes last
+        * insert_before: puts the handler in a position so it executes immediately before the function in insert_before
+        * insert_after: puts the handler in a position so it executes immediately after the function in insert_after
+
+        If none are set, then insert_first is default if reverse is true, otherwise it's insert_last."""
+        if insert_first is None and insert_last is None and insert_before is None and insert_after is None :
+            if self.reverse : insert_first=True
+            else : insert_last=True
+        if insert_first :
+            self.actions.insert(0, f)
+        elif insert_last :
+            self.actions.append(f)
+        elif insert_before :
+            i = self.actions.index(insert_before)
+            self.actions.insert(i,f)
+        elif insert_after :
+            i = self.actions.index(insert_before)
+            self.actions.insert(i+1, f)
+        return f
     def make_documentation(self, escape, heading_level=1) :
         print "<p>"
         if self.reverse : print "Runs in reverse-definition order."
@@ -185,16 +200,36 @@ class EventTable(object) :
         self.actions = []
         self.accumulator = accumulator or (lambda x : x)
         self.reverse = reverse
-    def add_handler(self, pattern, f) :
-        if self.reverse :
+    def add_handler(self, pattern, f, insert_first=None, insert_last=None, insert_before=None, insert_after=None) :
+        """Adds (pattern, f) to the table.  At most one of the following may be set:
+        * insert_first: puts the handler in a position so it executes first
+        * insert_last: puts the handler in a position so it executes last
+        * insert_before: puts the handler in a position so it executes immediately before the function in insert_before (ignoring pattern)
+        * insert_after: puts the handler in a position so it executes immediately after the function in insert_after (ignoring pattern)
+
+        If none are set, then insert_first is default if reverse is true, otherwise it's insert_last."""
+        if insert_first is None and insert_last is None and insert_before is None and insert_after is None :
+            if self.reverse : insert_first=True
+            else : insert_last=True
+        if insert_first :
             self.actions.insert(0, (pattern, f))
-        else :
+        elif insert_last :
             self.actions.append((pattern, f))
-    def notify(self, event, data) :
+        elif insert_before :
+            for i in xrange(0, len(self.actions)) :
+                if self.actions[i][1] is insert_before : break
+            self.actions.insert(i, (pattern, f))
+        elif insert_after :
+            for i in xrange(0, len(self.actions)) :
+                if self.actions[i][1] is insert_after : break
+            self.actions.insert(i+1, (pattern, f))
+    def notify(self, event, data, pattern_data=None) :
         accum = []
+        if not pattern_data :
+            pattern_data = data
         for (pattern, f) in self.actions :
             try :
-                matches = pattern.match(event, data=data)
+                matches = pattern.match(event, data=pattern_data)
                 for k,v in data.iteritems() :
                     matches[k] = v
                 accum.append(f(**matches))

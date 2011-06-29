@@ -118,7 +118,7 @@ def eval_str(input, context) :
         print "eval_str: Offending input is"
         print input
         raise x
-    evaled = _eval(code, context, context.actorname)
+    evaled = _eval(code, context, context.actor)
     return "".join([str(o) for o in evaled])
 
 def _eval_parse(input, i=0, in_code=False) :
@@ -304,7 +304,7 @@ def _cap(string) :
 @add_str_eval_func("when")
 def _str_eval_fn_when(context, *obs) :
     if len(obs) == 2 :
-        ob1, relation, ob2 = context.actorname, obs[0], obs[1]
+        ob1, relation, ob2 = context.actor, obs[0], obs[1]
     else :
         ob1, relation, ob2 = obs
     return [context.world.query_relation(context.world.get_relation(relation)(ob1, ob2))]
@@ -331,7 +331,7 @@ def _str_eval_fn_is_are_list(context, *obs) :
 def reword(args, context, actor) :
     word = args[0]
     flags = args[1:]
-    is_me = (context.actorname == actor)
+    is_me = (context.actor == actor)
     capitalized = word[0] in string.uppercase
     rewritten = _reword(word.lower(), flags, context.world, actor, is_me)
     if capitalized or "cap" in flags:

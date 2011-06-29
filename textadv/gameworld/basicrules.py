@@ -4,7 +4,7 @@ from textadv.core.patterns import VarPattern, BasicPattern
 from textadv.core.rulesystem import handler_requires, ActionHandled, MultipleResults, NotHandled, AbortAction
 from textadv.gamesystem.relations import *
 from textadv.gamesystem.world import *
-from textadv.gamesystem.gamecontexts import actoractions
+from textadv.gamesystem.gamecontexts import actoractions, actorevents
 from textadv.gamesystem.basicpatterns import *
 from textadv.gamesystem.utilities import *
 import textadv.gamesystem.parser as parser
@@ -412,6 +412,21 @@ def rule_IsLit_if_parts_lit(x, world) :
 
 
 ##
+# Property: NotableDescription
+##
+
+@world.define_property
+class NotableDescription(Property) :
+    """Represents a special textual description of an object if it is
+    notable enough to be put in a special paragraph in a location
+    description.  If it is set to False, then it is taken to mean
+    there is no such paragraph."""
+    numargs = 1
+
+world[NotableDescription(X)] = False
+
+
+##
 # Property: Report
 ##
 
@@ -801,18 +816,26 @@ world[Reported("player")] = False
 
 
 ###
-### Other kinds
+### Other properties
 ###
 
 ##
 ## Scenery
 ##
 
-world.add_relation(KindOf("scenery", "thing"))
+@world.define_property
+class Scenery(Property) :
+    """Scenery refers to things which are fixed in place and not
+    referred to in room descriptions."""
+    numargs = 1
+
+# things aren't in general scenery
+world[Scenery(X) <= IsA(X, "thing")] = False
+
 # scenery is fixed in place
-world[FixedInPlace(X) <= IsA(X, "scenery")] = True
+world[FixedInPlace(X) <= Scenery(X)] = True
 # scenery is not reported
-world[Reported(X) <= IsA(X, "scenery")] = False
+world[Reported(X) <= Scenery(X)] = False
 
 
 ###*
@@ -823,28 +846,37 @@ world[Reported(X) <= IsA(X, "scenery")] = False
 ### Action: location descriptions
 ###
 
-__DESCRIBE_LOCATION_obj_mentioned = []
+@actoractions.to("describe_current_location")
+def describe_current_location_default(ctxt) :
+    """Calls describe_location using the Location and the
+    EffectiveContainer of the current actor."""
+    loc = ctxt.world[Location(ctxt.actor)]
+    eff_cont = ctxt.world[EffectiveContainer(loc)]
+    ctxt.actions.describe_location(ctxt.actor, loc, eff_cont)
+
+__DESCRIBE_LOCATION_notables = []
+__DESCRIBE_LOCATION_mentioned = []
 
 @actoractions.to("describe_location")
-def describe_location_init_global_vars(loc, eff_cont, ctxt) :
-    """We have a global variable __DESCRIBE_LOCATION_obj_mentioned
-    which is a list of all objects that have already been mentioned.
-    This is cleared by this init function."""
-    global __DESCRIBE_LOCATION_obj_mentioned
-    __DESCRIBE_LOCATION_obj_mentioned = []
+def describe_location_init(actor, loc, eff_cont, ctxt) :
+    """Initializes the global variables __DESCRIBE_LOCATION_notables
+    and __DESCRIBE_LOCATION_mentioned."""
+    global __DESCRIBE_LOCATION_notables, __DESCRIBE_LOCATION_mentioned
+    __DESCRIBE_LOCATION_notables = []
+    __DESCRIBE_LOCATION_mentioned = []
 
 @actoractions.to("describe_location")
-def describe_location_Heading(loc, eff_cont, ctxt) :
+def describe_location_Heading(actor, loc, eff_cont, ctxt) :
     """Constructs the heading using describe_location_heading.  If the
     room is in darkness, then, writes "Darkness"."""
     if ctxt.world[IsLit(eff_cont)] :
-        ctxt.actions.describe_location_heading(loc, eff_cont)
+        ctxt.actions.describe_location_heading(actor, loc, eff_cont)
     else :
         ctxt.write("Darkness")
     ctxt.write("[newline]")
 
 @actoractions.to("describe_location")
-def describe_location_Description(loc, eff_cont, ctxt) :
+def describe_location_Description(actor, loc, eff_cont, ctxt) :
     """Prints the description property of the effective container if
     it is a room, unless the room is in darkness.  Darkness stops
     further description of the location."""
@@ -856,16 +888,62 @@ def describe_location_Description(loc, eff_cont, ctxt) :
         raise ActionHandled()
 
 @actoractions.to("describe_location")
-def describe_location_Objects(loc, eff_cont, ctxt) :
-    """Prints the of the location by asking the effective
-    container to do so."""
+def describe_location_Objects(actor, loc, eff_cont, ctxt) :
+    """Prints descriptions of the notable objects in the contents of
+    the effective container."""
     obs = ctxt.world[Contents(eff_cont)]
-    obs = [o for o in obs if ctxt.world[Reported(o)]]
-    if obs :
-        ctxt.write("[newline]You see "+serial_comma([" ".join(ctxt.actions.object_description(o)) for o in obs])+".")
+    raw_notables = list_append(ctxt.actions.get_notable_objects(actor, o) for o in obs)
+    to_ignore = [o for o,n in raw_notables if n==0]
+    filtered_notables = [(o,n) for o,n in raw_notables if o not in to_ignore]
+    filtered_notables.sort(key=lambda x : x[1], reverse=True)
+    notables = [o for o,n in filtered_notables]
+    mentioned = []
+
+    unnotable_messages = []
+    current_location = None
+    is_first_sentence = True
+    current_start = None
+    current_descs = None
+    for o in notables :
+        if o not in mentioned :
+            msg = ctxt.actions.terse_obj_description(actor, o, notables, mentioned)
+            mentioned.append(o)
+            if not msg : # the object printed its own description
+                pass
+            else :
+                o_loc = ctxt.world[Location(o)]
+                if o_loc != current_location :
+                    if current_descs :
+                        unnotable_messages.append((current_start, current_descs))
+                    current_location = o_loc
+                    if o_loc == eff_cont :
+                        if is_first_sentence :
+                            current_start = "You see "
+                            is_first_sentence = False
+                        else :
+                            current_start = "You also see "
+                    elif ctxt.world[IsA(o_loc, "container")] :
+                        if is_first_sentence :
+                            current_start = "In "+ctxt.world[DefiniteName(o_loc)]+" you see "
+                            is_first_sentence = False
+                        else :
+                            current_start = "In "+ctxt.world[DefiniteName(o_loc)]+" you also see "
+                    elif ctxt.world[IsA(o_loc, "supporter")] :
+                        if is_first_sentence :
+                            current_start = "On "+ctxt.world[DefiniteName(o_loc)]+" you see "
+                            is_first_sentence = False
+                        else :
+                            current_start = "On "+ctxt.world[DefiniteName(o_loc)]+" you also see "
+                    current_descs = []
+                current_descs.append(msg)
+    if current_descs :
+        unnotable_messages.append((current_start, current_descs))
+
+    if unnotable_messages :
+        ctxt.write("[newline]"+"[newline]".join(start+serial_comma(msgs)+"." for start,msgs in unnotable_messages)+".")
 
 @actoractions.to("describe_location")
-def describe_location_set_visited(loc, eff_cont, ctxt) :
+def describe_location_set_visited(actor, loc, eff_cont, ctxt) :
     """If the effective container is a room, then we set it to being
     visited."""
     if ctxt.world[IsA(eff_cont, "room")] :
@@ -873,46 +951,119 @@ def describe_location_set_visited(loc, eff_cont, ctxt) :
 
 
 @actoractions.to("describe_location_heading")
-def describe_location_heading_Name(loc, eff_cont, ctxt) :
+def describe_location_heading_Name(actor, loc, eff_cont, ctxt) :
     """Prints the name of the effective container."""
     ctxt.write(ctxt.world[Name(eff_cont)])
 
 @actoractions.to("describe_location_heading")
-def describe_location_property_heading_location(loc, eff_cont, ctxt) :
+def describe_location_property_heading_location(actor, loc, eff_cont, ctxt) :
     """Creates a description of where the location is with respect to
     the effective container."""
     while loc != eff_cont :
         if ctxt.world[IsA(loc, "container")] :
             ctxt.write("(in",world[DefiniteName(loc)]+")")
+            __DESCRIBE_LOCATION_mentioned.append(loc)
         elif ctxt.world[IsA(loc, "supporter")] :
             ctxt.write("(on",world[DefiniteName(loc)]+")")
+            __DESCRIBE_LOCATION_mentioned.append(loc)
         else :
             return
         loc = ctxt.world[Location(loc)]
 
-@actoractions.to("object_description")
-def object_description_DefiniteName(o, ctxt) :
-    """Describes the object based on its indefinite name."""
-    return ctxt.world[IndefiniteName(o)]
+def join_with_spaces(xs) :
+    return " ".join(xs)
 
-@actoractions.to("object_description")
-def object_description_container(o, ctxt) :
+actoractions.define_action("terse_obj_description", accumulator=join_with_spaces,
+                           doc="""Should give a terse description of
+                           an object while modifying mentioned as
+                           objects are mentioned.  Should raise
+                           ActionHandled() if want to signal no
+                           message to be given (for if wanting to
+                           print out a paragraph).""")
+
+@actoractions.to("terse_obj_description")
+def terse_obj_description_DefiniteName(actor, o, notables, mentioned, ctxt) :
+    """Describes the object based on its indefinite name.  Except, if
+    the NotableDescription is set, that is printed instead, and makes
+    terse_obj_description return the empty string."""
+    mentioned.append(o)
+    d = ctxt.world[NotableDescription(o)]
+    if d :
+        ctxt.write(d)
+        raise ActionHandled()
+    else :
+        return ctxt.world[IndefiniteName(o)]
+
+@actoractions.to("terse_obj_description")
+def terse_obj_description_container(actor, o, notables, mentioned, ctxt) :
+    """Describes the contents of a container, giving information of
+    whether it is open or closed as needed (uses IsOpaque for if the
+    container is openable and closed)."""
     if ctxt.world[IsA(o, "container")] :
-        contents = ctxt.world[Contents(o)]
-        contents = [o for o in contents if ctxt.world[Reported(o)]]
-        if contents :
-            return "(in which "+is_are_list([" ".join(ctxt.actions.object_description(x)) for x in contents])+")"
-        else : raise NotHandled()
+        if ctxt.world[IsOpaque(o)] and ctxt.world[Openable(o)] and not ctxt.world[IsOpen(o)] :
+            return "(which is closed)"
+        else :
+            contents = ctxt.world[Contents(o)]
+            msgs = []
+            for c in contents :
+                if c in notables and c not in mentioned :
+                    msg = ctxt.actions.terse_obj_description(actor, c, notables, mentioned)
+                    if msg : msgs.append(msg)
+            if msgs :
+                state = "which is closed and " if ctxt.world[Openable(o)] and not ctxt.world[IsOpen(o)] else ""
+                return "("+state+"in which "+is_are_list(msgs)+")"
+            elif not contents :
+                return "(which is empty)"
+            else :
+                raise NotHandled()
     else : raise NotHandled()
 
+@actoractions.to("terse_obj_description")
+def terse_obj_description_supporter(actor, o, notables, mentioned, ctxt) :
+    if ctxt.world[IsA(o, "supporter")] :
+        contents = ctxt.world[Contents(o)]
+        msgs = []
+        for o in contents :
+            if o in notables and o not in mentioned :
+                msg = ctxt.actions.terse_obj_description(actor, o, notables, mentioned)
+                if msg : msgs.append(msg)
+        if msgs :
+            return "(on which "+is_are_list(msgs)+")"
+    raise NotHandled()
 
-@actoractions.to("describe_current_location")
-def describe_current_location_default(ctxt) :
-    """Calls describe_location using the Location and the
-    EffectiveContainer of the current actor."""
-    loc = ctxt.world[Location(ctxt.actorname)]
-    eff_cont = ctxt.world[EffectiveContainer(loc)]
-    ctxt.actions.describe_location(loc, eff_cont)
+
+actoractions.define_action("get_notable_objects", accumulator=list_append,
+                           doc="""Returns a list of objects which are
+                           notable in a description as (obj,n) pairs,
+                           where n is a numeric value from 0 onward
+                           denoting notability.  n=1 is default, and
+                           n=0 disables.  Repeats are fine.""")
+
+@actoractions.to("get_notable_objects")
+def get_notable_objects_thing(actor, x, ctxt) :
+    """By default, returns (x, 1) to represent x not being very
+    notable, but notable enough to be mentioned."""
+    if ctxt.world[IsA(x, "thing")] :
+        return [(x, 1)]
+    else : raise NotHandled()
+@actoractions.to("get_notable_objects")
+def get_notable_objects_container(actor, x, ctxt) :
+    """Gets objects from the container"""
+    if ctxt.world[IsA(x, "container")] :
+        obs = ctxt.world[Contents(x)]
+        return list_append(ctxt.actions.get_notable_objects(actor, o) for o in obs if ctxt.world[AccessibleTo(o, actor)])
+    else : raise NotHandled()
+@actoractions.to("get_notable_objects")
+def get_notable_objects_supporter(actor, x, ctxt) :
+    if ctxt.world[IsA(x, "supporter")] :
+        obs = ctxt.world[Contents(x)]
+        return list_append(ctxt.actions.get_notable_objects(actor, o) for o in obs)
+    else : raise NotHandled()
+@actoractions.to("get_notable_objects")
+def get_notable_objects_not_reported(actor, x, ctxt) :
+    if not ctxt.world[Reported(x)] :
+        return [(x, 0)]
+    else : raise NotHandled()
 
 
 ###*

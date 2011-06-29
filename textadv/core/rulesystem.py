@@ -117,6 +117,8 @@ class PropertyTable(object) :
             else :
                 print "<p><i>No entries</i></p>"
 
+def identity(x) : return x
+
 class ActionTable(object) :
     """Runs the actions one at a time until an AbortAction is raised
     or there are no more actions.  Actions are run in the order they
@@ -124,10 +126,11 @@ class ActionTable(object) :
     takes the list of results to make a return value.  By default it's
     just the identity function.  Unlike the other tables in the
     rulesystem, the functions are not selected by a pattern."""
-    def __init__(self, accumulator=None, reverse=False) :
+    def __init__(self, accumulator=None, reverse=False, doc=None) :
         self.actions = []
-        self.accumulator = accumulator or (lambda x : x)
+        self.accumulator = accumulator or identity
         self.reverse = reverse
+        self.doc = doc
     def notify(self, args, data) :
         acc = []
         for f in self.actions :
@@ -169,6 +172,9 @@ class ActionTable(object) :
         return f
     def make_documentation(self, escape, heading_level=1) :
         print "<p>"
+        if self.doc : print escape(self.doc)
+        else : print "<i>(No documentation)</i>"
+        print "</p><p>"
         if self.reverse : print "Runs in reverse-definition order."
         else : print "Runs in definition order."
         print "Accumulator: "
@@ -196,10 +202,11 @@ class EventTable(object) :
 
     This is basically an ActionTable which also first pattern
     matches."""
-    def __init__(self, accumulator=None, reverse=True) :
+    def __init__(self, accumulator=None, reverse=True, doc=None) :
         self.actions = []
-        self.accumulator = accumulator or (lambda x : x)
+        self.accumulator = accumulator or identity
         self.reverse = reverse
+        self.doc = doc
     def add_handler(self, pattern, f, insert_first=None, insert_last=None, insert_before=None, insert_after=None) :
         """Adds (pattern, f) to the table.  At most one of the following may be set:
         * insert_first: puts the handler in a position so it executes first
@@ -248,6 +255,9 @@ class EventTable(object) :
         return self.accumulator(accum)
     def make_documentation(self, escape, heading_level=1) :
         print "<p>"
+        if self.doc : print escape(self.doc)
+        else : print "<i>(No documentation)</i>"
+        print "</p><p>"
         if self.reverse : print "Runs in reverse-definition order."
         else : print "Runs in definition order."
         print "Accumulator: "
@@ -265,15 +275,23 @@ class EventTable(object) :
             print "<p><i>No entries</i></p>"
 
 ##
-## A class for helping have many ActionTables (see World)
+## A class for helping have many ActionTables and EventTables (see World)
 ##
 
 class ActionHelperObject(object) :
     def __init__(self, handler) :
         self.__handler__ = handler
     def __getattr__(self, name) :
-        def _caller(*args) :
-            return self.__handler__.call(name, *args)
+        def _caller(*args, **kwargs) :
+            return self.__handler__.call_action(name, *args, **kwargs)
+        return _caller
+
+class EventHelperObject(object) :
+    def __init__(self, handler) :
+        self.__handler__ = handler
+    def __getattr__(self, name) :
+        def _caller(*args, **kwargs) :
+            return self.__handler__.call_event(name, *args, **kwargs)
         return _caller
 
 ###

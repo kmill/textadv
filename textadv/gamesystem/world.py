@@ -86,16 +86,16 @@ class World(object) :
 
     def define_action(self, name, **kwargs) :
         self._actions[name] = ActionTable(**kwargs)
-    def to(self, name) :
+    def to(self, name, **kwargs) :
         if self.game_defined :
             raise Exception("Can't add new actions when game is defined.")
         def _to(f) :
             if not self._actions.has_key(name) :
                 self._actions[name] = ActionTable()
-            self._actions[name].add_handler(f)
+            self._actions[name].add_handler(f, **kwargs)
             return f
         return _to
-    def call(self, name, *args) :
+    def call_action(self, name, *args) :
         return self._actions[name].notify(args, {"world" : self})
 
     def serialize(self) :

@@ -344,7 +344,7 @@ def run_parser(name, input, ctxt) :
             return [[]]
         else :
             return []
-    return subparsers[name].notify([None, input, 0, ctxt, ctxt.actorname, _end], {})
+    return subparsers[name].notify([None, input, 0, ctxt, ctxt.actor, _end], {})
 
 def transform_command_to_words(text) :
     text = text.lower()

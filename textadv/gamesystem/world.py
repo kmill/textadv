@@ -101,6 +101,25 @@ class World(object) :
         """Gets the action table of the given name."""
         return self._activities[name]
 
+    def copy(self) :
+        """Makes a copy of the world which behaves the same as the
+        present one, but is disconnected.  However, the values of
+        modified_properties are not copied but referenced."""
+        import copy
+        newworld = World()
+        newworld.properties = self.properties.copy()
+        newworld.property_types = self.property_types.copy()
+        newworld.inv_property_types = self.inv_property_types.copy() # Property -> name
+        for k,v in self.modified_properties.iteritems() :
+            newworld.modified_properties[k] = v
+        newworld.game_defined = self.game_defined
+        for r,data in self.relations.iteritems() :
+            newworld.relations[r] = r.copy(data)
+        newworld.relation_handlers = list(self.relation_handlers)
+        newworld.name_to_relation = self.name_to_relation.copy()
+        for name, table in self._activities.iteritems() :
+            newworld._activities[name] = table.copy()
+        return newworld
     def serialize(self) :
         import pickle
         mp = []

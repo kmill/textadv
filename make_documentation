@@ -1,7 +1,5 @@
 #!/usr/bin/env python
 
-import textadv.basiclibrary
-
 import sys
 
 docfor=""
@@ -10,6 +8,8 @@ if len(sys.argv)>=2 :
     print "Making documentation for "+sys.argv[1]
     docfor = "_for_"+sys.argv[1].split(".")[0]
     execfile(sys.argv[1])
+else :
+    from textadv.basicsetup import *
 
 sys.stdout = open("doc/doc"+docfor+".html", "w")
 
@@ -30,11 +30,9 @@ def html_escape(text):
 
 print "<html><body><h1>TextAdv auto-documentation</h1>"
 print "<p>This is automagically generated documentation of the rules defined in the game engine.</p>"
-textadv.basiclibrary.world.make_documentation(html_escape, heading_level=1)
-import textadv.gamesystem.parser as parser
+world.make_documentation(html_escape, heading_level=1)
 parser.make_documentation(html_escape, heading_level=1)
-import textadv.gamesystem.eventsystem as eventsystem
-eventsystem.make_documentation(html_escape, heading_level=1)
+actionsystem.make_documentation(html_escape, heading_level=1)
 import textadv.gamesystem.gamecontexts as gamecontexts
 gamecontexts.make_documentation(html_escape, heading_level=1)
 

@@ -1,6 +1,6 @@
 # rulesystem.py
 #
-# rule- and event-based programming
+# rule- and activity-based programming
 #
 # What's here:
 # Exceptions: NotHandled, AbortAction, ActionHandled, MultipleResults, FinishWith, RestartWith
@@ -96,6 +96,16 @@ class PropertyTable(object) :
                     print repr(item)+" calls "+repr(value)
                 else :
                     print repr(item)+" = "+repr(value)
+    def copy(self) :
+        """Returns a copy that behaves like the original by making a
+        copy of the properties dictionary and puting the table items
+        in new lists.  Values are not physically copied."""
+        newtable = PropertyTable()
+        newdict = dict()
+        for t,table in self.properties.iteritems() :
+            newdict[t] = list(table)
+        newtable.properties = newdict
+        return newtable
     def make_documentation(self, escape, heading_level=1) :
         hls = str(heading_level)
         props = self.properties.keys()
@@ -220,6 +230,16 @@ class ActivityTable(object) :
         self.current_disabled = to_disable+self.disabled
     def __pop_current_disabled(self) :
         self.current_disabled = self.last_current_disabled.pop()
+    def copy(self) :
+        """Returns a copy which behaves like before, except the
+        activity table has been suitably remade.  Values are stored in
+        the new table by reference."""
+        newtable = ActivityTable(accumulator=self.accumulator,
+                                 reverse=self.reverse,
+                                 doc=self.doc)
+        newtable.actions = list(self.actions)
+        newtable.disabled = list(self.disabled)
+        return newtable
     def make_documentation(self, escape, heading_level=1) :
         print "<p>"
         if self.doc : print escape(self.doc)
@@ -260,6 +280,9 @@ class RuleTable(object) :
         self.accumulator = accumulator or identity
         self.reverse = reverse
         self.doc = doc
+        self.disabled = []
+        self.current_disabled = None
+        self.last_current_disabled = []
     def add_handler(self, pattern, f, insert_first=None, insert_last=None, insert_before=None, insert_after=None) :
         """Adds (pattern, f) to the table.  At most one of the following may be set:
         * insert_first: puts the handler in a position so it executes first
@@ -283,11 +306,14 @@ class RuleTable(object) :
             for i in xrange(0, len(self.actions)) :
                 if self.actions[i][1] is insert_after : break
             self.actions.insert(i+1, (pattern, f))
-    def notify(self, event, data, pattern_data=None) :
+    def notify(self, event, data, pattern_data=None, disable=None) :
+        self.__push_current_disabled(disable or [])
         accum = []
         if not pattern_data :
             pattern_data = data
         for (pattern, f) in self.actions :
+            if f in self.current_disabled :
+                continue
             try :
                 matches = pattern.match(event, data=pattern_data)
                 for k,v in data.iteritems() :
@@ -298,14 +324,34 @@ class RuleTable(object) :
             except NotHandled :
                 pass
             except ActionHandled as ix :
+                self.__pop_current_disabled()
                 return self.accumulator(ix.args)
             except MultipleResults as ix :
                 acc.extend(ix.args)
             except RestartWith as ix :
                 acc = list(ix.args)
             except FinishWith as ix :
+                self.__pop_current_disabled()
                 return self.accumulator(acc + ix.args)
+            except :
+                self.__pop_current_disabled()
+                raise
         return self.accumulator(accum)
+    def __push_current_disabled(self, to_disable) :
+        self.last_current_disabled.append(self.current_disabled)
+        self.current_disabled = to_disable+self.disabled
+    def __pop_current_disabled(self) :
+        self.current_disabled = self.last_current_disabled.pop()
+    def copy(self) :
+        """Returns a copy which behaves like before, except the
+        activity table has been suitably remade.  Values are stored in
+        the new table by reference."""
+        newtable = RuleTable(accumulator=self.accumulator,
+                             reverse=self.reverse,
+                             doc=self.doc)
+        newtable.actions = list(self.actions)
+        newtable.disabled = list(self.disabled)
+        return newtable
     def make_documentation(self, escape, heading_level=1) :
         print "<p>"
         if self.doc : print escape(self.doc)
@@ -317,11 +363,14 @@ class RuleTable(object) :
         print "<tt>"+escape(self.accumulator.__name__)+"</tt></p>"
         if self.actions :
             print "<ol>"
-            for key,value in self.actions :
-                print "<li><p>"+escape(repr(key))#+"<br>"
-                print "<b>calls</b> <tt>"+escape(value.__name__)+"</tt>"
+            for key,handler in self.actions :
+                print "<li><p>"
+                if handler in self.disabled :
+                    print "<b><i>DISABLED</i></b>"
+                print escape(repr(key))#+"<br>"
+                print "<b>calls</b> <tt>"+escape(handler.__name__)+"</tt>"
                 print "</p>"
-                print "<p><i>"+(escape(value.__doc__) or "(No documentation)")+"</i></p>"
+                print "<p><i>"+(escape(handler.__doc__) or "(No documentation)")+"</i></p>"
                 print "</li>"
             print "</ol>"
         else :
@@ -346,6 +395,18 @@ class RuleHelperObject(object) :
         def _caller(*args, **kwargs) :
             return self.__handler__.call_rule(name, *args, **kwargs)
         return _caller
+
+##
+## A decorator
+##
+
+def make_rule_decorator(table) :
+    def _deco(pattern, **kwargs) :
+        def __deco(f) :
+            table.add_handler(pattern, f, **kwargs)
+            return f
+        return __deco
+    return _deco
 
 ###
 ### Tests

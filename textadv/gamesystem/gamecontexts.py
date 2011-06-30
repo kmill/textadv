@@ -11,7 +11,6 @@
 from textadv.gamesystem.utilities import eval_str, as_actor
 from textadv.core.rulesystem import AbortAction, ActionHandled, ActivityHelperObject, RuleHelperObject
 from textadv.core.rulesystem import ActivityTable, RuleTable
-from textadv.gamesystem.eventsystem import verify_action, run_action
 from textadv.gamesystem.utilities import *
 from textadv.gamesystem import parser
 #from textadv.gamesystem.basicpatterns import X,Y,Z
@@ -85,13 +84,15 @@ actorrules = ActorRules()
 class ActorContext(GameContext) :
     """Represents the context in which the player is assuming the role
     of the actor.  The parser is the main parser in the parser module."""
-    def __init__(self, parentcontext, io, world, actor) :
+    def __init__(self, parentcontext, io, world, actionsystem, parser, actor) :
         self.parentcontext = parentcontext
         self.io = io
         self.world = world
         self.actor = actor
         self.activity = ActivityHelperObject(self)
         self.rule = RuleHelperObject(self)
+        self.actionsystem = actionsystem
+        self.parser = parser
     def write(self, *stuff, **kwargs) :
         """Writes a line by evaluating the string using the utilities
         module.  If there is an actor, then the text is wrapped so
@@ -109,18 +110,18 @@ class ActorContext(GameContext) :
                     return (self, {})
             try :
                 if action is None :
-                    action, disambiguated = parser.handle_all(input, self, verify_action)
+                    action, disambiguated = self.parser.handle_all(input, self, self.actionsystem.verify_action)
                 else :
                     disambiguated = True
                 if disambiguated :
-                    run_action(action, self, write_action=True)
+                    self.actionsystem.run_action(action, self, write_action=True)
                 else :
-                    run_action(action, self)
+                    self.actionsystem.run_action(action, self)
             except parser.NoSuchWord as ex :
                 esc = escape_str(ex.word)
-                self.write("I don't know what you mean by %r." % esc)
+                self.write("I don't know what you mean by %r.[newline]" % esc)
             except parser.NoUnderstand :
-                self.write("Huh?")
+                self.write("Huh?[newline]")
             except parser.NoInput :
                 pass
             except parser.Ambiguous as ex :
@@ -161,7 +162,7 @@ class DisambiguationContext(GameContext) :
         for var, opts in self.amb.options.iteritems() :
             res = serial_comma([self.parent.world.get_property("DefiniteName", o)
                                 for o in opts], conj="or")
-            self.parent.write("Did you mean "+res+"?")
+            self.parent.write("Did you mean "+res+"?[newline]")
             input = self.parent.io.get_input(">>>")
             res = parser.run_parser("something",
                                     parser.transform_text_to_words(input), self.parent)
@@ -170,7 +171,7 @@ class DisambiguationContext(GameContext) :
             elif len(res) == 1 :
                 repl[var] = res[0][0].value
             else :
-                self.parent.write("That didn't help me out at all.")
+                self.parent.write("That didn't help me out at all.[newline]")
                 return (self.parent, dict())
         return (self.parent, {"action" : self.amb.pattern.expand_pattern(repl)})
 

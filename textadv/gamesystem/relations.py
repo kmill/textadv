@@ -28,6 +28,9 @@ class Relation(BasicPattern) :
         """Finds a path from a to b using data as the database."""
         raise NotImplementedError("Relation is abstract")
     @classmethod
+    def copy(r, data) :
+        raise NotImplementedError("Relation is abstract")
+    @classmethod
     def dump(r, data) :
         raise NotImplementedError("Relation is abstract")
 
@@ -73,6 +76,9 @@ class ManyToOneRelation(Relation) :
             a = rels[a]
             out.append(a)
         return out
+    @classmethod
+    def copy(r, data) :
+        return [data[0].copy(), list(data[1])]
     @classmethod
     def dump(r, data) :
         for a,b in data[0].iteritems() :
@@ -120,6 +126,9 @@ class OneToManyRelation(Relation) :
             b = rels[b]
             out.insert(0,b)
         return out
+    @classmethod
+    def copy(r, data) :
+        return [data[0].copy(), list(data[1])]
     @classmethod
     def dump(r, data) :
         for b,a in data[0].iteritems() :
@@ -178,6 +187,9 @@ class ManyToManyRelation(Relation) :
                     return paths[n]
         return None
     @classmethod
+    def copy(r, data) :
+        return list(data)
+    @classmethod
     def dump(r, data) :
         for rel in data :
             print repr(r(*rel))
@@ -213,6 +225,9 @@ class FreeformRelation(Relation) :
             except NoMatchException :
                 pass
         return out
+    @classmethod
+    def copy(r, data) :
+        return list(data)
     @classmethod
     def dump(r, data) :
         for rel in data :

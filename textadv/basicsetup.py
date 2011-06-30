@@ -18,6 +18,16 @@ import re
 import string
 import sys
 
+world = world.copy()
+actionsystem = actionsystem.copy()
+parser = parser.copy()
+
+verify = make_rule_decorator(actionsystem.action_verify)
+trybefore = make_rule_decorator(actionsystem.action_trybefore)
+before = make_rule_decorator(actionsystem.action_before)
+when = make_rule_decorator(actionsystem.action_when)
+report = make_rule_decorator(actionsystem.action_report)
+
 class TerminalGameIO(object) :
     """This class may be replaced in the GameContext by anything which
     implements the following two methods."""
@@ -26,7 +36,7 @@ class TerminalGameIO(object) :
         return raw_input(prompt + " ")
     def write(self, *data) :
         for d in data :
-            print d.replace("[newline]", "\n\n").replace("[break]", "\n").replace("[indent]"," "),
+            print d.replace("[newline]", "\n\n").replace("[break]", "\n").replace("[indent]","  "),
         return
         paragraphs = re.split("\n\\s*\n", " ".join(data))
         to_print = []
@@ -38,7 +48,7 @@ class TerminalGameIO(object) :
             to_print.append("\n".join(one_p))
         print string.replace("\n\n".join(to_print)+"\n", "&nbsp;", " ")
 
-game_context = ActorContext(None, TerminalGameIO(), world, "player")
+game_context = ActorContext(None, TerminalGameIO(), world, actionsystem, parser, "player")
 
 def basic_begin_game(see_world_size=False) :
     """Just start up the game using the context defined in

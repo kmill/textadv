@@ -6,7 +6,6 @@
 # These are user and world rules which can be executed.
 
 
-
 ###
 ### Directions
 ###
@@ -18,7 +17,7 @@ parser.define_subparser("direction", "Represents one of the directions one may g
 
 def define_direction(direction, synonyms) :
     for synonym in synonyms :
-        understand(synonym, direction, dest="direction")
+        parser.understand(synonym, direction, dest="direction")
 
 define_direction("north", ["north", "n"])
 define_direction("south", ["south", "s"])
@@ -45,8 +44,9 @@ define_direction("down", ["down", "d"])
 
 @world.define_property
 class Name(Property) :
-    """Represents the name of a kind.  Then, the id of a thing may be
-    differentiated from what the user will call it (for shorthand)."""
+    """Represents the name of an instance of a kind.  Then, the id of
+    a thing may be differentiated from what the user will call it (for
+    shorthand)."""
     numargs = 1
 
 @world.handler(Name(X) <= IsA(X, "kind"))
@@ -406,15 +406,15 @@ world[IsOpaque(X) <= IsA(X, "thing")] = True
 
 
 ##
-# Property: Enterable
+# Property: IsEnterable
 ##
 @world.define_property
-class Enterable(Property) :
+class IsEnterable(Property) :
     """Is true if the object is something someone could enter."""
     numargs = 1
 
 # By default it's false
-world[Enterable(X) <= IsA(X, "thing")] = False
+world[IsEnterable(X) <= IsA(X, "thing")] = False
 
 ###
 ### Defining: door
@@ -616,7 +616,7 @@ def rule_IsLit_possessions_can_light_person(x, world) : # maybe should handle co
 # The default player
 ##
 
-def_obj("player", "person")
+world.activity.def_obj("player", "person")
 world[PrintedName("player")] = "[if [current_actor_is player]]yourself[else]the player[endif]"
 world[InhibitArticle("player")] = True
 world[Words("player")] = ["yourself", "self", "AFGNCAAP"]
@@ -784,10 +784,10 @@ def describe_location_property_heading_location(actor, loc, eff_cont, ctxt) :
     the effective container."""
     while loc != eff_cont :
         if ctxt.world[IsA(loc, "container")] :
-            ctxt.write("(in",world[DefiniteName(loc)]+")")
+            ctxt.write("(in",ctxt.world[DefiniteName(loc)]+")")
             __DESCRIBE_LOCATION_mentioned.append(loc)
         elif ctxt.world[IsA(loc, "supporter")] :
-            ctxt.write("(on",world[DefiniteName(loc)]+")")
+            ctxt.write("(on",ctxt.world[DefiniteName(loc)]+")")
             __DESCRIBE_LOCATION_mentioned.append(loc)
         else :
             return
@@ -805,7 +805,7 @@ actoractivities.define_activity("terse_obj_description", accumulator=join_with_s
                            print out a paragraph).""")
 
 @actoractivities.to("terse_obj_description")
-def terse_obj_description_DefiniteName(actor, o, notables, mentioned, ctxt) :
+def terse_obj_description_IndefiniteName(actor, o, notables, mentioned, ctxt) :
     """Describes the object based on its indefinite name.  Except, if
     the NotableDescription is set, that is printed instead, and makes
     terse_obj_description return the empty string."""
@@ -924,7 +924,7 @@ def describe_object_container(actor, o, ctxt) :
     global __DESCRIBE_OBJECT_described
     if ctxt.world[IsA(o, "container")] :
         if not ctxt.world[IsOpaque(o)] :
-            contents = [ctxt.world[DefiniteName(c)] for c in ctxt.world[Contents(o)] if ctxt.world[Reported(c)]]
+            contents = [ctxt.world[IndefiniteName(c)] for c in ctxt.world[Contents(o)] if ctxt.world[Reported(c)]]
             if contents :
                 __DESCRIBE_OBJECT_described = True
                 ctxt.write("In "+ctxt.world[DefiniteName(o)]+" "+is_are_list(contents)+".[newline]", actor=actor)
@@ -935,7 +935,7 @@ def describe_object_container(actor, o, ctxt) :
 def describe_object_supporter(actor, o, ctxt) :
     """Writes a line about the contents of a supporter."""
     if ctxt.world[IsA(o, "supporter")] :
-        contents = [c for c in ctxt.world[Contents(o)] if ctxt.world[Reported(c)]]
+        contents = [ctxt.world[IndefiniteName(c)] for c in ctxt.world[Contents(o)] if ctxt.world[Reported(c)]]
         if contents :
             global __DESCRIBE_OBJECT_described
             __DESCRIBE_OBJECT_described = True
@@ -958,7 +958,7 @@ actoractivities.define_activity("describe_possession",
 def describe_possession_indefinite_name(actor, o, numtabs, ctxt) :
     """Prints the indefinite name of the object preceded by numtabs
     indentations."""
-    ctxt.write("[indent]"*numtabs+ctxt.world[IndefiniteName(o)])
+    ctxt.write("[break]"+"[indent]"*numtabs+ctxt.world[IndefiniteName(o)])
 @actoractivities.to("describe_possession")
 def describe_possession_openable(actor, o, numtabs, ctxt) :
     """Prints (open) or (closed) if the thing is openable."""
@@ -968,20 +968,18 @@ def describe_possession_openable(actor, o, numtabs, ctxt) :
         else :
             ctxt.write("(closed)")
 @actoractivities.to("describe_possession")
-def describe_possession_supporter(actor, o, numtabs, ctxt) :
-    """Prints the contents of a supporter."""
-    if ctxt.world[IsA(o, "supporter")] :
-        cont = ctxt.world[Contents(o)]
-        for c in cont :
-            ctxt.write("[break]"+"[indent]"*numtabs)
-            ctxt.activity.describe_possession(actor, c, numtabs+1)
-@actoractivities.to("describe_possession")
 def describe_possession_container(actor, o, numtabs, ctxt) :
     """Prints the contents of a container if it's not opaque."""
     if ctxt.world[IsA(o, "container")] and not ctxt.world[IsOpaque(o)] :
         cont = ctxt.world[Contents(o)]
         for c in cont :
-            ctxt.write("[break]"+"[indent]"*numtabs)
+            ctxt.activity.describe_possession(actor, c, numtabs+1)
+@actoractivities.to("describe_possession")
+def describe_possession_supporter(actor, o, numtabs, ctxt) :
+    """Prints the contents of a supporter."""
+    if ctxt.world[IsA(o, "supporter")] :
+        cont = ctxt.world[Contents(o)]
+        for c in cont :
             ctxt.activity.describe_possession(actor, c, numtabs+1)
 
 ###*
@@ -992,16 +990,16 @@ def describe_possession_container(actor, o, numtabs, ctxt) :
 ### Oft-used requirements on actions
 ###
 
-def require_xobj_accessible(action) :
+def require_xobj_accessible(actionsystem, action) :
     """Adds a rule which ensures that x is accessible to the actor in
     the action."""
-    @verify(action)
+    @actionsystem.verify(action)
     @docstring("Ensures the object x in "+repr(action)+" is accessible to the actor.  Added by require_xobj_accessible.")
     def _verify_xobj_accessible(actor, x, ctxt, **kwargs) :
         if not ctxt.world[AccessibleTo(x, actor)] :
             return IllogicalOperation(as_actor("{Bob|cap} {can} see no such thing.", actor=actor))
 
-def require_xobj_held(action, only_hint=False, transitive=True) :
+def require_xobj_held(actionsystem, action, only_hint=False, transitive=True) :
     """Adds rules which check if the object x is held by the actor in
     the action, and if only_hint is not true, then if the thing is not
     already held, an attempt is made to take it."""
@@ -1010,7 +1008,7 @@ def require_xobj_held(action, only_hint=False, transitive=True) :
             return actor == ctxt.world[Owner(x)] and ctxt.world[AccessibleTo(x, actor)]
         else :
             return ctxt.world.query_relation(Has(actor, x))
-    @verify(action)
+    @actionsystem.verify(action)
     @docstring("Makes "+repr(action)+" more logical if object x is held by the actor.  Also ensures that x is accessible to the actor. Added by require_xobj_held.")
     def _verify_xobj_held(actor, x, ctxt, **kwargs) :
         if ctxt.world.query_relation(Has(actor, x)) :
@@ -1018,17 +1016,17 @@ def require_xobj_held(action, only_hint=False, transitive=True) :
         elif not ctxt.world[AccessibleTo(x, actor)] :
             return IllogicalOperation(as_actor("{Bob|cap} {can} see no such thing.", actor=actor))
     if only_hint :
-        @before(action)
+        @actionsystem.before(action)
         @docstring("A check that the actor is holding the x in "+repr(action)+".  The holding may be transitive.")
         def _before_xobj_held(actor, x, ctxt, **kwargs) :
             if not __is_held(actor, x, ctxt) :
                 raise AbortAction("{Bob|cap} {isn't} holding that.", actor=actor)
     else :
-        @trybefore(action)
+        @actionsystem.trybefore(action)
         @docstring("An attempt is made to take the object x from "+repr(action)+" if the actor is not already holding it")
         def _trybefore_xobj_held(actor, x, ctxt, **kwargs) :
             if not __is_held(actor, x, ctxt) :
-                do_first(Take(actor, x), ctxt=ctxt)
+                ctxt.actionsystem.do_first(Take(actor, x), ctxt=ctxt)
             # just in case it succeeds, but we don't yet have the object
             if transitive :
                 can_do = (actor == ctxt.world[Owner(x)] and ctxt.world[AccessibleTo(x, actor)])
@@ -1037,10 +1035,10 @@ def require_xobj_held(action, only_hint=False, transitive=True) :
             if not __is_held(actor, x, ctxt) :
                 raise AbortAction("{Bob|cap} {doesn't} have that.", actor=actor)
 
-def hint_xobj_notheld(action) :
+def hint_xobj_notheld(actionsystem, action) :
     """Adds a rule which makes the action more logical if x is not
     held by the actor of the action."""
-    @verify(action)
+    @actionsystem.verify(action)
     @docstring("Makes "+repr(action)+" more logical if object x is not held by the actor.  Added by hint_xobj_notheld.")
     def _verify_xobj_notheld(actor, x, ctxt, **kwargs) :
         if not ctxt.world.query_relation(Has(actor, x)) :
@@ -1059,7 +1057,7 @@ class Look(BasicAction) :
     verb = "look"
     gerund = "looking"
     numargs = 1
-understand("look/l", Look(actor))
+parser.understand("look/l", Look(actor))
 
 @when(Look(actor))
 def when_look_default(actor, ctxt) :
@@ -1074,13 +1072,13 @@ class Inventory(BasicAction) :
     verb = "take inventory"
     gerund = "taking out inventory"
     numargs = 1
-understand("inventory/i", Inventory(actor))
+parser.understand("inventory/i", Inventory(actor))
 
 @when(Inventory(actor))
 def when_inventory(actor, ctxt) :
     possessions = ctxt.world[Contents(actor)]
     if possessions :
-        ctxt.write("{Bob|cap} {is} carrying:[break]")
+        ctxt.write("{Bob|cap} {is} carrying:")
         for p in possessions :
             ctxt.activity.describe_possession(actor, p, 1)
     else :
@@ -1095,9 +1093,9 @@ class Examine(BasicAction) :
     verb = "examine"
     gerund = "examining"
     numargs = 2
-understand("examine/x [something x]", Examine(actor, X))
+parser.understand("examine/x [something x]", Examine(actor, X))
 
-require_xobj_accessible(Examine(actor, X))
+require_xobj_accessible(actionsystem, Examine(actor, X))
 
 @when(Examine(actor, X))
 def when_examine_default(actor, x, ctxt) :
@@ -1112,11 +1110,11 @@ class Take(BasicAction) :
     verb = "take"
     gerund = "taking"
     numargs = 2
-understand("take/get [something x]", Take(actor, X))
-understand("pick up [something x]", Take(actor, X))
+parser.understand("take/get [something x]", Take(actor, X))
+parser.understand("pick up [something x]", Take(actor, X))
 
-require_xobj_accessible(Take(actor, X))
-hint_xobj_notheld(Take(actor, X))
+require_xobj_accessible(actionsystem, Take(actor, X))
+hint_xobj_notheld(actionsystem, Take(actor, X))
 
 @before(Take(actor, X))
 def before_take_when_already_have(actor, x, ctxt) :
@@ -1157,9 +1155,9 @@ def before_take_check_not_inside(actor, x, ctxt) :
     while not ctxt.world[IsA(loc, "room")] :
         if loc == x :
             if ctxt.world[IsA(x, "container")] :
-                raise AbortAction(str_with_objs("{Bob|cap}'d {have} to get out of [the $x] first.", x=x), actor=actor)
+                raise AbortAction(str_with_objs("{Bob|cap}'d have to get out of [the $x] first.", x=x), actor=actor)
             elif ctxt.world[IsA(x, "supporter")] :
-                raise AbortAction(str_with_objs("{Bob|cap}'d {have} to get off [the $x] first.", x=x), actor=actor)
+                raise AbortAction(str_with_objs("{Bob|cap}'d have to get off [the $x] first.", x=x), actor=actor)
             else :
                 raise Exception("Unknown object location type.")
         loc = ctxt.world[Location(loc)]
@@ -1184,9 +1182,9 @@ class Drop(BasicAction) :
     verb = "drop"
     gerund = "dropping"
     numargs = 2
-understand("drop [something x]", Drop(actor, X))
+parser.understand("drop [something x]", Drop(actor, X))
 
-require_xobj_held(Drop(actor, X), only_hint=True)
+require_xobj_held(actionsystem, Drop(actor, X), only_hint=True)
 
 @when(Drop(actor, X))
 def when_drop_default(actor, x, ctxt) :
@@ -1213,8 +1211,8 @@ class Go(BasicAction) :
     gerund = "going"
     dereference_dobj = False
     numargs = 2 # Go(actor, direction)
-understand("go [direction x]", Go(actor, X))
-understand("[direction x]", Go(actor, X))
+parser.understand("go [direction x]", Go(actor, X))
+parser.understand("[direction x]", Go(actor, X))
 
 class AskTo(BasicAction) :
     verb = ("ask", "to")
@@ -1228,19 +1226,19 @@ class AskTo(BasicAction) :
         dobj = ctxt.world.get_property("DefiniteName", self.args[1])
         comm = self.args[2].infinitive_form(ctxt)
         return self.verb[0] + " " + dobj + " to " + comm
-understand("ask [something x] to [action y]", AskTo(actor, X, Y))
+parser.understand("ask [something x] to [action y]", AskTo(actor, X, Y))
 
 class GiveTo(BasicAction) :
     verb = ("give", "to")
     gerund = ("giving", "to")
     numargs = 3
-understand("give [something x] to [something y]", GiveTo(actor, X, Y))
+parser.understand("give [something x] to [something y]", GiveTo(actor, X, Y))
 
 class Destroy(BasicAction) :
     verb = "destroy"
     gerund = "destroying"
     numargs = 2
-understand("destroy [something x]", Destroy(actor, X))
+parser.understand("destroy [something x]", Destroy(actor, X))
 
 @when(Destroy(actor, X))
 def when_destroy(actor, x, ctxt) :
@@ -1254,9 +1252,9 @@ class Open(BasicAction) :
     verb = "open"
     gerund = "opening"
     numargs = 2
-understand("open [something x]", Open(actor, X))
+parser.understand("open [something x]", Open(actor, X))
 
-require_xobj_accessible(Open(actor, X))
+require_xobj_accessible(actionsystem, Open(actor, X))
 
 @when(Open(actor, X))
 def when_open(actor, x, ctxt) :

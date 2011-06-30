@@ -3,25 +3,38 @@
 # This is the basic library for how the world works.
 
 from textadv.core.patterns import VarPattern, BasicPattern
-from textadv.core.rulesystem import handler_requires, ActionHandled, MultipleResults, NotHandled, AbortAction
+from textadv.core.rulesystem import handler_requires, ActionHandled, MultipleResults, NotHandled, AbortAction, make_rule_decorator
 from textadv.gamesystem.relations import *
 from textadv.gamesystem.world import *
 from textadv.gamesystem.gamecontexts import actoractivities, actorrules
 from textadv.gamesystem.basicpatterns import *
 from textadv.gamesystem.utilities import *
-import textadv.gamesystem.parser as parser
-from textadv.gamesystem.parser import understand
-from textadv.gamesystem.eventsystem import BasicAction, verify, trybefore, before, when, report, do_first
-from textadv.gamesystem.eventsystem import VeryLogicalOperation, LogicalOperation, IllogicalOperation, IllogicalInaccessible, NonObviousOperation
+#import textadv.gamesystem.parser as parser
+from textadv.gamesystem.parser import default_parser
+from textadv.gamesystem.actionsystem import BasicAction, DoInstead, verify_instead, ActionSystem
+from textadv.gamesystem.actionsystem import VeryLogicalOperation, LogicalOperation, IllogicalOperation, IllogicalInaccessible, NonObviousOperation
 
 ###
 ### The main game world!
 ###
 world = World()
 
-# A convenience function
-def def_obj(name, type) :
-    world.add_relation(IsA(name, type))
+actionsystem = ActionSystem()
+
+verify = make_rule_decorator(actionsystem.action_verify)
+trybefore = make_rule_decorator(actionsystem.action_trybefore)
+before = make_rule_decorator(actionsystem.action_before)
+when = make_rule_decorator(actionsystem.action_when)
+report = make_rule_decorator(actionsystem.action_report)
+
+parser = default_parser.copy()
+
+world.define_activity("def_obj", doc="""Defines an object of a
+particular kind in the game world.""")
+@world.to("def_obj")
+def default_def_obj(name, kind, world) :
+    """Adds the relation IsA(name, kind)."""
+    world.add_relation(IsA(name, kind))
 
 
 ###

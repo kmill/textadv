@@ -4,7 +4,7 @@
 # these are assumed to be used in a player context.
 
 from textadv.core.patterns import BasicPattern
-from textadv.core.rulesystem import ActionTable, EventTable, AbortAction
+from textadv.core.rulesystem import ActivityTable, RuleTable, AbortAction
 
 ###
 ### Actions
@@ -22,7 +22,7 @@ class BasicAction(BasicPattern) :
         if len(args) == self.numargs :
             self.args = args
         else :
-            raise Exception("Pattern requires exactly "+self.numargs+" arguments.")
+            raise Exception("Pattern requires exactly "+str(self.numargs)+" arguments.")
     def get_actor(self) :
         """An accessor method for the actor of the action. Assumed to
         be first element."""
@@ -82,11 +82,16 @@ class BasicAction(BasicPattern) :
 ### Handling actions
 ###
 
-action_verify = EventTable()
-action_trybefore = EventTable()
-action_before = EventTable()
-action_when = EventTable()
-action_report = EventTable()
+action_verify = RuleTable(doc="""Handles verifying actions for being
+at least somewhat logical. Should not change world state.""")
+action_trybefore = RuleTable(doc="""Handles a last attempt to make
+the action work (one shouldn't work with this table directly).""")
+action_before = RuleTable(doc="""Checks an action to see if it is
+even possible (opening a door is logical, but it's not immediately
+possible to open a locked door)""")
+action_when = RuleTable(doc="""Carries out the action.  Must not fail.""")
+action_report = RuleTable(doc="""Explains what happened with this
+action.  Should not change world state.""")
 
 def _make_action_decorator(table) :
     def _deco(pattern, **kwargs) :
@@ -224,18 +229,12 @@ def make_documentation(escape, heading_level=1) :
     hls = str(heading_level)
     print "<h"+hls+">Event system</h"+hls+">"
     print "<p>This is the documentation for the event system.</p>"
-    def _make_action_docs(heading_level, table, heading, desc) :
+    def _make_action_docs(heading_level, table, heading) :
         shls = str(heading_level+1)
         print "<h"+shls+">"+heading+"</h"+shls+">"
-        print "<p><i>"+desc+"</i></p>"
         table.make_documentation(escape, heading_level=heading_level+2)
-    _make_action_docs(heading_level, action_verify, "action_verify",
-                      "Handles verifying actions for being at least somewhat logical. Should not change world state.")
-    _make_action_docs(heading_level, action_trybefore, "action_trybefore",
-                      "Handles a last attempt to make the action work (one shouldn't work with this table directly).")
-    _make_action_docs(heading_level, action_before, "action_before",
-                      "Checks an action to see if it is even possible (opening a door is logical, but it's not immediately possible to open a locked door)")
-    _make_action_docs(heading_level, action_when, "action_when",
-                      "Carries out the action.  Must not fail.")
-    _make_action_docs(heading_level, action_report, "action_report",
-                      "Explains what happened with this action.  Should not change world state.")
+    _make_action_docs(heading_level, action_verify, "action_verify")
+    _make_action_docs(heading_level, action_trybefore, "action_trybefore")
+    _make_action_docs(heading_level, action_before, "action_before")
+    _make_action_docs(heading_level, action_when, "action_when")
+    _make_action_docs(heading_level, action_report, "action_report")

@@ -11,7 +11,7 @@ from textadv.gamesystem.relations import *
 #from textadv.gamesystem.basicpatterns import x, y, z, get_x, get_y, get_z
 from textadv.gamesystem.gamecontexts import ActorContext, execute_context
 #from textadv.gamesystem.eventsystem import *
-from textadv.gameworld.basicrules import *
+from textadv.gameworld.basiclibrary import *
 #from textadv.gameworld.basicevents import *
 import textwrap
 import re
@@ -26,7 +26,7 @@ class TerminalGameIO(object) :
         return raw_input(prompt + " ")
     def write(self, *data) :
         for d in data :
-            print d,
+            print d.replace("[newline]", "\n\n").replace("[break]", "\n").replace("[indent]"," "),
         return
         paragraphs = re.split("\n\\s*\n", " ".join(data))
         to_print = []

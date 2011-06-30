@@ -1,214 +1,18 @@
-# The basic definition of how the world works
+### Not to be imported
+## Should be execfile'd
 
-from textadv.core.patterns import VarPattern, BasicPattern
-from textadv.core.rulesystem import handler_requires, ActionHandled, MultipleResults, NotHandled, AbortAction
-from textadv.gamesystem.relations import *
-from textadv.gamesystem.world import *
-from textadv.gamesystem.gamecontexts import actoractions, actorevents
-from textadv.gamesystem.basicpatterns import *
-from textadv.gamesystem.utilities import *
-import textadv.gamesystem.parser as parser
-from textadv.gamesystem.parser import understand
-from textadv.gamesystem.eventsystem import BasicAction, verify, trybefore, before, when, report, do_first
-from textadv.gamesystem.eventsystem import VeryLogicalOperation, LogicalOperation, IllogicalOperation, IllogicalInaccessible, NonObviousOperation
-
-# The main game world!
-world = World()
-
-# A convenience function
-def def_obj(name, type) :
-    world.add_relation(IsA(name, type))
-
-###
-### Global properties
-###
-
-@world.define_property
-class Global(Property) :
-    """Use Global("x") to get global variable "x"."""
-    numargs = 1
-
-###
-### Basic position relations
-###
-
-# The following four are mutually exclusive relations which have to
-# do with position.
-
-@world.define_relation
-class Contains(OneToManyRelation) :
-    """Contains(x,y) for "x Contains y"."""
-
-@world.define_relation
-class Supports(OneToManyRelation) :
-    """Supports(x,y) for "x Supports y"."""
-
-@world.define_relation
-class Has(OneToManyRelation) :
-    """Has(x,y) for "x Has y"."""
-
-@world.define_relation
-class PartOf(ManyToOneRelation) :
-    """PartOf(x,y) for "x PartOf y"."""
-
+# basicrules.py
 #
-# some helper actions to make it easy to use these three relations
-#
-
-# move X to Y (so then Y Contains X)
-@world.to("move_to")
-def default_move_to(x, y, world) :
-    """Called with move_to(x, y).  Moves x to be contained by y, first
-    removing all Contains, Supports, Has, and PartOf relations."""
-    world.remove_relation(Contains(X, x))
-    world.remove_relation(Supports(X, x))
-    world.remove_relation(Has(X, x))
-    world.remove_relation(PartOf(x, X))
-    world.add_relation(Contains(y, x))
-
-@world.to("put_in")
-def default_put_in(x, y, world) :
-    """A synonym for "move_to"."""
-    world.actions.move_to(x, y)
-
-# put X on Y (so then Y Supports X)
-@world.to("put_on")
-def default_put_on(x, y, world) :
-    """Called with put_on(x, y).  Puts x onto y, first removing all
-    Contains, Supports, Has, and PartOf relations."""
-    world.remove_relation(Contains(X, x))
-    world.remove_relation(Supports(X, x))
-    world.remove_relation(Has(X, x))
-    world.remove_relation(PartOf(x, X))
-    world.add_relation(Supports(y, x))
-
-# give X to Y (so then Y Has X)
-@world.to("give_to")
-def default_give_to(x, y, world) :
-    """Called with give_to(x, y).  Gives x to y, first
-    removing all Contains, Supports, Has, and PartOf relations."""
-    world.remove_relation(Contains(X, x))
-    world.remove_relation(Supports(X, x))
-    world.remove_relation(Has(X, x))
-    world.remove_relation(PartOf(x, X))
-    world.add_relation(Has(y, x))
-
-# make X part of Y (so then X PartOf Y)
-@world.to("make_part_of")
-def default_make_part_of(x, y, world) :
-    """Called with make_part_of(x, y).  Makes x a part of y, first
-    removing all Contains, Supports, Has, and PartOf relations."""
-    world.remove_relation(Contains(X, x))
-    world.remove_relation(Supports(X, x))
-    world.remove_relation(Has(X, x))
-    world.remove_relation(PartOf(x, X))
-    world.add_relation(PartOf(x, y))
-
-@world.to("remove_obj")
-def default_remove_obj(obj, world) :
-    """Effectively removes an object from play by making it have no
-    positional location."""
-    world.remove_relation(Contains(X, obj))
-    world.remove_relation(Supports(X, obj))
-    world.remove_relation(Has(X, obj))
-    world.remove_relation(PartOf(obj, X))
-
-@world.define_property
-class Location(Property) :
-    """Location(X) is the current immediate location in which X
-    resides.  Usually used to get the location of the actor."""
-    numargs = 1
-
-world[Location(X)] = None
-@world.handler(Location(X))
-def object_location_Contains(x, world) :
-    """Gets the location of an object by what currently contains it."""
-    locs = world.query_relation(Contains(Y, x), var=Y)
-    if locs : return locs[0]
-    else : raise NotHandled()
-@world.handler(Location(X))
-def object_location_Has(x, world) :
-    """Gets the location of an object by what currently has it."""
-    locs = world.query_relation(Has(Y, x), var=Y)
-    if locs : return locs[0]
-    else : raise NotHandled()
-@world.handler(Location(X))
-def object_location_Supports(x, world) :
-    """Gets the location of an object by what currently supports it."""
-    locs = world.query_relation(Supports(Y, x), var=Y)
-    if locs : return locs[0]
-    else : raise NotHandled()
-@world.handler(Location(X))
-def object_location_PartOf(x, world) :
-    """Gets the location of an object by what it is currently part of."""
-    locs = world.query_relation(PartOf(x, Y), var=Y)
-    if locs : return locs[0]
-    else : raise NotHandled()
+# These are user and world rules which can be executed.
 
 
-@world.define_property
-class Owner(Property) :
-    """Gets the owner of the object."""
-    numargs = 1
-
-@world.handler(Owner(X))
-def rule_Owner_default(x, world) :
-    """We assume that the owner of an object is the first object which
-    Has some object which in some chain of containment (containment
-    optional).  Returns None if no owner was found."""
-    poss_owner = world.query_relation(Has(Y, x), var=Y)
-    if poss_owner :
-        return poss_owner[0]
-    poss_container = world.query_relation(Contains(Y, x), var=Y)
-    if poss_container :
-        return world[Owner(poss_container[0])]
-    return None
-
-###
-### Kinds and instances
-###
-
-@world.define_relation
-class KindOf(ManyToOneRelation) :
-    """Represents a class-like hierarchy."""
-
-world.add_relation(KindOf("room", "kind"))
-world.add_relation(KindOf("thing", "kind"))
-world.add_relation(KindOf("door", "thing"))
-world.add_relation(KindOf("container", "thing"))
-world.add_relation(KindOf("supporter", "thing"))
-world.add_relation(KindOf("person", "thing"))
-
-@world.define_property
-@world.define_relation
-class IsA(ManyToOneRelation, Property) :
-    """Represents inheriting from a kind.  As a relation, represents a
-    direct inheritence.  As a property, represents the transitive IsA
-    relation."""
-
-@world.handler(IsA(X,Y))
-def property_handler_IsA(x, y, world) :
-    """Lets one ask whether a particular object has a kind, searching
-    up the KindOf tree."""
-    kind = world.query_relation(IsA(x, Z), var=Z)
-    if not kind :
-        return False
-    else :
-        return world.r_path_to(KindOf, kind[0], y)
-
-world.define_action("referenceable_things", accumulator=list_append)
-@world.to("referenceable_things")
-def referenceable_things_Default(world) :
-    """Gets all things in the world (that is, all objects which
-    inherit from "thing")."""
-    objects = world.query_relation(IsA(X, Y), var=X)
-    things = [o for o in objects if world[IsA(o, "thing")]]
-    return things
 
 ###
 ### Directions
 ###
 
+# Defines a subparser named "direction" which is loaded with basic
+# directions and their one- or two-letter synonyms.
 
 parser.define_subparser("direction", "Represents one of the directions one may go.")
 
@@ -284,7 +88,7 @@ def default_Words(x, world) :
 ### Defining: room
 ###
 
-world[Description(X) <= IsA(X, "room")] = "It's a place to be."
+world[Description(X) <= IsA(X, "room")] = None
 
 #
 # connecting rooms together
@@ -345,8 +149,8 @@ class EffectiveContainer(Property) :
     """Gets the object which effectively contain an object which is
     "inside" this one (change to "on top of" for supporters).
     Specifically, if the object is a closed box, then the box is the
-    effective container.  Otherwise, it's the effective container of
-    the location of the open box."""
+    effective container.  Otherwise, if the box is open, the result is
+    the effective container for the location of the box."""
     numargs = 1
 
 @world.handler(EffectiveContainer(X) <= IsA(X, "room"))
@@ -392,7 +196,7 @@ def rule_IsLit_contents_can_light_room(x, world) :
 ### Defining: thing
 ###
 
-world[Description(X) <= IsA(X, "thing")] = "It does't seem that interesting."
+world[Description(X) <= IsA(X, "thing")] = None
 
 # Most things don't provide light
 world[ProvidesLight(X) <= IsA(X, "thing")] = False
@@ -613,6 +417,12 @@ class Enterable(Property) :
 world[Enterable(X) <= IsA(X, "thing")] = False
 
 ###
+### Defining: door
+###
+
+
+
+###
 ### Defining: container
 ###
 
@@ -699,7 +509,7 @@ def rule_IsLit_for_supporter(x, world) :
     else : raise NotHandled()
 
 @world.handler(EffectiveContainer(X) <= IsA(X, "supporter"))
-def rule_EffectiveContainer_if_x_on_supporter(x, world) :
+def rule_EffectiveContainer_if_supporter(x, world) :
     """The effective container of a supporter is the effective
     container of the location of the supporter."""
     return world[EffectiveContainer(world[Location(x)])]
@@ -712,6 +522,13 @@ def rule_EffectiveContainer_if_x_on_supporter(x, world) :
 def supporter_contents(x, world) :
     """Gets the things the person immediately has."""
     return [o["y"] for o in world.query_relation(Has(x, Y))]
+
+@world.handler(EffectiveContainer(X) <= IsA(X, "person"))
+def rule_EffectiveContainer_if_person(x, world) :
+    """We assume that people aren't able to conceal their possessions
+    very well, and the effective container is thus the location of the
+    person."""
+    return world[EffectiveContainer(world[Location(x)])]
 
 ##
 # Property: Gender
@@ -790,7 +607,7 @@ world[PossessivePronounIfMe(X) <= IsA(X, "person")] = "your"
 
 @world.handler(IsLit(X) <= IsA(X, "person"))
 def rule_IsLit_possessions_can_light_person(x, world) : # maybe should handle concealment at some point?
-    """A person is lit if any of its posessions are lit."""
+    """A person is lit if any of their posessions are lit."""
     if any(world[IsLit(o)] for o in world[Contents(x)]) :
         return True
     else : raise NotHandled()
@@ -839,25 +656,25 @@ world[Reported(X) <= Scenery(X)] = False
 
 
 ###*
-###* Actions
+###* Activities
 ###*
 
 ###
-### Action: location descriptions
+### Activity: location descriptions
 ###
 
-@actoractions.to("describe_current_location")
+@actoractivities.to("describe_current_location")
 def describe_current_location_default(ctxt) :
     """Calls describe_location using the Location and the
     EffectiveContainer of the current actor."""
     loc = ctxt.world[Location(ctxt.actor)]
     eff_cont = ctxt.world[EffectiveContainer(loc)]
-    ctxt.actions.describe_location(ctxt.actor, loc, eff_cont)
+    ctxt.activity.describe_location(ctxt.actor, loc, eff_cont)
 
 __DESCRIBE_LOCATION_notables = []
 __DESCRIBE_LOCATION_mentioned = []
 
-@actoractions.to("describe_location")
+@actoractivities.to("describe_location")
 def describe_location_init(actor, loc, eff_cont, ctxt) :
     """Initializes the global variables __DESCRIBE_LOCATION_notables
     and __DESCRIBE_LOCATION_mentioned."""
@@ -865,34 +682,36 @@ def describe_location_init(actor, loc, eff_cont, ctxt) :
     __DESCRIBE_LOCATION_notables = []
     __DESCRIBE_LOCATION_mentioned = []
 
-@actoractions.to("describe_location")
+@actoractivities.to("describe_location")
 def describe_location_Heading(actor, loc, eff_cont, ctxt) :
     """Constructs the heading using describe_location_heading.  If the
     room is in darkness, then, writes "Darkness"."""
     if ctxt.world[IsLit(eff_cont)] :
-        ctxt.actions.describe_location_heading(actor, loc, eff_cont)
+        ctxt.activity.describe_location_heading(actor, loc, eff_cont)
     else :
         ctxt.write("Darkness")
     ctxt.write("[newline]")
 
-@actoractions.to("describe_location")
+@actoractivities.to("describe_location")
 def describe_location_Description(actor, loc, eff_cont, ctxt) :
     """Prints the description property of the effective container if
     it is a room, unless the room is in darkness.  Darkness stops
     further description of the location."""
     if ctxt.world[IsLit(eff_cont)] :
+        
         if ctxt.world[IsA(eff_cont, "room")] :
-            ctxt.write(ctxt.world[Description(eff_cont)])
+            d = ctxt.world[Description(eff_cont)]
+            if d : ctxt.write(d)
     else :
         ctxt.write("You can't see a thing; it's incredibly dark.")
         raise ActionHandled()
 
-@actoractions.to("describe_location")
+@actoractivities.to("describe_location")
 def describe_location_Objects(actor, loc, eff_cont, ctxt) :
     """Prints descriptions of the notable objects in the contents of
     the effective container."""
     obs = ctxt.world[Contents(eff_cont)]
-    raw_notables = list_append(ctxt.actions.get_notable_objects(actor, o) for o in obs)
+    raw_notables = list_append(ctxt.activity.get_notable_objects(actor, o) for o in obs)
     to_ignore = [o for o,n in raw_notables if n==0]
     filtered_notables = [(o,n) for o,n in raw_notables if o not in to_ignore]
     filtered_notables.sort(key=lambda x : x[1], reverse=True)
@@ -906,7 +725,7 @@ def describe_location_Objects(actor, loc, eff_cont, ctxt) :
     current_descs = None
     for o in notables :
         if o not in mentioned :
-            msg = ctxt.actions.terse_obj_description(actor, o, notables, mentioned)
+            msg = ctxt.activity.terse_obj_description(actor, o, notables, mentioned)
             mentioned.append(o)
             if not msg : # the object printed its own description
                 pass
@@ -923,26 +742,30 @@ def describe_location_Objects(actor, loc, eff_cont, ctxt) :
                         else :
                             current_start = "You also see "
                     elif ctxt.world[IsA(o_loc, "container")] :
+                        mentioned.append(o_loc)
                         if is_first_sentence :
                             current_start = "In "+ctxt.world[DefiniteName(o_loc)]+" you see "
                             is_first_sentence = False
                         else :
                             current_start = "In "+ctxt.world[DefiniteName(o_loc)]+" you also see "
                     elif ctxt.world[IsA(o_loc, "supporter")] :
+                        mentioned.append(o_loc)
                         if is_first_sentence :
                             current_start = "On "+ctxt.world[DefiniteName(o_loc)]+" you see "
                             is_first_sentence = False
                         else :
                             current_start = "On "+ctxt.world[DefiniteName(o_loc)]+" you also see "
+                    else :
+                        raise Exception("Unknown kind of location for "+o_loc)
                     current_descs = []
                 current_descs.append(msg)
     if current_descs :
         unnotable_messages.append((current_start, current_descs))
 
     if unnotable_messages :
-        ctxt.write("[newline]"+"[newline]".join(start+serial_comma(msgs)+"." for start,msgs in unnotable_messages)+".")
+        ctxt.write("[newline]"+"[newline]".join(start+serial_comma(msgs)+"." for start,msgs in unnotable_messages))
 
-@actoractions.to("describe_location")
+@actoractivities.to("describe_location")
 def describe_location_set_visited(actor, loc, eff_cont, ctxt) :
     """If the effective container is a room, then we set it to being
     visited."""
@@ -950,12 +773,12 @@ def describe_location_set_visited(actor, loc, eff_cont, ctxt) :
         ctxt.world[Visited(eff_cont)] = True
 
 
-@actoractions.to("describe_location_heading")
+@actoractivities.to("describe_location_heading")
 def describe_location_heading_Name(actor, loc, eff_cont, ctxt) :
     """Prints the name of the effective container."""
     ctxt.write(ctxt.world[Name(eff_cont)])
 
-@actoractions.to("describe_location_heading")
+@actoractivities.to("describe_location_heading")
 def describe_location_property_heading_location(actor, loc, eff_cont, ctxt) :
     """Creates a description of where the location is with respect to
     the effective container."""
@@ -973,7 +796,7 @@ def describe_location_property_heading_location(actor, loc, eff_cont, ctxt) :
 def join_with_spaces(xs) :
     return " ".join(xs)
 
-actoractions.define_action("terse_obj_description", accumulator=join_with_spaces,
+actoractivities.define_activity("terse_obj_description", accumulator=join_with_spaces,
                            doc="""Should give a terse description of
                            an object while modifying mentioned as
                            objects are mentioned.  Should raise
@@ -981,7 +804,7 @@ actoractions.define_action("terse_obj_description", accumulator=join_with_spaces
                            message to be given (for if wanting to
                            print out a paragraph).""")
 
-@actoractions.to("terse_obj_description")
+@actoractivities.to("terse_obj_description")
 def terse_obj_description_DefiniteName(actor, o, notables, mentioned, ctxt) :
     """Describes the object based on its indefinite name.  Except, if
     the NotableDescription is set, that is printed instead, and makes
@@ -994,7 +817,7 @@ def terse_obj_description_DefiniteName(actor, o, notables, mentioned, ctxt) :
     else :
         return ctxt.world[IndefiniteName(o)]
 
-@actoractions.to("terse_obj_description")
+@actoractivities.to("terse_obj_description")
 def terse_obj_description_container(actor, o, notables, mentioned, ctxt) :
     """Describes the contents of a container, giving information of
     whether it is open or closed as needed (uses IsOpaque for if the
@@ -1007,7 +830,7 @@ def terse_obj_description_container(actor, o, notables, mentioned, ctxt) :
             msgs = []
             for c in contents :
                 if c in notables and c not in mentioned :
-                    msg = ctxt.actions.terse_obj_description(actor, c, notables, mentioned)
+                    msg = ctxt.activity.terse_obj_description(actor, c, notables, mentioned)
                     if msg : msgs.append(msg)
             if msgs :
                 state = "which is closed and " if ctxt.world[Openable(o)] and not ctxt.world[IsOpen(o)] else ""
@@ -1018,53 +841,148 @@ def terse_obj_description_container(actor, o, notables, mentioned, ctxt) :
                 raise NotHandled()
     else : raise NotHandled()
 
-@actoractions.to("terse_obj_description")
+@actoractivities.to("terse_obj_description")
 def terse_obj_description_supporter(actor, o, notables, mentioned, ctxt) :
     if ctxt.world[IsA(o, "supporter")] :
         contents = ctxt.world[Contents(o)]
         msgs = []
         for o in contents :
             if o in notables and o not in mentioned :
-                msg = ctxt.actions.terse_obj_description(actor, o, notables, mentioned)
+                msg = ctxt.activity.terse_obj_description(actor, o, notables, mentioned)
                 if msg : msgs.append(msg)
         if msgs :
             return "(on which "+is_are_list(msgs)+")"
     raise NotHandled()
 
 
-actoractions.define_action("get_notable_objects", accumulator=list_append,
+actoractivities.define_activity("get_notable_objects", accumulator=list_append,
                            doc="""Returns a list of objects which are
                            notable in a description as (obj,n) pairs,
                            where n is a numeric value from 0 onward
                            denoting notability.  n=1 is default, and
                            n=0 disables.  Repeats are fine.""")
 
-@actoractions.to("get_notable_objects")
+@actoractivities.to("get_notable_objects")
+def get_notable_objects_no_for_scenery(actor, x, ctxt) :
+    """Scenery is not notable, and neither are its contents, so
+    returns [(x,0)] and stops executing the rest of the activity."""
+    if ctxt.world[Scenery(x)] :
+        raise ActionHandled([(x, 0)])
+    else : raise NotHandled()
+@actoractivities.to("get_notable_objects")
 def get_notable_objects_thing(actor, x, ctxt) :
     """By default, returns (x, 1) to represent x not being very
     notable, but notable enough to be mentioned."""
     if ctxt.world[IsA(x, "thing")] :
         return [(x, 1)]
     else : raise NotHandled()
-@actoractions.to("get_notable_objects")
+@actoractivities.to("get_notable_objects")
 def get_notable_objects_container(actor, x, ctxt) :
     """Gets objects from the container"""
     if ctxt.world[IsA(x, "container")] :
         obs = ctxt.world[Contents(x)]
-        return list_append(ctxt.actions.get_notable_objects(actor, o) for o in obs if ctxt.world[AccessibleTo(o, actor)])
+        return list_append(ctxt.activity.get_notable_objects(actor, o) for o in obs if ctxt.world[AccessibleTo(o, actor)])
     else : raise NotHandled()
-@actoractions.to("get_notable_objects")
+@actoractivities.to("get_notable_objects")
 def get_notable_objects_supporter(actor, x, ctxt) :
     if ctxt.world[IsA(x, "supporter")] :
         obs = ctxt.world[Contents(x)]
-        return list_append(ctxt.actions.get_notable_objects(actor, o) for o in obs)
+        return list_append(ctxt.activity.get_notable_objects(actor, o) for o in obs)
     else : raise NotHandled()
-@actoractions.to("get_notable_objects")
+@actoractivities.to("get_notable_objects")
 def get_notable_objects_not_reported(actor, x, ctxt) :
     if not ctxt.world[Reported(x)] :
         return [(x, 0)]
     else : raise NotHandled()
 
+##
+# Describing objects
+##
+
+actoractivities.define_activity("describe_object",
+                           doc="""Describes an object for the purpose of examining.""")
+
+__DESCRIBE_OBJECT_described = False
+
+@actoractivities.to("describe_object")
+def describe_object_init(actor, o, ctxt) :
+    """Initialize the global variable __DESCRIBE_OBJECT_described,
+    which represents whether any description was uttered."""
+    global __DESCRIBE_OBJECT_described
+    __DESCRIBE_OBJECT_described = False
+@actoractivities.to("describe_object")
+def describe_object_description(actor, o, ctxt) :
+    """Writes the Description if there is one defined."""
+    d = ctxt.world[Description(o)]
+    if d :
+        global __DESCRIBE_OBJECT_described
+        __DESCRIBE_OBJECT_described = True
+        ctxt.write(d+"[newline]", actor=actor)
+@actoractivities.to("describe_object")
+def describe_object_container(actor, o, ctxt) :
+    """Writes a line about the contents of a container if the container is not opaque."""
+    global __DESCRIBE_OBJECT_described
+    if ctxt.world[IsA(o, "container")] :
+        if not ctxt.world[IsOpaque(o)] :
+            contents = [ctxt.world[DefiniteName(c)] for c in ctxt.world[Contents(o)] if ctxt.world[Reported(c)]]
+            if contents :
+                __DESCRIBE_OBJECT_described = True
+                ctxt.write("In "+ctxt.world[DefiniteName(o)]+" "+is_are_list(contents)+".[newline]", actor=actor)
+        elif ctxt.world[Openable(o)] and not ctxt.world[IsOpen(o)] :
+            __DESCRIBE_OBJECT_described = True
+            ctxt.write(str_with_objs("[The $o] is closed.", o=o), actor=actor)
+@actoractivities.to("describe_object")
+def describe_object_supporter(actor, o, ctxt) :
+    """Writes a line about the contents of a supporter."""
+    if ctxt.world[IsA(o, "supporter")] :
+        contents = [c for c in ctxt.world[Contents(o)] if ctxt.world[Reported(c)]]
+        if contents :
+            global __DESCRIBE_OBJECT_described
+            __DESCRIBE_OBJECT_described = True
+            ctxt.write("On "+ctxt.world[DefiniteName(o)]+" "+is_are_list(contents)+".[newline]", actor=actor)
+@actoractivities.to("describe_object")
+def describe_object_default(actor, o, ctxt) :
+    """Runs if none of the previous were successful.  Prints a default message."""
+    global __DESCRIBE_OBJECT_described
+    if not __DESCRIBE_OBJECT_described :
+        ctxt.write(str_with_objs("{Bob|cap} {sees} nothing special about [the $o].", o=o), actor=actor)
+
+##
+# Describing possessions
+##
+
+actoractivities.define_activity("describe_possession",
+                           doc="""Describes an object as if it were a possession.""")
+
+@actoractivities.to("describe_possession")
+def describe_possession_indefinite_name(actor, o, numtabs, ctxt) :
+    """Prints the indefinite name of the object preceded by numtabs
+    indentations."""
+    ctxt.write("[indent]"*numtabs+ctxt.world[IndefiniteName(o)])
+@actoractivities.to("describe_possession")
+def describe_possession_openable(actor, o, numtabs, ctxt) :
+    """Prints (open) or (closed) if the thing is openable."""
+    if ctxt.world[Openable(o)] :
+        if ctxt.world[IsOpen(o)] :
+            ctxt.write("(open)")
+        else :
+            ctxt.write("(closed)")
+@actoractivities.to("describe_possession")
+def describe_possession_supporter(actor, o, numtabs, ctxt) :
+    """Prints the contents of a supporter."""
+    if ctxt.world[IsA(o, "supporter")] :
+        cont = ctxt.world[Contents(o)]
+        for c in cont :
+            ctxt.write("[break]"+"[indent]"*numtabs)
+            ctxt.activity.describe_possession(actor, c, numtabs+1)
+@actoractivities.to("describe_possession")
+def describe_possession_container(actor, o, numtabs, ctxt) :
+    """Prints the contents of a container if it's not opaque."""
+    if ctxt.world[IsA(o, "container")] and not ctxt.world[IsOpaque(o)] :
+        cont = ctxt.world[Contents(o)]
+        for c in cont :
+            ctxt.write("[break]"+"[indent]"*numtabs)
+            ctxt.activity.describe_possession(actor, c, numtabs+1)
 
 ###*
 ###* Actions by a person
@@ -1132,6 +1050,10 @@ def hint_xobj_notheld(action) :
 ### Action definitions
 ###
 
+##
+# Look
+##
+
 class Look(BasicAction) :
     """Look(actor)"""
     verb = "look"
@@ -1141,7 +1063,45 @@ understand("look/l", Look(actor))
 
 @when(Look(actor))
 def when_look_default(actor, ctxt) :
-    ctxt.actions.describe_current_location()
+    ctxt.activity.describe_current_location()
+
+##
+# Inventory
+##
+
+class Inventory(BasicAction) :
+    """Inventory(actor)"""
+    verb = "take inventory"
+    gerund = "taking out inventory"
+    numargs = 1
+understand("inventory/i", Inventory(actor))
+
+@when(Inventory(actor))
+def when_inventory(actor, ctxt) :
+    possessions = ctxt.world[Contents(actor)]
+    if possessions :
+        ctxt.write("{Bob|cap} {is} carrying:[break]")
+        for p in possessions :
+            ctxt.activity.describe_possession(actor, p, 1)
+    else :
+        ctxt.write("{Bob|cap} {is} carrying nothing.")
+
+##
+# Examine
+##
+
+class Examine(BasicAction) :
+    """Examine(actor, x)"""
+    verb = "examine"
+    gerund = "examining"
+    numargs = 2
+understand("examine/x [something x]", Examine(actor, X))
+
+require_xobj_accessible(Examine(actor, X))
+
+@when(Examine(actor, X))
+def when_examine_default(actor, x, ctxt) :
+    ctxt.activity.describe_object(actor, x)
 
 ##
 # Taking
@@ -1153,6 +1113,7 @@ class Take(BasicAction) :
     gerund = "taking"
     numargs = 2
 understand("take/get [something x]", Take(actor, X))
+understand("pick up [something x]", Take(actor, X))
 
 require_xobj_accessible(Take(actor, X))
 hint_xobj_notheld(Take(actor, X))
@@ -1186,18 +1147,28 @@ def before_take_check_not_self(actor, x, ctxt) :
 def before_take_check_not_other_person(actor, x, ctxt) :
     """One cannot take other people."""
     if actor != x :
-        raise AbortAction(str_with_objs("[The $x] doesn't look like [he $x]'d appreciate that.", x=x))
+         raise AbortAction(str_with_objs("[The $x] doesn't look like [he $x]'d appreciate that.", x=x))
 
 @before(Take(actor, X))
 def before_take_check_not_inside(actor, x, ctxt) :
-    """One cannot take what one is inside."""
-    if ctxt.world.r_path_to(Contains, x, actor) :
-        raise AbortAction(str_with_objs("{Bob|cap} {is} inside of that.", actor=actor))
+    """One cannot take what one is inside or on.  Assumes there is a
+    room at the top of the heirarchy of containment and support."""
+    loc = ctxt.world[Location(actor)]
+    while not ctxt.world[IsA(loc, "room")] :
+        if loc == x :
+            if ctxt.world[IsA(x, "container")] :
+                raise AbortAction(str_with_objs("{Bob|cap}'d {have} to get out of [the $x] first.", x=x), actor=actor)
+            elif ctxt.world[IsA(x, "supporter")] :
+                raise AbortAction(str_with_objs("{Bob|cap}'d {have} to get off [the $x] first.", x=x), actor=actor)
+            else :
+                raise Exception("Unknown object location type.")
+        loc = ctxt.world[Location(loc)]
 
 @when(Take(actor, X))
 def when_take_default(actor, x, ctxt) :
     """Carry out the taking by giving it to the actor."""
-    ctxt.world.actions.give_to(x, actor)
+    ctxt.world.activity.give_to(x, actor)
+
 
 @report(Take(actor, X))
 def report_take_default(actor, x, ctxt) :
@@ -1224,9 +1195,9 @@ def when_drop_default(actor, x, ctxt) :
     location is a supporter, the object is put on the supporter."""
     l = ctxt.world[Location(actor)]
     if ctxt.world[IsA(l, "supporter")] :
-        ctxt.world.actions.put_on(x, ctxt.world[Location(actor)])
+        ctxt.world.activity.put_on(x, ctxt.world[Location(actor)])
     else :
-        ctxt.world.actions.move_to(x, ctxt.world[Location(actor)])
+        ctxt.world.activity.put_in(x, ctxt.world[Location(actor)])
 
 @report(Drop(actor, X))
 def report_drop_default(actor, x, ctxt) :
@@ -1273,7 +1244,7 @@ understand("destroy [something x]", Destroy(actor, X))
 
 @when(Destroy(actor, X))
 def when_destroy(actor, x, ctxt) :
-    ctxt.world.actions.remove_obj(x)
+    ctxt.world.activity.remove_obj(x)
 
 @report(Destroy(actor, X))
 def report_destroy(actor, x, ctxt) :

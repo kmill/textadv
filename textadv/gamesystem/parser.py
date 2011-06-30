@@ -25,7 +25,7 @@ import string
 import re
 import itertools
 from textadv.core.patterns import VarPattern, AbstractPattern
-from textadv.core.rulesystem import ActionTable, ActionHandled
+from textadv.core.rulesystem import ActivityTable, ActionHandled
 from textadv.gamesystem.utilities import list_append, docstring
 from textadv.gamesystem.basicpatterns import *
 from textadv.gamesystem.eventsystem import BasicAction
@@ -126,7 +126,7 @@ class Matched(object) :
 ### Basic thing parser
 ###
 
-parse_thing = ActionTable(accumulator=list_append)
+parse_thing = ActivityTable(accumulator=list_append)
 @parse_thing.add_handler
 def default_parse_thing(var, name, words, input, i, ctxt, next, multiplier=1) :
     def match_adjs_nouns(curr_adjs, i2) :
@@ -168,7 +168,7 @@ def default_parse_thing(var, name, words, input, i, ctxt, next, multiplier=1) :
 subparsers = dict()
 subparsers_doc = dict()
 def define_subparser(name, doc=None) :
-    subparsers[name] = ActionTable(accumulator=list_append)
+    subparsers[name] = ActivityTable(accumulator=list_append)
     subparsers_doc[name] = doc
 
 def add_subparser(name) :
@@ -329,7 +329,7 @@ CURRENT_WORDS = []
 
 def init_current_objects(ctxt) :
     global CURRENT_OBJECTS, CURRENT_WORDS
-    CURRENT_OBJECTS = ctxt.world.actions.referenceable_things()
+    CURRENT_OBJECTS = ctxt.world.activity.referenceable_things()
     CURRENT_WORDS = [separate_object_words(ctxt.world.get_property("Words", o)) for o in CURRENT_OBJECTS]
 
 def __is_word_for_thing(word) :
@@ -359,19 +359,22 @@ def transform_text_to_words(text) :
 
 def disambiguate(results, ctxt, action_verifier) :
     """Try to disambiguate the results if needed using the
-    action_verifier to get whether things work."""
+    action_verifier to get whether things work.  Returns (action,
+    did_disambiguate) pair, where did_disambiguate represents
+    whether there were multiple logical options."""
     if len(results) == 1 : # no need to disambiguate
-        return results[0].value
+        return results[0].value, False
     else : # it's ambiguous!
         # first, see if verification helps at all
         scores = [(r, action_verifier(r.value, ctxt)) for r in results]
         scores.sort(key=lambda z : z[1].score)
+        is_disambiguating = 1 < len([True for r,v in scores if v.is_acceptible()])
         if scores[-1][1].is_acceptible() :
             # good, there is some acceptible action.
             best_score = scores[-1][1].score
             best_results = [r for r,v in scores if v.score >= best_score]
             if len(best_results) == 1 : # good, the verification score saved us
-                return best_results[0].value
+                return best_results[0].value, is_disambiguating
             else :
                 # we assume that the order of the results
                 # disambiguates potential multi-action result sets
@@ -390,7 +393,7 @@ def disambiguate(results, ctxt, action_verifier) :
                 best_score = new_results[-1].score
                 new_best_results = [r for r in new_results if r.score >= best_score]
                 if len(new_best_results) == 1 : # good, the specificity score saved us
-                    return new_best_results[0].value
+                    return new_best_results[0].value, True
                 else :
                     # We need the user to disambiguate.  The following
                     # returns the Ambiguous exception.
@@ -398,7 +401,7 @@ def disambiguate(results, ctxt, action_verifier) :
         else :
             # well, none of them are acceptible.  Let's go for the
             # worst one.
-            return scores[0][0].value
+            return scores[0][0].value, True
 
 def __construct_amb_exception(results) :
     # It's ambiguous. Construct the possibilities for each argument
@@ -439,8 +442,8 @@ def handle_all(input, ctxt, action_verifier) :
             if word not in KNOWN_WORDS and not __is_word_for_thing(word) :
                 raise NoSuchWord(word)
         raise NoUnderstand()
-    action = disambiguate(results, ctxt, action_verifier)
-    return (action, len(results) > 1)
+    action, did_disambiguate = disambiguate(results, ctxt, action_verifier)
+    return (action, did_disambiguate)
 
 ###
 ### Construct documentation

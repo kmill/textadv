@@ -13,38 +13,46 @@ def_obj("room1", "room")
 world[Name("room1")] = "The Great Test Room"
 world[Description("room1")] = "You know, it's like a room and stuff."
 world[ProvidesLight("room1")] = True
-world.actions.connect_rooms("room0", "out", "room1")
+world.activity.connect_rooms("room0", "out", "room1")
 
-world.actions.move_to("player", "room1")
+world.activity.put_in("player", "room1")
 
 def_obj("red ball", "thing")
 world[Description("red ball")] = "It's just a run-of-the-mill red ball."
 world[Words("red ball")] = ["run-of-the-mill", "red", "@ball"]
-world.actions.move_to("red ball", "room1")
+world.activity.put_in("red ball", "room1")
 
 def_obj("blue ball", "thing")
 world[ProvidesLight("blue ball")] = False
-world.actions.move_to("blue ball", "room1")
-world[NotableDescription("blue ball")] = """There's this blue ball
-sitting there which is really catching your eye."""
+world.activity.put_in("blue ball", "big box")
+#world[NotableDescription("blue ball")] = """There's this blue ball
+#sitting there which is really catching your eye."""
 
 def_obj("big box", "container")
 world[Name("big box")] = "big glass box"
-world[IsOpaque("big box")] = False
+#world[IsOpaque("big box")] = False
 world[Openable("big box")] = True
 world[IsOpen("big box")] = False
-world.actions.move_to("big box", "room1")
-world[NotableDescription("big box")] = """A big glass box is sitting here."""
+world.activity.put_in("big box", "room1")
+#world[NotableDescription("big box")] = """A big glass box is sitting here."""
 
 def_obj("whatchamacallit", "container")
-world.actions.put_in("whatchamacallit", "big box")
+world.activity.put_in("whatchamacallit", "big box")
 
 def_obj("oak table", "supporter")
+world[Description("oak table")] = "It's a very old looking oak table which is in need of a refinishing."
 world[Scenery("oak table")] = True
-world.actions.move_to("oak table", "room1")
+world.activity.put_in("oak table", "room1")
 
 def_obj("candlestick", "thing")
-world.actions.put_on("candlestick", "oak table")
+world.activity.put_on("candlestick", "oak table")
+
+@actoractivities.to("terse_obj_description", insert_first=True)
+def terse_obj_desc_disable_for_woo(actor, o, notables, mentioned, ctxt) :
+    """Disables the container description for the whatchamacallit."""
+    if o == "whatchamacallit" :
+        ctxt.activity_table("terse_obj_description").temp_disable(f=terse_obj_description_container)
+    raise NotHandled()
 
 #world.actions.describe_room("room1")
 
@@ -68,7 +76,7 @@ def my_something(var, input, i, ctxt, actor, next) :
 print
 print
 
-game_context.actions.describe_current_location()
+game_context.activity.describe_current_location()
 
 
 #print run_parser(parse_something, ["the", "run-of-the-mill", "ball"], world)

@@ -31,11 +31,10 @@ def is_are_list(nouns) :
     else :
         return "are "+serial_comma(nouns)
 
-def obj_is_are_list(context, objs, prop=None) :
+def obj_is_are_list(context, objs, propname=None) :
     if prop is None :
-        from textadv.gameworld.basicrules import IndefiniteName
-        prop = IndefiniteName
-    objs = [context.world[prop(o)] for o in objs]
+        prop = "IndefiniteName"
+    objs = [context.world.get_property(prop, o) for o in objs]
     return is_are_list(objs)
 
 DIRECTION_INVERSES = {"north" : "south",
@@ -72,10 +71,10 @@ def docstring(s) :
 def str_with_objs(input, **kwarg) :
     newkwarg = dict()
     for key, value in kwarg.iteritems() :
-        if type(value) == str :
-            newkwarg[key] = value
+        if " " in value :
+            newkwarg[key] = "<%s>"%value
         else :
-            newkwarg[key] = value.id
+            newkwarg[key] = value
     return string.Template(input).safe_substitute(newkwarg)
 
 def as_actor(input, actor) :
@@ -294,7 +293,9 @@ _str_eval_functions["He"] = lambda context, ob : [_cap(context.world.get_propert
 _str_eval_functions["Him"] = lambda context, ob : [_cap(context.world.get_property("ObjectPronoun", ob))]
 
 # text formatting
-_str_eval_functions["newline"] = lambda context : ["\n\n"]
+_str_eval_functions["newline"] = lambda context : ["[newline]"]
+_str_eval_functions["break"] = lambda context : ["[break]"]
+_str_eval_functions["indent"] = lambda context : ["[indent]"]
 
 def _cap(string) :
     return string[0].upper()+string[1:]

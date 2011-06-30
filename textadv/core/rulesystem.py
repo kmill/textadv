@@ -119,33 +119,46 @@ class PropertyTable(object) :
 
 def identity(x) : return x
 
-class ActionTable(object) :
-    """Runs the actions one at a time until an AbortAction is raised
-    or there are no more actions.  Actions are run in the order they
-    were added to the ActionTable.  Accumulator is a function which
-    takes the list of results to make a return value.  By default it's
-    just the identity function.  Unlike the other tables in the
-    rulesystem, the functions are not selected by a pattern."""
+class ActivityTable(object) :
+    """Runs the functions one at a time until an AbortAction is raised
+    or there are no more functions.  Functions are run in the order
+    they were added to the ActivityTable, unless reverse is set to True.
+    Accumulator is a function which takes the list of results to make
+    a return value.  By default it's just the identity function.
+    Unlike the other tables in the rulesystem, the functions are not
+    selected by a pattern."""
     def __init__(self, accumulator=None, reverse=False, doc=None) :
         self.actions = []
         self.accumulator = accumulator or identity
         self.reverse = reverse
         self.doc = doc
-    def notify(self, args, data) :
+        self.disabled = []
+        self.current_disabled = None
+        self.last_current_disabled = []
+    def notify(self, args, data, disable=None) :
+        self.__push_current_disabled(disable or [])
         acc = []
         for f in self.actions :
+            if f in self.current_disabled :
+                continue
             try :
                 acc.append(f(*args, **data))
             except NotHandled :
                 pass
             except ActionHandled as ix :
+                self.__pop_current_disabled()
                 return self.accumulator(ix.args)
             except MultipleResults as ix :
                 acc.extend(ix.args)
             except RestartWith as ix :
                 acc = list(ix.args)
             except FinishWith as ix :
+                self.__pop_current_disabled()
                 return self.accumulator(acc + ix.args)
+            except :
+                self.__pop_current_disabled()
+                raise
+        self.__pop_current_disabled()
         return self.accumulator(acc)
     def add_handler(self, f, insert_first=None, insert_last=None, insert_before=None, insert_after=None) :
         """A function (which can be used as a decorator) which adds
@@ -170,6 +183,43 @@ class ActionTable(object) :
             i = self.actions.index(insert_before)
             self.actions.insert(i+1, f)
         return f
+    def disable(self, f=None) :
+        """This disables a function in the activity table
+        semi-permanently.  Should not be used once a game has
+        started."""
+        if self.current_disabled is not None :
+            raise Exception("Should be using temp_disable.")
+        if f :
+            if f in self.actions :
+                self.disabled.append(f)
+            else :
+                raise Exception("The given f=%r is not in the table." % f)
+        else :
+            raise Exception("No f given to disable.")
+    def temp_disable(self, f=None) :
+        """This disables a function temporarily during the execution
+        of the table."""
+        if f :
+            if f in self.actions :
+                self.current_disabled.append(f)
+            else :
+                raise Exception("The given f=%r is not in the table." % f)
+        else :
+            raise Exception("No f given to temporarily disable.")
+    def temp_enable(self, f=None) :
+        """This enables a function temporarily during the execution of
+        the table.  Does not require the function to have been
+        previously disabled."""
+        if f :
+            if f in self.current_disabled :
+                self.current_disabled.remove(f)
+        else :
+            raise Exception("No f given to temporarily disable.")
+    def __push_current_disabled(self, to_disable) :
+        self.last_current_disabled.append(self.current_disabled)
+        self.current_disabled = to_disable+self.disabled
+    def __pop_current_disabled(self) :
+        self.current_disabled = self.last_current_disabled.pop()
     def make_documentation(self, escape, heading_level=1) :
         print "<p>"
         if self.doc : print escape(self.doc)
@@ -182,25 +232,28 @@ class ActionTable(object) :
         if self.actions :
             print "<ol>"
             for handler in self.actions :
-                print "<li><p><b>call</b> <tt>"+escape(handler.__name__)+"</tt></p>"
+                print "<li><p>"
+                if handler in self.disabled :
+                    print "<b><i>DISABLED</i></b>"
+                print "<b>call</b> <tt>"+escape(handler.__name__)+"</tt></p>"
                 print "<p><i>"+(escape(handler.__doc__) or "(No documentation)")+"</i></p>"
                 print "</li>"
             print "</ol>"
         else :
             print "<p><i>No entries</i></p>"
 
-class EventTable(object) :
-    """The action table is a bunch of "actions" which are all
-    functions which take an event and supplementary data.  The
-    variables are applied to each function.  If the action doesn't
-    care about the event, then it may raise NotHandled.  If an event
-    wants to stop all notification, then it should raise AbortAction.
+class RuleTable(object) :
+    """The rule table is a bunch of patterns and function pairs.
+    OUT-OF-DATE DOCUMENTATION. The variables are applied to each
+    function.  If the action doesn't care about the event, then it may
+    raise NotHandled.  If an event wants to stop all notification,
+    then it should raise AbortAction.
 
     Actions are executed in reverse order.  That way, actions which
     are given later (and which are assumed to be more specific) get
     executed first.
 
-    This is basically an ActionTable which also first pattern
+    This is basically an ActivityTable which also first pattern
     matches."""
     def __init__(self, accumulator=None, reverse=True, doc=None) :
         self.actions = []
@@ -278,20 +331,20 @@ class EventTable(object) :
 ## A class for helping have many ActionTables and EventTables (see World)
 ##
 
-class ActionHelperObject(object) :
+class ActivityHelperObject(object) :
     def __init__(self, handler) :
         self.__handler__ = handler
     def __getattr__(self, name) :
         def _caller(*args, **kwargs) :
-            return self.__handler__.call_action(name, *args, **kwargs)
+            return self.__handler__.call_activity(name, *args, **kwargs)
         return _caller
 
-class EventHelperObject(object) :
+class RuleHelperObject(object) :
     def __init__(self, handler) :
         self.__handler__ = handler
     def __getattr__(self, name) :
         def _caller(*args, **kwargs) :
-            return self.__handler__.call_event(name, *args, **kwargs)
+            return self.__handler__.call_rule(name, *args, **kwargs)
         return _caller
 
 ###

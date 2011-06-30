@@ -2,7 +2,7 @@
 # The definition of the main world database.  Properties are what can be used to query the properties database
 
 from textadv.core.patterns import BasicPattern
-from textadv.core.rulesystem import ActionTable, PropertyTable, ActionHelperObject
+from textadv.core.rulesystem import ActivityTable, PropertyTable, ActivityHelperObject
 
 
 class Property(BasicPattern) :
@@ -23,8 +23,8 @@ class World(object) :
         self.relations = dict()
         self.relation_handlers = []
         self.name_to_relation = dict()
-        self._actions = dict()
-        self.actions = ActionHelperObject(self)
+        self._activities = dict()
+        self.activity = ActivityHelperObject(self)
     def set_game_defined(self) :
         """Set when it's time to close off arbitrary property
         definitions."""
@@ -84,19 +84,22 @@ class World(object) :
     def get_relation(self, name) :
         return self.relation_handlers[name]
 
-    def define_action(self, name, **kwargs) :
-        self._actions[name] = ActionTable(**kwargs)
+    def define_activity(self, name, **kwargs) :
+        self._activities[name] = ActivityTable(**kwargs)
     def to(self, name, **kwargs) :
         if self.game_defined :
             raise Exception("Can't add new actions when game is defined.")
         def _to(f) :
-            if not self._actions.has_key(name) :
-                self._actions[name] = ActionTable()
-            self._actions[name].add_handler(f, **kwargs)
+            if not self._activities.has_key(name) :
+                self._activities[name] = ActivityTable()
+            self._activities[name].add_handler(f, **kwargs)
             return f
         return _to
-    def call_action(self, name, *args) :
-        return self._actions[name].notify(args, {"world" : self})
+    def call_activity(self, name, *args) :
+        return self._activities[name].notify(args, {"world" : self})
+    def activity_table(self, name) :
+        """Gets the action table of the given name."""
+        return self._activities[name]
 
     def serialize(self) :
         import pickle
@@ -140,7 +143,7 @@ class World(object) :
             print "<pre>"
             r.dump(self.relations[r])
             print "</pre>"
-        print "<h"+shls+">Action tables</h"+shls+">"
-        for name, table in self._actions.iteritems() :
+        print "<h"+shls+">Activity tables</h"+shls+">"
+        for name, table in self._activities.iteritems() :
             print "<h"+sshls+">to "+escape(name)+"</h"+sshls+">"
             table.make_documentation(escape, heading_level=heading_level+3)

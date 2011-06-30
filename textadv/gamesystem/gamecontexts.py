@@ -9,9 +9,8 @@
 # provides: execute_context and ActorContext
 
 from textadv.gamesystem.utilities import eval_str, as_actor
-from textadv.core.rulesystem import AbortAction, ActionHandled, ActionHelperObject, EventHelperObject, ActionTable, EventTable
-#from textadv.gamesystem.eventsystem import event_notify, verify_action, run_action
-#from textadv.gamesystem.eventsystem import StartGame, StartTurn, GameIsEnding
+from textadv.core.rulesystem import AbortAction, ActionHandled, ActivityHelperObject, RuleHelperObject
+from textadv.core.rulesystem import ActivityTable, RuleTable
 from textadv.gamesystem.eventsystem import verify_action, run_action
 from textadv.gamesystem.utilities import *
 from textadv.gamesystem import parser
@@ -40,42 +39,48 @@ class GameContext(object) :
 ## the io object for ActorContext must implement "get_input" which
 ## functions as "raw_input", and "write" which functions as "print x,"
 
-class ActorActions(object) :
-    """This is a table of actions that all actors use."""
+class ActorActivities(object) :
+    """This is a table of activities that all actors use."""
     def __init__(self) :
-        self._actions = dict()
-        self.actions = ActionHelperObject(self)
-    def define_action(self, name, **kwargs) :
-        self._actions[name] = ActionTable(**kwargs)
+        self._activities = dict()
+        self.activity = ActivityHelperObject(self)
+    def define_activity(self, name, **kwargs) :
+        self._activities[name] = ActivityTable(**kwargs)
     def to(self, name, **kwargs) :
         def _to(f) :
-            if not self._actions.has_key(name) :
-                self._actions[name] = ActionTable()
-            self._actions[name].add_handler(f, **kwargs)
+            if not self._activities.has_key(name) :
+                self._activities[name] = ActivityTable()
+            self._activities[name].add_handler(f, **kwargs)
             return f
         return _to
+    def activity_table(self, name) :
+        """Gets the activity table of the given name."""
+        return self._activities[name]
     def call(self, name, *args, **kwargs) :
-        return self._actions[name].notify(args, {"ctxt" : kwargs["ctxt"]})
+        return self._activities[name].notify(args, {"ctxt" : kwargs["ctxt"]}, disable=kwargs.get("disable", []))
 
-class ActorEvents(object) :
-    """This is a table of events that all actors use."""
+class ActorRules(object) :
+    """This is a table of rules that all actors use."""
     def __init__(self) :
-        self._events = dict()
-        self.events = ActionHelperObject(self)
+        self._rules = dict()
+        self.rule = RuleHelperObject(self)
     def define_event(self, name, **kwargs) :
-        self._events[name] = EventTable(**kwargs)
+        self._rules[name] = RuleTable(**kwargs)
     def to(self, name, pattern, **kwargs) :
         def _to(f) :
-            if not self._events.has_key(name) :
-                self._events[name] = EventTable()
-            self._events[name].add_handler(pattern, f, **kwargs)
+            if not self._rules.has_key(name) :
+                self._rules[name] = RuleTable()
+            self._rules[name].add_handler(pattern, f, **kwargs)
             return f
         return _to
+    def rule_table(self, name) :
+        """Gets the event table of the given name"""
+        return self._rules[name]
     def call(self, name, *args, **kwargs) :
-        return self._events[name].notify(args, {"ctxt" : kwargs["ctxt"]}, {"world" : kwargs["ctxt"].world})
+        return self._rules[name].notify(args, {"ctxt" : kwargs["ctxt"]}, {"world" : kwargs["ctxt"].world})
 
-actoractions = ActorActions()
-actorevents = ActorEvents()
+actoractivities = ActorActivities()
+actorrules = ActorRules()
 
 class ActorContext(GameContext) :
     """Represents the context in which the player is assuming the role
@@ -85,12 +90,8 @@ class ActorContext(GameContext) :
         self.io = io
         self.world = world
         self.actor = actor
-        self.actions = ActionHelperObject(self)
-        self.events = EventHelperObject(self)
-    def call_action(self, name, *args) :
-        return actoractions.call(name, *args, ctxt=self)
-    def call_event(self, name, *args) :
-        return actorevents.call(name, *args, ctxt=self)
+        self.activity = ActivityHelperObject(self)
+        self.rule = RuleHelperObject(self)
     def write(self, *stuff, **kwargs) :
         """Writes a line by evaluating the string using the utilities
         module.  If there is an actor, then the text is wrapped so
@@ -136,6 +137,18 @@ class ActorContext(GameContext) :
             import traceback
             traceback.print_exc()
             return (self, dict())
+    def call_activity(self, name, *args, **kwargs) :
+        kwargs["ctxt"] = self
+        return actoractivities.call(name, *args, **kwargs)
+    def call_rule(self, name, *args, **kwargs) :
+        kwargs["ctxt"] = self
+        return actorrules.call(name, *args, **kwargs)
+    def activity_table(self, name) :
+        """Gets the action table of the given name."""
+        return actoractivities.activity_table(name)
+    def rule_table(self, name) :
+        """Gets the event table of the given name."""
+        return actorrules.rule_table(name)
 
 class DisambiguationContext(GameContext) :
     def __init__(self, parent, amb) :
@@ -164,14 +177,14 @@ class DisambiguationContext(GameContext) :
 def make_documentation(escape, heading_level=1) :
     hls = str(heading_level)
     shls = str(heading_level+1)
-    print "<h"+hls+">Actor actions</h"+hls+">"
-    print "<p>This is the documentation for the actor actions attached to <tt>actoractions</tt> in <tt>gamecontexts.py</tt>.</p>"
-    for name, table in actoractions._actions.iteritems() :
+    print "<h"+hls+">Actor activities</h"+hls+">"
+    print "<p>This is the documentation for the actor activities attached to <tt>actoractivities</tt> in <tt>gamecontexts.py</tt>.</p>"
+    for name, table in actoractivities._activities.iteritems() :
         print "<h"+shls+">to "+escape(name)+"</h"+shls+">"
         table.make_documentation(escape, heading_level=heading_level+2)
-    print "<h"+hls+">Actor events</h"+hls+">"
-    print "<p>This is the documentation for the actor events attached to <tt>actorevents</tt> in <tt>gamecontexts.py</tt>.</p>"
-    for name, table in actorevents._events.iteritems() :
+    print "<h"+hls+">Actor rules</h"+hls+">"
+    print "<p>This is the documentation for the actor rules attached to <tt>actorrules</tt> in <tt>gamecontexts.py</tt>.</p>"
+    for name, table in actorrules._rules.iteritems() :
         print "<h"+shls+">to "+escape(name)+"</h"+shls+">"
         table.make_documentation(escape, heading_level=heading_level+2)
 

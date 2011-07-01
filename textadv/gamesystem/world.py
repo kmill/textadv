@@ -10,7 +10,7 @@ class Property(BasicPattern) :
     created."""
     def __init__(self, *args) :
         if len(args) != self.numargs :
-            raise Exception("Property requires exactly "+str(numargs)+" arguments.")
+            raise Exception("Property requires exactly "+str(self.numargs)+" arguments.")
         self.args = args
 
 class World(object) :

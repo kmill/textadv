@@ -312,42 +312,47 @@ class RuleTable(object) :
         self.disabled = []
         self.current_disabled = None
         self.last_current_disabled = []
-    def add_handler(self, pattern, f, insert_first=None, insert_last=None, insert_before=None, insert_after=None) :
+    def add_handler(self, pattern, f, insert_first=None, insert_last=None, insert_before=None, insert_after=None, wants_event=False) :
         """Adds (pattern, f) to the table.  At most one of the following may be set:
         * insert_first: puts the handler in a position so it executes first
         * insert_last: puts the handler in a position so it executes last
         * insert_before: puts the handler in a position so it executes immediately before the function in insert_before (ignoring pattern)
         * insert_after: puts the handler in a position so it executes immediately after the function in insert_after (ignoring pattern)
 
-        If none are set, then insert_first is default if reverse is true, otherwise it's insert_last."""
+        If none are set, then insert_first is default if reverse is true, otherwise it's insert_last.
+
+        If wants_event is true, then the event is also supplied to the function as its first argument."""
         if insert_first is None and insert_last is None and insert_before is None and insert_after is None :
             if self.reverse : insert_first=True
             else : insert_last=True
         if insert_first :
-            self.actions.insert(0, (pattern, f))
+            self.actions.insert(0, (pattern, f, wants_event))
         elif insert_last :
-            self.actions.append((pattern, f))
+            self.actions.append((pattern, f, wants_event))
         elif insert_before :
             for i in xrange(0, len(self.actions)) :
                 if self.actions[i][1] is insert_before : break
-            self.actions.insert(i, (pattern, f))
+            self.actions.insert(i, (pattern, f, wants_event))
         elif insert_after :
             for i in xrange(0, len(self.actions)) :
                 if self.actions[i][1] is insert_after : break
-            self.actions.insert(i+1, (pattern, f))
+            self.actions.insert(i+1, (pattern, f, wants_event))
     def notify(self, event, data, pattern_data=None, disable=None) :
         self.__push_current_disabled(disable or [])
         accum = []
         if not pattern_data :
             pattern_data = data
-        for (pattern, f) in self.actions :
+        for (pattern, f, wants_event) in self.actions :
             if f in self.current_disabled :
                 continue
             try :
                 matches = pattern.match(event, data=pattern_data)
                 for k,v in data.iteritems() :
                     matches[k] = v
-                accum.append(f(**matches))
+                if wants_event :
+                    accum.append(f(event, **matches))
+                else :
+                    accum.append(f(**matches))
             except NoMatchException :
                 pass
             except NotHandled :
@@ -393,12 +398,14 @@ class RuleTable(object) :
         print "<tt>"+escape(self.accumulator.__name__)+"</tt></p>"
         if self.actions :
             print "<ol>"
-            for key,handler in self.actions :
+            for key,handler,we in self.actions :
                 print "<li><p>"
                 if handler in self.disabled :
                     print "<b><i>DISABLED</i></b>"
                 print escape(repr(key))#+"<br>"
                 print "<b>calls</b> <tt>"+escape(handler.__name__)+"</tt>"
+                if we :
+                    print "<b>with event</b>"
                 try :
                     print "<small><i>(from <tt>"+inspect.getsourcefile(handler)+"</tt>)</i></small>"
                 except TypeError :

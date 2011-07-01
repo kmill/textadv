@@ -87,8 +87,8 @@ class Contents(Property) :
 
 @world.handler(Contents(X) <= IsA(X, "room"))
 def contents_room(x, world) :
-    """Gets the immediate contents of a room."""
-    return [o["y"] for o in world.query_relation(Contains(x, Y))]
+    """Gets the immediate contents of a room along with its doors."""
+    return [o["y"] for o in world.query_relation(Contains(x, Y))]+world.activity.get_room_doors(x)
 
 ##
 # Property: EffectiveContainer
@@ -171,6 +171,17 @@ def rule_ContainsLight_contents_can_light_room(x, world) :
         return True
     else : raise NotHandled()
 
+##
+# Property: NoGoMessage
+##
+
+@world.define_property
+class NoGoMessage(Property) :
+    """Takes a (room, direction) pair and gives the reason one can't
+    go that way."""
+    numargs = 2
+
+world[NoGoMessage(X, direction) <= IsA(X, "room")] = "{Bob|cap} can't go that way."
 
 ###
 ### Defining: thing
@@ -202,12 +213,20 @@ def rule_ContributesLight_if_parts_contribute(x, world) :
         return True
     else : raise NotHandled()
 
-@world.handler(ContributesLight(X) <= IsA(X, "thing"))
-def rule_ContributesLight_if_contains_light(x, world) :
-    """A thing contributes light if it contains light."""
-    if world[ContainsLight(x)] :
-        return True
-    else : raise NotHandled()
+# @world.handler(ContributesLight(X) <= IsA(X, "thing"))
+# def rule_ContributesLight_if_contains_light(x, world) :
+#     """A thing contributes light if it contains light."""
+#     if world[ContainsLight(x)] :
+#         return True
+#     else : raise NotHandled()
+
+@world.handler(EffectiveContainer(X) <= IsA(X, "thing"))
+def rule_EffectiveContainer_if_thing(x, world) :
+    """We assume that we only care about whether a regular thing is
+    the effective container if it has constituent parts.  With this
+    assumption, we then say that the effective container of a thing is
+    its location."""
+    return world[EffectiveContainer(world[Location(x)])]
 
 
 ##
@@ -361,9 +380,13 @@ def rule_VisibleTo_if_held(x, actor, world) :
 
 @world.handler(VisibleTo(X, actor))
 def rule_VisibleTo_if_in_same_visible_container(x, actor, world) :
-    """Anything in the same visible container to the actor is
-    visible if the visible container is lit."""
+    """Anything in the same visible container to the actor is visible
+    if the visible container is lit.  We treat doors specially: if x
+    is in the get_room_doors of the visible container, then the door
+    is visible, too."""
     actor_vis_cont = world[VisibleContainer(world[Location(actor)])]
+    if x in world.activity.get_room_doors(actor_vis_cont) :
+        return True
     if actor_vis_cont == x :
         # otherwise we'd be looking too many levels high
         x_vis_cont = x
@@ -403,8 +426,11 @@ def rule_not_AccessibleTo_if_different_effective_containers(x, actor, world) :
     """If x and the actor are in the different effective containers,
     then x is not accessible.  We check if the effective container of
     the location of the actor is x in case x is a supporter or a
-    container."""
+    container.  We treat doors specially: a door is accessible if it's
+    in the get_room_doors of the effective container for the actor."""
     actor_eff_cont = world[EffectiveContainer(world[Location(actor)])]
+    if x in world.activity.get_room_doors(actor_eff_cont) :
+        return True
     if actor_eff_cont != x :
         if actor_eff_cont != world[EffectiveContainer(world[Location(x)])] :
             return False
@@ -442,6 +468,31 @@ class IsEnterable(Property) :
 world[IsEnterable(X) <= IsA(X, "thing")] = False
 
 
+@world.define_property
+class NoEnterMessage(Property) :
+    """Gives a message for why one is unable to enter the object
+    (usually because IsEnterable is not true)."""
+    numargs = 1
+
+world[NoEnterMessage(X) <= IsA(X, "thing")] = "{Bob|cap} can't enter that."
+
+@world.define_property
+class ParentEnterable(Property) :
+    """Gives the next object in the chain of Location which is
+    enterable.  Assumes that rooms also satisfy this condition."""
+    numargs = 1
+
+@world.handler(ParentEnterable(X) <= IsA(X, "thing"))
+def rule_ParentEnterable_by_Location(x, world) :
+    """Gets either the next room or enterable by repeated calling of
+    Location."""
+    loc = world[Location(x)]
+    while not world[IsA(loc, "room")] :
+        if world[IsEnterable(loc)] :
+            return loc
+        loc = world[Location(x)]
+    return loc
+
 ##
 # Property: LocaleDescription
 ##
@@ -460,6 +511,87 @@ world[LocaleDescription(X) <= IsA(X, "enterable")] = None
 ### Defining: door
 ###
 
+@world.to("put_in", insert_first=True)
+def rule_put_in_not_for_doors(x, y, world) :
+    """Doors should not be put in anything directly.  Instead, they
+    should be attached to rooms using the connect_rooms activity."""
+    if world[IsA(x, "door")] :
+        raise Exception("Use connect_rooms to put a door in a room.")
+
+@world.handler(Location(X) <= IsA(X, "door"))
+def rule_Location_of_door_is_error(x, world) :
+    """There is no location of a door: we would have two choices for
+    its location."""
+    raise Exception("Doors have no location.")
+
+world[FixedInPlace(X) <= IsA(X, "door")] = True
+
+
+##
+# Properties: Openable, IsOpen
+##
+
+@world.define_property
+class Openable(Property) :
+    """Represents whether an object is able to be opened and closed."""
+    numargs = 1
+
+@world.define_property
+class IsOpen(Property) :
+    """Represents whether an openable object is open."""
+    numargs = 1
+
+world[Openable(X) <= IsA(X, "thing")] = False # by default, things aren't openable
+world[IsOpen(X) <= Openable(X)] = False # by default, openable things are closed
+
+world[Openable(X) <= IsA(X, "door")] = True # doors are openable by default.
+
+@world.define_property
+class NoOpenMessages(Property) :
+    """Represents the messages for not being able to open or close an
+    unopenable object."""
+    numargs = 2
+
+world[NoOpenMessages(X, "no_open")] = "{Bob|cap} can't open that."
+world[NoOpenMessages(X, "no_close")] = "{Bob|cap} can't close that."
+world[NoOpenMessages(X, "already_open")] = "That's already open."
+world[NoOpenMessages(X, "already_closed")] = "That's already closed."
+
+##
+# Property: Lockable, IsLocked
+##
+
+@world.define_property
+class Lockable(Property) :
+    """Represents whether an object can be locked and unlocked."""
+    numargs = 1
+
+@world.define_property
+class IsLocked(Property) :
+    """Represents whether a lockable object is locked."""
+    numargs = 1
+
+world[Lockable(X) <= IsA(X, "thing")] = False
+
+@world.define_property
+class KeyOfLock(Property) :
+    """This is the object which can unlock a Lockable item.  By
+    default, it's None, representing there being no key."""
+    numargs = 1
+
+world[KeyOfLock(X) <= Lockable(X)] = None
+
+
+@world.define_property
+class NoLockMessages(Property) :
+    """Represents the messages for not being able to lock or unlock an
+    unlockable object, or if it's the wrong key."""
+    numargs = 2
+
+world[NoLockMessages(X, "no_lock")] = "That doesn't appear to be lockable."
+world[NoLockMessages(X, "no_unlock")] = "That doesn't appear to be unlockable."
+world[NoLockMessages(X, "wrong_key")] = "That key doesn't fit the lock."
+world[NoLockMessages(X, "no_open")] = "That's locked."
 
 
 ###
@@ -471,23 +603,6 @@ def container_contents(x, world) :
     """Gets the immediate contents of the container."""
     return [o["y"] for o in world.query_relation(Contains(x, Y))]
 
-##
-# Properties: Openable, IsOpen
-##
-
-@world.define_property
-class Openable(Property) :
-    """Represents whether an object is able to be opened and closed."""
-    numargs = 1
-
-world[Openable(X) <= IsA(X, "thing")] = False # by default, things aren't openable
-
-@world.define_property
-class IsOpen(Property) :
-    """Represents whether an openable object is open."""
-    numargs = 1
-
-world[IsOpen(X) <= Openable(X)] = False # by default, openable things are closed
 
 #
 # Lighting for container

@@ -99,8 +99,10 @@ class BasicPattern(AbstractPattern) :
             else :
                 newargs.append(arg)
         return type(self)(*newargs)
+    def test(self, world) :
+        return world[self]
     def __and__(self, b) :
-        if not isinstance(b, BasicPattern) :
+        if not isinstance(b, BasicPattern) and not isinstance(b, PNot) :
             raise Exception("Not anding with a basicpattern")
         return PatternConjunction(self, b)
     def __repr__(self) :
@@ -115,9 +117,7 @@ class PatternRequires(AbstractPattern) :
     def match(self, input, matches=None, data=None) :
         matches = self.pattern.match(input, matches, data)
         try :
-            if type(self.support) == PatternConjunction :
-                self.support.expand_patterns(matches).test(data["world"])
-            elif not data["world"][self.support.expand_pattern(matches)] :
+            if not self.support.expand_pattern(matches).test(data["world"]) :
                 raise NoMatchException(self, self.support)
             return matches
         except KeyError :
@@ -127,20 +127,43 @@ class PatternRequires(AbstractPattern) :
     def __repr__(self) :
         return "%r <= %r" % (self.pattern, self.support)
 
-class PatternConjunction(object) :
+class PatternConjunction(AbstractPattern) :
     def __init__(self, *support) :
         self.support = support
     def test(self, world) :
-        if not all(world[s] for s in self.support) :
-            raise NoMatchException(self)
-    def expand_patterns(self, matches) :
+        return all(s.test(world) for s in self.support)
+    def expand_pattern(self, matches) :
         return PatternConjunction(*[s.expand_pattern(matches) for s in self.support])
     def __and__(self, b) :
-        if not isinstance(BasicPattern) :
+        if not isinstance(b, AbstractPattern) :
             raise Exception("Not anding with a BasicPattern")
         return PatternConjunction(*(self.support+[b]))
     def __repr__(self) :
         return " & ".join(repr(s) for s in self.support)
+
+class PNot(AbstractPattern) :
+    def __init__(self, to_not) :
+        self.to_not = to_not
+    def test(self, world) :
+        return not self.to_not.test(world)
+    def expand_pattern(self, matches) :
+        return PNot(self.to_not.expand_pattern(matches))
+    def __repr__(self) :
+        return "PNot(%r)" % self.to_not
+
+class PEquals(object) :
+    def __init__(self, a, b) :
+        self.a, self.b = a, b
+    def test(self, world) :
+        a = self.a.test(world) if isinstance(self.a, AbstractPattern) else self.a
+        b = self.b.test(world) if isinstance(self.b, AbstractPattern) else self.b
+        return (a==b)
+    def expand_pattern(self, matches) :
+        a = self.a.expand_pattern(matches) if isinstance(self.a, AbstractPattern) else self.a
+        b = self.b.expand_pattern(matches) if isinstance(self.b, AbstractPattern) else self.b
+        return PEquals(a, b)
+    def __repr__(self) :
+        return "PEquals(%r, %r)" % (self.a, self.b)
 
 ###
 ### Tests

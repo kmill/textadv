@@ -115,6 +115,8 @@ class ActorContext(GameContext) :
         newstuff = [eval_str(s, self) for s in stuff]
         self.io.write(*newstuff)
     def run(self, input=None, action=None) :
+        if not self.world.get_property("Global", "game_started") :
+            self.activity.start_game()
         try :
             if input is None and action is None:
                 input = self.io.get_input()
@@ -130,6 +132,7 @@ class ActorContext(GameContext) :
                     self.actionsystem.run_action(action, self, write_action=True)
                 else :
                     self.actionsystem.run_action(action, self)
+                self.activity.step_turn()
             except parser.NoSuchWord as ex :
                 esc = escape_str(ex.word)
                 self.write("I don't know what you mean by %r." % esc)

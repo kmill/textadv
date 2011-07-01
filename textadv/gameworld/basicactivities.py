@@ -19,10 +19,10 @@ def default_def_obj(name, kind, world) :
 
 
 ##
-## 
+## Activity: get the doors in a room
 ##
 
-world.define_activity("room_doors", accumulator=list_append,
+world.define_activity("get_room_doors", accumulator=list_append,
                       doc="""Gets a list of doors that are in a particular room.""")
 @world.to("get_room_doors")
 def default_get_room_doors(room, world) :
@@ -31,6 +31,37 @@ def default_get_room_doors(room, world) :
     neighbors = world.query_relation(Exit(room, X, Y), var=Y)
     doors = [n for n in neighbors if world[IsA(n, "door")]]
     return doors
+
+##
+## Activity: get the other side of a door
+##
+
+world.define_activity("door_other_side_from", accumulator=lambda x : x[0],
+                      doc="""Gets the room on the other side of a door from a given room.""")
+@world.to("door_other_side_from")
+def default_door_other_side_from(door, room, world) :
+    """Given (door, room), gives the other room associated with the
+    door."""
+    rooms = world.query_relation(Exit(door, X, Y), var=Y)
+    if len(rooms) == 1 :
+        raise Exception("Door only has one side")
+    elif rooms[0] == room :
+        return rooms[1]
+    else :
+        return rooms[0]
+
+##
+## Activities: getting exits from a room
+##
+
+world.define_activity("get_room_exit_directions", accumulator=list_append,
+                      doc="""Gets the directions from a room one can leave.""")
+
+@world.to("get_room_exit_directions")
+def default_get_room_exit_directions(room, world) :
+    """Just looks through the Exit relation table."""
+    return world.query_relation(Exit(room, X, Y), var=X)
+
 
 ###
 ### Actor Activities
@@ -46,6 +77,7 @@ def describe_current_location_default(ctxt) :
     VisibleContainer of the current actor."""
     loc = ctxt.world[Location(ctxt.actor)]
     vis_cont = ctxt.world[VisibleContainer(loc)]
+    ctxt.world[Global("current_location")] = vis_cont
     ctxt.activity.describe_location(ctxt.actor, loc, vis_cont)
 
 __DESCRIBE_LOCATION_notables = []
@@ -64,8 +96,10 @@ def describe_location_Heading(actor, loc, vis_cont, ctxt) :
     """Constructs the heading using describe_location_heading.  If the
     room is in darkness, then, writes "Darkness"."""
     if ctxt.world[ContainsLight(vis_cont)] :
+        ctxt.world[Global("currently_lit")] = True
         ctxt.activity.describe_location_heading(actor, loc, vis_cont)
     else :
+        ctxt.world[Global("currently_lit")] = False
         ctxt.write("Darkness")
 
 @actoractivities.to("describe_location")
@@ -109,7 +143,12 @@ def describe_location_Objects(actor, loc, vis_cont, ctxt) :
                 if not msg : # the object printed its own description
                     pass
                 else :
-                    o_loc = ctxt.world[Location(o)]
+                    # we need special handling for doors (which have no Location)
+                    if ctxt.world[IsA(o, "door")] :
+                        # we assume that if we've found a door, then then it must be in the vis_cont location
+                        o_loc = vis_cont
+                    else :
+                        o_loc = ctxt.world[Location(o)]
                     if o_loc != current_location :
                         if current_descs :
                             unnotable_messages.append((current_start, current_descs))

@@ -2,7 +2,7 @@
 #
 # This is the basic library for how the world works.
 
-from textadv.core.patterns import VarPattern, BasicPattern
+from textadv.core.patterns import VarPattern, BasicPattern, PNot, PEquals
 from textadv.core.rulesystem import handler_requires, ActionHandled, MultipleResults, NotHandled, AbortAction, make_rule_decorator
 from textadv.gamesystem.relations import *
 from textadv.gamesystem.world import *
@@ -80,6 +80,7 @@ execfile("textadv/gameworld/basicrelations.py")
 execfile("textadv/gameworld/basickinds.py")
 execfile("textadv/gameworld/basicrules.py")
 execfile("textadv/gameworld/basicactivities.py")
+execfile("textadv/gameworld/basicsequence.py")
 execfile("textadv/gameworld/basicactions.py")
 
 ##

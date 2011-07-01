@@ -17,6 +17,8 @@ world.activity.def_obj("wood door", "door")
 world[Description("wood door")] = "It's wood.  It's a door."
 world.activity.connect_rooms("room0", "south", "wood door")
 world.activity.connect_rooms("wood door", "south", "room1")
+world[Lockable("wood door")] = True
+world[KeyOfLock("wood door")] = "red ball"
 
 world.activity.def_obj("room1", "room")
 world[Name("room1")] = "The Great Test Room"

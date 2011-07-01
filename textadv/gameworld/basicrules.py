@@ -572,6 +572,7 @@ class IsLocked(Property) :
     numargs = 1
 
 world[Lockable(X) <= IsA(X, "thing")] = False
+world[IsLocked(X) <= Lockable(X)] = True
 
 @world.define_property
 class KeyOfLock(Property) :
@@ -588,10 +589,25 @@ class NoLockMessages(Property) :
     unlockable object, or if it's the wrong key."""
     numargs = 2
 
-world[NoLockMessages(X, "no_lock")] = "That doesn't appear to be lockable."
-world[NoLockMessages(X, "no_unlock")] = "That doesn't appear to be unlockable."
-world[NoLockMessages(X, "wrong_key")] = "That key doesn't fit the lock."
-world[NoLockMessages(X, "no_open")] = "That's locked."
+@world.handler(NoLockMessages(X, "no_lock"))
+def rule_NoLockMessages_no_lock(x, world) :
+    """Just a default message for 'no_lock'."""
+    return str_with_objs("[The $x] doesn't appear to be lockable.", x=x)
+@world.handler(NoLockMessages(X, "no_unlock"))
+def rule_NoLockMessages_no_lock(x, world) :
+    """Just a default message for 'no_unlock'."""
+    return str_with_objs("[The $x] doesn't appear to be unlockable.", x=x)
+world[NoLockMessages(X, "no_open")] = "It's locked."
+world[NoLockMessages(X, "already_locked")] = "It's already locked."
+world[NoLockMessages(X, "already_unlocked")] = "It's already unlocked."
+
+@world.define_property
+class WrongKeyMessages(Property) :
+    """Represents the message for why a particular lock,key pair
+    doesn't work."""
+    numargs = 2
+
+world[WrongKeyMessages(X, Y)] = "That doesn't fit the lock."
 
 
 ###

@@ -58,7 +58,7 @@ def require_xobj_held(actionsystem, action, only_hint=False, transitive=True) :
         @docstring("An attempt is made to take the object x from "+repr(action)+" if the actor is not already holding it")
         def _trybefore_xobj_held(actor, x, ctxt, **kwargs) :
             if not __is_held(actor, x, ctxt) :
-                ctxt.actionsystem.do_first(Taking(actor, x), ctxt=ctxt)
+                ctxt.actionsystem.do_first(Taking(actor, x), ctxt=ctxt, silently=True)
             # just in case it succeeds, but we don't yet have the object
             if transitive :
                 can_do = (actor == ctxt.world[Owner(x)] and ctxt.world[AccessibleTo(x, actor)])
@@ -570,7 +570,7 @@ def report_GettingOff_default(event, actor, ctxt) :
 ##
 
 class ExitingParticular(BasicAction) :
-    "ExitingParticular(actor, x)"
+    """ExitingParticular(actor, x)"""
     verb = "exit"
     gerund = "exiting"
     numargs = 2
@@ -593,7 +593,7 @@ def before_ExitingParticular_needs_to_be_in_x(actor, x, ctxt) :
 ##
 
 class GettingOffParticular(BasicAction) :
-    "GettingOffParticular(actor, x)"
+    """GettingOffParticular(actor, x)"""
     verb = "get off"
     gerund = "getting off"
     numargs = 2
@@ -611,10 +611,80 @@ def before_GettingOffParticular_needs_to_be_on_x(actor, x, ctxt) :
 
 
 ##
+# Insert something into something
+##
+
+class InsertingInto(BasicAction) :
+    """InsertingInto(actor, x, y)"""
+    verb = ("insert", "into")
+    gerund = ("inserting", "into")
+    numargs = 3
+parser.understand("put/insert [something x] in/into [something y]", InsertingInto(actor, X, Y))
+
+require_xobj_held(actionsystem, InsertingInto(actor, X, Y))
+require_xobj_accessible(actionsystem, InsertingInto(actor, Z, X))
+
+@before(InsertingInto(actor, X, Y) <= PNot(IsA(Y, "container")))
+def before_InsertingInto_needs_container(actor, x, y, ctxt) :
+    """One can only insert things into a container."""
+    raise AbortAction(str_with_objs("{Bob|cap} can't put [the $x] into [the $y].", x=x, y=y), actor=actor)
+
+@before(InsertingInto(actor, X, Y) <= PEquals(X, Y))
+def before_InsertingInto_not_on_itself(actor, x, y, ctxt) :
+    """One can't place something in itself."""
+    raise AbortAction(str_with_objs("{Bob|cap} can't put [the $x] into itself.", x=x), actor=actor)
+
+@when(InsertingInto(actor, X, Y))
+def when_InsertingInto_default(actor, x, y, ctxt) :
+    """Makes y contain x."""
+    ctxt.world.activity.put_in(x, y)
+
+@report(InsertingInto(actor, X, Y))
+def report_InsertingInto_default(actor, x, y, ctxt) :
+    """Provides a default message for InsertingInto."""
+    ctxt.write(str_with_objs("{Bob|cap} {puts} [the $x] into [the $y].", x=x, y=y), actor=actor)
+
+
+##
+# Placing something on something
+##
+
+class PlacingOn(BasicAction) :
+    """PlacingOn(actor, x, y)"""
+    verb = ("place", "on")
+    gerund = ("placing", "on")
+    numargs = 3
+parser.understand("put/place [something x] on/onto [something y]", PlacingOn(actor, X, Y))
+
+require_xobj_held(actionsystem, PlacingOn(actor, X, Y))
+require_xobj_accessible(actionsystem, PlacingOn(actor, Z, X))
+
+@before(PlacingOn(actor, X, Y) <= PNot(IsA(Y, "supporter")))
+def before_PlacingOn_needs_supporter(actor, x, y, ctxt) :
+    """One can only place things on a supporter."""
+    raise AbortAction(str_with_objs("{Bob|cap} can't place [the $x] on [the $y].", x=x, y=y), actor=actor)
+
+@before(PlacingOn(actor, X, Y) <= PEquals(X, Y))
+def before_PlacingOn_not_on_itself(actor, x, y, ctxt) :
+    """One can't place something on itself."""
+    raise AbortAction(str_with_objs("{Bob|cap} can't place [the $x] on itself.", x=x), actor=actor)
+
+@when(PlacingOn(actor, X, Y))
+def when_PlacingOn_default(actor, x, y, ctxt) :
+    """Makes y support x."""
+    ctxt.world.activity.put_on(x, y)
+
+@report(PlacingOn(actor, X, Y))
+def report_PlacingOn_default(actor, x, y, ctxt) :
+    """Provides a default message for PlacingOn."""
+    ctxt.write(str_with_objs("{Bob|cap} {places} [the $x] on [the $y].", x=x, y=y), actor=actor)
+
+##
 # Opening
 ##
 
 class Opening(BasicAction) :
+    """Opening(actor, x)"""
     verb = "open"
     gerund = "opening"
     numargs = 2
@@ -627,11 +697,10 @@ def verify_opening_openable(actor, x, ctxt) :
     """That which is openable is more logical to open."""
     return VeryLogicalOperation()
 
-@before(Opening(actor, X))
+@before(Opening(actor, X) <= PNot(Openable(X)))
 def before_opening_unopenable(actor, x, ctxt) :
     """That which isn't openable can't be opened."""
-    if not ctxt.world[Openable(x)] :
-        raise AbortAction(ctxt.world[NoOpenMessages(x, "no_open")], actor=actor)
+    raise AbortAction(ctxt.world[NoOpenMessages(x, "no_open")], actor=actor)
 
 @before(Opening(actor, X) <= Lockable(X) & IsLocked(X))
 def before_opening_locked(actor, x, ctxt) :
@@ -645,10 +714,12 @@ def before_opening_already_open(actor, x, ctxt) :
 
 @when(Opening(actor, X))
 def when_opening(actor, x, ctxt) :
+    """Sets the IsOpen property to True."""
     ctxt.world[IsOpen(x)] = True
 
 @report(Opening(actor, X))
 def report_opening(actor, x, ctxt) :
+    """Writes 'Opened.'"""
     ctxt.write("Opened.")
 
 
@@ -657,6 +728,7 @@ def report_opening(actor, x, ctxt) :
 ##
 
 class Closing(BasicAction) :
+    """Closing(actor, x)"""
     verb = "close"
     gerund = "closing"
     numargs = 2
@@ -669,11 +741,10 @@ def verify_closing_openable(actor, x, ctxt) :
     """That which is openable is more logical to close."""
     return VeryLogicalOperation()
 
-@before(Closing(actor, X))
+@before(Closing(actor, X) <= PNot(Openable(X)))
 def before_closing_unopenable(actor, x, ctxt) :
     """That which isn't openable can't be closed."""
-    if not ctxt.world[Openable(x)] :
-        raise AbortAction(ctxt.world[NoOpenMessages(x, "no_close")], actor=actor)
+    raise AbortAction(ctxt.world[NoOpenMessages(x, "no_close")], actor=actor)
 
 @before(Closing(actor, X) <= Openable(X) & PNot(IsOpen(X)))
 def before_closing_already_open(actor, x, ctxt) :
@@ -682,13 +753,127 @@ def before_closing_already_open(actor, x, ctxt) :
 
 @when(Closing(actor, X))
 def when_closing(actor, x, ctxt) :
+    """Sets the IsOpen property to False."""
     ctxt.world[IsOpen(x)] = False
 
 @report(Closing(actor, X))
 def report_closing(actor, x, ctxt) :
+    """Writes 'Closed.'"""
     ctxt.write("Closed.")
 
 
+##
+# Unlocking
+##
+
+class UnlockingWith(BasicAction) :
+    """UnlockingWith(actor, x, key)"""
+    verb = ("unlock", "with")
+    gerund = ("unlocking", "with")
+    numargs = 3
+parser.understand("unlock [something x] with [something y]", UnlockingWith(actor, X, Y))
+parser.understand("open [something x] with [something y]", UnlockingWith(actor, X, Y))
+
+require_xobj_accessible(actionsystem, UnlockingWith(actor, X, Y))
+require_xobj_held(actionsystem, UnlockingWith(actor, Z, X))
+
+@before(UnlockingWith(actor, X, Y) <= PNot(Lockable(X)))
+def before_unlocking_unlockable(actor, x, y, ctxt) :
+    """One can't unlock that which has no lock."""
+    raise AbortAction(ctxt.world[NoLockMessages(x, "no_unlock")], actor=actor)
+
+@before(UnlockingWith(actor, X, Y) <= Lockable(X) & PNot(IsLocked(X)))
+def before_unlocking_unlocked(actor, x, y, ctxt) :
+    """One can't unlock that which is already unlocked."""
+    raise AbortAction(ctxt.world[NoLockMessages(x, "already_unlocked")], actor=actor)
+
+@before(UnlockingWith(actor, X, Y) <= Lockable(X) & PNot(PEquals(Y, KeyOfLock(X))))
+def before_unlocking_unlocked(actor, x, y, ctxt) :
+    """One can't unlock with the wrong key."""
+    raise AbortAction(ctxt.world[WrongKeyMessages(x, y)], actor=actor)
+
+@when(UnlockingWith(actor, X, Y))
+def when_unlocking_locked(actor, x, y, ctxt) :
+    """We just set the IsLocked property to false."""
+    ctxt.world[IsLocked(x)] = False
+
+@report(UnlockingWith(actor, X, Y))
+def report_unlocking_locked(actor, x, y, ctxt) :
+    """Just outputs 'Unlocked.'"""
+    ctxt.write("Unlocked.")
+
+#
+# Help the user know they need a key
+#
+class Unlocking(BasicAction) :
+    """Unlock(actor, x)"""
+    verb = "unlock"
+    gerund = "unlocking"
+    numargs = 2
+parser.understand("unlock [something x]", Unlocking(actor, X))
+require_xobj_accessible(actionsystem, Unlocking(actor, X))
+@before(Unlocking(actor, X))
+def before_unlocking_fail(actor, x, ctxt) :
+    """Unlocking requires a key."""
+    raise AbortAction(str_with_objs("Unlock [the $x] with what?", x=x), actor=actor)
+
+
+##
+# Locking
+##
+
+class LockingWith(BasicAction) :
+    """LockingWith(actor, x, key)"""
+    verb = ("lock", "with")
+    gerund = ("locking", "with")
+    numargs = 3
+parser.understand("lock [something x] with [something y]", LockingWith(actor, X, Y))
+parser.understand("close [something x] with [something y]", LockingWith(actor, X, Y))
+
+require_xobj_accessible(actionsystem, LockingWith(actor, X, Y))
+require_xobj_held(actionsystem, LockingWith(actor, Z, X))
+
+@before(LockingWith(actor, X, Y) <= PNot(Lockable(X)))
+def before_locking_lockable(actor, x, y, ctxt) :
+    """One can't lock that which has no lock."""
+    raise AbortAction(ctxt.world[NoLockMessages(x, "no_lock")], actor=actor)
+
+@before(LockingWith(actor, X, Y) <= Lockable(X) & IsLocked(X))
+def before_locking_locked(actor, x, y, ctxt) :
+    """One can't lock that which is already locked."""
+    raise AbortAction(ctxt.world[NoLockMessages(x, "already_locked")], actor=actor)
+
+@before(LockingWith(actor, X, Y) <= Lockable(X) & PNot(PEquals(Y, KeyOfLock(X))))
+def before_locking_locked(actor, x, y, ctxt) :
+    """One can't lock with the wrong key."""
+    raise AbortAction(ctxt.world[WrongKeyMessages(x, y)], actor=actor)
+
+@when(LockingWith(actor, X, Y))
+def when_locking_locked(actor, x, y, ctxt) :
+    """We just set the IsLocked property to true."""
+    ctxt.world[IsLocked(x)] = True
+
+@report(LockingWith(actor, X, Y))
+def report_locking_locked(actor, x, y, ctxt) :
+    """Just outputs 'Locked.'"""
+    ctxt.write("Locked.")
+
+#
+# Help the user know they need a key
+#
+class Locking(BasicAction) :
+    """Locking(actor, x)"""
+    verb = "lock"
+    gerund = "locking"
+    numargs = 2
+parser.understand("lock [something x]", Locking(actor, X))
+require_xobj_accessible(actionsystem, Locking(actor, X))
+@before(Locking(actor, X))
+def before_locking_fail(actor, x, ctxt) :
+    """Locking requires a key."""
+    raise AbortAction(str_with_objs("Lock [the $x] with what?", x=x), actor=actor)
+
+#### to deal with later
 
 class AskTo(BasicAction) :
     verb = ("ask", "to")

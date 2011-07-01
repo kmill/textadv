@@ -57,34 +57,46 @@ class ActorActivities(object) :
         return self._activities[name]
     def call(self, name, *args, **kwargs) :
         return self._activities[name].notify(args, {"ctxt" : kwargs["ctxt"]}, disable=kwargs.get("disable", []))
+    def copy(self) :
+        naa = ActorActivities()
+        for name, table in self._activities.iteritems() :
+            naa._activities[name] = table.copy()
+        return naa
+    def make_documentation(self, escape, heading_level=1) :
+        hls = str(heading_level)
+        shls = str(heading_level+1)
+        print "<h"+hls+">Actor activities</h"+hls+">"
+        print "<p>This is the documentation for the actor activities.</p>"
+        for name, table in self._activities.iteritems() :
+            print "<h"+shls+">to "+escape(name)+"</h"+shls+">"
+            table.make_documentation(escape, heading_level=heading_level+2)
 
-class ActorRules(object) :
-    """This is a table of rules that all actors use."""
-    def __init__(self) :
-        self._rules = dict()
-        self.rule = RuleHelperObject(self)
-    def define_event(self, name, **kwargs) :
-        self._rules[name] = RuleTable(**kwargs)
-    def to(self, name, pattern, **kwargs) :
-        def _to(f) :
-            if not self._rules.has_key(name) :
-                self._rules[name] = RuleTable()
-            self._rules[name].add_handler(pattern, f, **kwargs)
-            return f
-        return _to
-    def rule_table(self, name) :
-        """Gets the event table of the given name"""
-        return self._rules[name]
-    def call(self, name, *args, **kwargs) :
-        return self._rules[name].notify(args, {"ctxt" : kwargs["ctxt"]}, {"world" : kwargs["ctxt"].world})
+# class ActorRules(object) :
+#     """This is a table of rules that all actors use."""
+#     def __init__(self) :
+#         self._rules = dict()
+#         self.rule = RuleHelperObject(self)
+#     def define_event(self, name, **kwargs) :
+#         self._rules[name] = RuleTable(**kwargs)
+#     def to(self, name, pattern, **kwargs) :
+#         def _to(f) :
+#             if not self._rules.has_key(name) :
+#                 self._rules[name] = RuleTable()
+#             self._rules[name].add_handler(pattern, f, **kwargs)
+#             return f
+#         return _to
+#     def rule_table(self, name) :
+#         """Gets the event table of the given name"""
+#         return self._rules[name]
+#     def call(self, name, *args, **kwargs) :
+#         return self._rules[name].notify(args, {"ctxt" : kwargs["ctxt"]}, {"world" : kwargs["ctxt"].world})
 
-actoractivities = ActorActivities()
-actorrules = ActorRules()
+#actoractivities = ActorActivities()
 
 class ActorContext(GameContext) :
     """Represents the context in which the player is assuming the role
     of the actor.  The parser is the main parser in the parser module."""
-    def __init__(self, parentcontext, io, world, actionsystem, parser, actor) :
+    def __init__(self, parentcontext, io, world, actionsystem, parser, actoractivities, actor) :
         self.parentcontext = parentcontext
         self.io = io
         self.world = world
@@ -93,6 +105,7 @@ class ActorContext(GameContext) :
         self.rule = RuleHelperObject(self)
         self.actionsystem = actionsystem
         self.parser = parser
+        self.actoractivities = actoractivities
     def write(self, *stuff, **kwargs) :
         """Writes a line by evaluating the string using the utilities
         module.  If there is an actor, then the text is wrapped so
@@ -119,9 +132,9 @@ class ActorContext(GameContext) :
                     self.actionsystem.run_action(action, self)
             except parser.NoSuchWord as ex :
                 esc = escape_str(ex.word)
-                self.write("I don't know what you mean by %r.[newline]" % esc)
+                self.write("I don't know what you mean by %r." % esc)
             except parser.NoUnderstand :
-                self.write("Huh?[newline]")
+                self.write("Huh?")
             except parser.NoInput :
                 pass
             except parser.Ambiguous as ex :
@@ -140,10 +153,10 @@ class ActorContext(GameContext) :
             return (self, dict())
     def call_activity(self, name, *args, **kwargs) :
         kwargs["ctxt"] = self
-        return actoractivities.call(name, *args, **kwargs)
-    def call_rule(self, name, *args, **kwargs) :
-        kwargs["ctxt"] = self
-        return actorrules.call(name, *args, **kwargs)
+        return self.actoractivities.call(name, *args, **kwargs)
+#    def call_rule(self, name, *args, **kwargs) :
+#        kwargs["ctxt"] = self
+#        return actorrules.call(name, *args, **kwargs)
     def activity_table(self, name) :
         """Gets the action table of the given name."""
         return actoractivities.activity_table(name)
@@ -162,30 +175,17 @@ class DisambiguationContext(GameContext) :
         for var, opts in self.amb.options.iteritems() :
             res = serial_comma([self.parent.world.get_property("DefiniteName", o)
                                 for o in opts], conj="or")
-            self.parent.write("Did you mean "+res+"?[newline]")
+            self.parent.write("Did you mean "+res+"?")
             input = self.parent.io.get_input(">>>")
-            res = parser.run_parser("something",
-                                    parser.transform_text_to_words(input), self.parent)
+            res = self.parent.parser.run_parser("something",
+                                                self.parent.parser.transform_text_to_words(input),
+                                                self.parent)
             if len(res) == 0 :
                 return (self.parent, {"input" : input})
             elif len(res) == 1 :
                 repl[var] = res[0][0].value
             else :
-                self.parent.write("That didn't help me out at all.[newline]")
+                self.parent.write("That didn't help me out at all.")
                 return (self.parent, dict())
         return (self.parent, {"action" : self.amb.pattern.expand_pattern(repl)})
-
-def make_documentation(escape, heading_level=1) :
-    hls = str(heading_level)
-    shls = str(heading_level+1)
-    print "<h"+hls+">Actor activities</h"+hls+">"
-    print "<p>This is the documentation for the actor activities attached to <tt>actoractivities</tt> in <tt>gamecontexts.py</tt>.</p>"
-    for name, table in actoractivities._activities.iteritems() :
-        print "<h"+shls+">to "+escape(name)+"</h"+shls+">"
-        table.make_documentation(escape, heading_level=heading_level+2)
-    print "<h"+hls+">Actor rules</h"+hls+">"
-    print "<p>This is the documentation for the actor rules attached to <tt>actorrules</tt> in <tt>gamecontexts.py</tt>.</p>"
-    for name, table in actorrules._rules.iteritems() :
-        print "<h"+shls+">to "+escape(name)+"</h"+shls+">"
-        table.make_documentation(escape, heading_level=heading_level+2)
 

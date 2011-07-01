@@ -177,3 +177,28 @@ def referenceable_things_Default(world) :
     objects = world.query_relation(IsA(X, Y), var=X)
     things = [o for o in objects if world[IsA(o, "thing")]]
     return things
+
+
+###
+### Connecting rooms and doors together
+###
+
+@world.define_relation
+class Adjacent(DirectedManyToManyRelation) :
+    """Used for searching for paths between rooms."""
+
+@world.define_relation
+class Exit(FreeformRelation) :
+    """Used to denote an exit from one room to the next.  Exit(room1,
+    dir, room2)."""
+
+@world.to("connect_rooms")
+def default_connect_rooms(room1, dir, room2, world, reverse=True) :
+    """Called with connect_rooms(room1, dir, room2).  Gives room1 an
+    exit to room2 in direction dir.  By default, also adds in reverse
+    direction, unless the optional argument "reverse" is false."""
+    world.add_relation(Adjacent(room1, room2))
+    world.add_relation(Exit(room1, dir, room2))
+    if reverse :
+        world.add_relation(Adjacent(room2, room1))
+        world.add_relation(Exit(room2, inverse_direction(dir), room1))

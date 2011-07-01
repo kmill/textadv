@@ -340,7 +340,7 @@ class Parser(object) :
                     else :
                         # We need the user to disambiguate.  The
                         # following returns the Ambiguous exception.
-                        raise __construct_amb_exception([r.value for r in new_best_results])
+                        raise self.__construct_amb_exception([r.value for r in new_best_results])
             else :
                 # well, none of them are acceptible.  Let's go for the
                 # worst one.

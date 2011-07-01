@@ -33,7 +33,6 @@ print "<p>This is automagically generated documentation of the rules defined in 
 world.make_documentation(html_escape, heading_level=1)
 parser.make_documentation(html_escape, heading_level=1)
 actionsystem.make_documentation(html_escape, heading_level=1)
-import textadv.gamesystem.gamecontexts as gamecontexts
-gamecontexts.make_documentation(html_escape, heading_level=1)
+actoractivities.make_documentation(html_escape, heading_level=1)
 
 print "</body></html>"

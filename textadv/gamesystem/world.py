@@ -105,7 +105,6 @@ class World(object) :
         """Makes a copy of the world which behaves the same as the
         present one, but is disconnected.  However, the values of
         modified_properties are not copied but referenced."""
-        import copy
         newworld = World()
         newworld.properties = self.properties.copy()
         newworld.property_types = self.property_types.copy()

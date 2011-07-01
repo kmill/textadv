@@ -107,6 +107,7 @@ class PropertyTable(object) :
         newtable.properties = newdict
         return newtable
     def make_documentation(self, escape, heading_level=1) :
+        import inspect
         hls = str(heading_level)
         props = self.properties.keys()
         props.sort(key=lambda x : x.__name__)
@@ -121,7 +122,13 @@ class PropertyTable(object) :
                     print ("<b>calls</b> <tt>"+escape(value.__name__)+"</tt>") if call else ("= "+escape(repr(value)))
                     print "</p>"
                     if call :
-                        print "<p><i>"+(escape(value.__doc__) or "(No documentation)")+"</i></p>"
+                        print "<p>"
+                        print "<i>"+(escape(value.__doc__) or "(No documentation).")+"</i>"
+                        try :
+                            print "<small>(from <tt>"+inspect.getsourcefile(value)+"</tt>)</small>"
+                        except TypeError :
+                            pass
+                        print "</p>"
                     print "</li>"
                 print "</ol>"
             else :
@@ -139,6 +146,7 @@ class ActivityTable(object) :
     selected by a pattern."""
     def __init__(self, accumulator=None, reverse=False, doc=None) :
         self.actions = []
+        self.wants_table = []
         self.accumulator = accumulator or identity
         self.reverse = reverse
         self.doc = doc
@@ -148,11 +156,14 @@ class ActivityTable(object) :
     def notify(self, args, data, disable=None) :
         self.__push_current_disabled(disable or [])
         acc = []
-        for f in self.actions :
+        for f, wt in zip(self.actions, self.wants_table) :
             if f in self.current_disabled :
                 continue
             try :
-                acc.append(f(*args, **data))
+                if wt :
+                    acc.append(f(self, *args, **data))
+                else :
+                    acc.append(f(*args, **data))
             except NotHandled :
                 pass
             except ActionHandled as ix :
@@ -170,7 +181,8 @@ class ActivityTable(object) :
                 raise
         self.__pop_current_disabled()
         return self.accumulator(acc)
-    def add_handler(self, f, insert_first=None, insert_last=None, insert_before=None, insert_after=None) :
+    def add_handler(self, f, insert_first=None, insert_last=None, insert_before=None, insert_after=None,
+                    wants_table=None) :
         """A function (which can be used as a decorator) which adds
         the function to the table.  At most one of the following may be set:
         * insert_first: puts the handler in a position so it executes first
@@ -178,20 +190,27 @@ class ActivityTable(object) :
         * insert_before: puts the handler in a position so it executes immediately before the function in insert_before
         * insert_after: puts the handler in a position so it executes immediately after the function in insert_after
 
+        Other settings:
+        * wants_table_as: marks to give the table to the function as its first argument
+
         If none are set, then insert_first is default if reverse is true, otherwise it's insert_last."""
         if insert_first is None and insert_last is None and insert_before is None and insert_after is None :
             if self.reverse : insert_first=True
             else : insert_last=True
         if insert_first :
             self.actions.insert(0, f)
+            self.wants_table.insert(0, wants_table)
         elif insert_last :
             self.actions.append(f)
+            self.wants_table.append(wants_table)
         elif insert_before :
             i = self.actions.index(insert_before)
             self.actions.insert(i,f)
+            self.wants_table.insert(i, wants_table)
         elif insert_after :
             i = self.actions.index(insert_before)
             self.actions.insert(i+1, f)
+            self.wants_table.insert(i+1, wants_table)
         return f
     def disable(self, f=None) :
         """This disables a function in the activity table
@@ -238,9 +257,11 @@ class ActivityTable(object) :
                                  reverse=self.reverse,
                                  doc=self.doc)
         newtable.actions = list(self.actions)
+        newtable.wants_table = list(self.wants_table)
         newtable.disabled = list(self.disabled)
         return newtable
     def make_documentation(self, escape, heading_level=1) :
+        import inspect
         print "<p>"
         if self.doc : print escape(self.doc)
         else : print "<i>(No documentation)</i>"
@@ -251,12 +272,20 @@ class ActivityTable(object) :
         print "<tt>"+escape(self.accumulator.__name__)+"</tt></p>"
         if self.actions :
             print "<ol>"
-            for handler in self.actions :
+            for handler, wt in zip(self.actions, self.wants_table) :
                 print "<li><p>"
                 if handler in self.disabled :
                     print "<b><i>DISABLED</i></b>"
-                print "<b>call</b> <tt>"+escape(handler.__name__)+"</tt></p>"
-                print "<p><i>"+(escape(handler.__doc__) or "(No documentation)")+"</i></p>"
+                print "<b>call</b> <tt>"+escape(handler.__name__)+"</tt>"
+                if wt :
+                    print "<b>with table</b>"
+                try :
+                    print "<small><i>(from <tt>"+inspect.getsourcefile(handler)+"</tt>)</i></small>"
+                except TypeError :
+                    pass
+                print "</p>"
+                print "<p><i>"+(escape(handler.__doc__) or "(No documentation).")+"</i>"
+                print "</p>"
                 print "</li>"
             print "</ol>"
         else :
@@ -353,6 +382,7 @@ class RuleTable(object) :
         newtable.disabled = list(self.disabled)
         return newtable
     def make_documentation(self, escape, heading_level=1) :
+        import inspect
         print "<p>"
         if self.doc : print escape(self.doc)
         else : print "<i>(No documentation)</i>"
@@ -369,8 +399,13 @@ class RuleTable(object) :
                     print "<b><i>DISABLED</i></b>"
                 print escape(repr(key))#+"<br>"
                 print "<b>calls</b> <tt>"+escape(handler.__name__)+"</tt>"
+                try :
+                    print "<small><i>(from <tt>"+inspect.getsourcefile(handler)+"</tt>)</i></small>"
+                except TypeError :
+                    pass
                 print "</p>"
-                print "<p><i>"+(escape(handler.__doc__) or "(No documentation)")+"</i></p>"
+                print "<p><i>"+(escape(handler.__doc__) or "(No documentation)")+"</i>"
+                print "</p>"
                 print "</li>"
             print "</ol>"
         else :

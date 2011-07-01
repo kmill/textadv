@@ -10,6 +10,11 @@ def list_append(xs) :
     #return itertools.chain.from_iterable(xs)
     return [a for x in xs for a in x]
 
+def join_with_spaces(xs) :
+    return " ".join(xs)
+def join(xs) :
+    return "".join(xs)
+
 def serial_comma(nouns, conj="and", comma=",", force_comma=False) :
     conj = " " + conj + " "
     if len(nouns) == 1 :

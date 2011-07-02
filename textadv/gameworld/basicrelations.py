@@ -13,7 +13,7 @@
 ### Basic position relations
 ###
 
-# The following four are mutually exclusive relations which have to do
+# The following five are mutually exclusive relations which have to do
 # with the position of an object in the world.
 
 @world.define_relation
@@ -32,6 +32,10 @@ class Has(OneToManyRelation) :
 class PartOf(ManyToOneRelation) :
     """PartOf(x,y) for "x PartOf y"."""
 
+@world.define_relation
+class Wears(OneToManyRelation) :
+    """Wears(x,y) for "x Wears y"."""
+
 
 # The following are helper activities to make it easy to use these
 # position relations while maintaining mutual exclusivity.
@@ -40,55 +44,73 @@ class PartOf(ManyToOneRelation) :
 @world.to("put_in")
 def default_put_in(x, y, world) :
     """Called with put_in(x, y).  Puts x into y, first removing all
-    Contains, Supports, Has, and PartOf relations.  This should be
-    used for y being a container or a room."""
-    world.remove_relation(Contains(X, x))
-    world.remove_relation(Supports(X, x))
-    world.remove_relation(Has(X, x))
-    world.remove_relation(PartOf(x, X))
+    Contains, Supports, Has, PartOf, and Wears relations.  This should
+    be used for y being a container or a room."""
+    world.remove_relation(Contains(Z, x))
+    world.remove_relation(Supports(Z, x))
+    world.remove_relation(Has(Z, x))
+    world.remove_relation(PartOf(x, Z))
+    world.remove_relation(Wears(Z, x))
     world.add_relation(Contains(y, x))
 
 # put X on Y (so then Y Supports X)
 @world.to("put_on")
 def default_put_on(x, y, world) :
     """Called with put_on(x, y).  Puts x onto y, first removing all
-    Contains, Supports, Has, and PartOf relations."""
-    world.remove_relation(Contains(X, x))
-    world.remove_relation(Supports(X, x))
-    world.remove_relation(Has(X, x))
-    world.remove_relation(PartOf(x, X))
+    Contains, Supports, Has, PartOf, and Waers relations."""
+    world.remove_relation(Contains(Z, x))
+    world.remove_relation(Supports(Z, x))
+    world.remove_relation(Has(Z, x))
+    world.remove_relation(PartOf(x, Z))
+    world.remove_relation(Wears(Z, x))
     world.add_relation(Supports(y, x))
 
 # give X to Y (so then Y Has X)
 @world.to("give_to")
 def default_give_to(x, y, world) :
-    """Called with give_to(x, y).  Gives x to y, first
-    removing all Contains, Supports, Has, and PartOf relations."""
-    world.remove_relation(Contains(X, x))
-    world.remove_relation(Supports(X, x))
-    world.remove_relation(Has(X, x))
-    world.remove_relation(PartOf(x, X))
+    """Called with give_to(x, y).  Gives x to y, first removing all
+    Contains, Supports, Has, PartOf, and Wears relations."""
+    world.remove_relation(Contains(Z, x))
+    world.remove_relation(Supports(Z, x))
+    world.remove_relation(Has(Z, x))
+    world.remove_relation(PartOf(x, Z))
+    world.remove_relation(Wears(Z, x))
     world.add_relation(Has(y, x))
 
 # make X part of Y (so then X PartOf Y)
 @world.to("make_part_of")
 def default_make_part_of(x, y, world) :
     """Called with make_part_of(x, y).  Makes x a part of y, first
-    removing all Contains, Supports, Has, and PartOf relations."""
-    world.remove_relation(Contains(X, x))
-    world.remove_relation(Supports(X, x))
-    world.remove_relation(Has(X, x))
-    world.remove_relation(PartOf(x, X))
+    removing all Contains, Supports, Has, PartOf, and Wears
+    relations."""
+    world.remove_relation(Contains(Z, x))
+    world.remove_relation(Supports(Z, x))
+    world.remove_relation(Has(Z, x))
+    world.remove_relation(PartOf(x, Z))
+    world.remove_relation(Wears(Z, x))
     world.add_relation(PartOf(x, y))
+
+# make X wear Y (so then X Wears Y)
+@world.to("make_wear")
+def default_make_part_of(x, y, world) :
+    """Called with make_wear(x, y).  Makes x wear y, first removing
+    all Contains, Supports, Has, PartOf, and Wears relations."""
+    world.remove_relation(Contains(Z, y))
+    world.remove_relation(Supports(Z, y))
+    world.remove_relation(Has(Z, y))
+    world.remove_relation(PartOf(y, Z))
+    world.remove_relation(Wears(Z, y))
+    world.add_relation(Wears(x, y))
 
 @world.to("remove_obj")
 def default_remove_obj(obj, world) :
     """Effectively removes an object from play by making it have no
     positional location."""
-    world.remove_relation(Contains(X, obj))
-    world.remove_relation(Supports(X, obj))
-    world.remove_relation(Has(X, obj))
-    world.remove_relation(PartOf(obj, X))
+    world.remove_relation(Contains(Z, obj))
+    world.remove_relation(Supports(Z, obj))
+    world.remove_relation(Has(Z, obj))
+    world.remove_relation(PartOf(obj, Z))
+    world.remove_relation(Wears(Z, obj))
 
 
 @world.define_property
@@ -120,6 +142,12 @@ def object_location_Supports(x, world) :
 def object_location_PartOf(x, world) :
     """Gets the location of an object by what it is currently part of."""
     locs = world.query_relation(PartOf(x, Y), var=Y)
+    if locs : return locs[0]
+    else : raise NotHandled()
+@world.handler(Location(X))
+def object_location_Wears(x, world) :
+    """Gets the location of an object by what currently wears it."""
+    locs = world.query_relation(Wears(Y, x), var=Y)
     if locs : return locs[0]
     else : raise NotHandled()
 

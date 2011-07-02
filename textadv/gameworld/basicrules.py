@@ -391,7 +391,9 @@ def rule_VisibleTo_if_in_same_visible_container(x, actor, world) :
         # otherwise we'd be looking too many levels high
         x_vis_cont = x
     else :
-        x_vis_cont = world[VisibleContainer(world[Location(x)])]
+        loc = world[Location(x)]
+        if not loc : raise NotHandled()
+        x_vis_cont = world[VisibleContainer(loc)]
     if actor_vis_cont == x_vis_cont and world[ContainsLight(actor_vis_cont)] :
         return True
     raise NotHandled()
@@ -490,7 +492,7 @@ def rule_ParentEnterable_by_Location(x, world) :
     while not world[IsA(loc, "room")] :
         if world[IsEnterable(loc)] :
             return loc
-        loc = world[Location(x)]
+        loc = world[Location(loc)]
     return loc
 
 ##
@@ -505,6 +507,19 @@ class LocaleDescription(Property) :
 
 # By default it's none for enterables
 world[LocaleDescription(X) <= IsA(X, "enterable")] = None
+
+
+##
+# Property: IsWearable
+##
+
+@world.define_property
+class IsWearable(Property) :
+    """Represents whether something is something that could be
+    worn by a person."""
+    numargs = 1
+
+world[IsWearable(X) <= IsA(X, "thing")] = False
 
 
 ###
@@ -661,6 +676,17 @@ def rule_VisibleContainer_if_x_in_container(x, world) :
     else :
         return world[VisibleContainer(world[Location(x)])]
 
+# @world.handler(VisibleTo(X, actor) <= IsA(X, "container") & Openable(X) & PNot(IsOpen(X)))
+# def rule_VisibleTo_if_directly_in_container(x, actor, world) :
+#     """To prevent instances of finding yourself inside a dark box and
+#     not being able to find yourself out, even though you just closed
+#     yourself in, we provide this rule: if you are directly inside a
+#     closed container, then you can see it."""
+#     if world[Location(actor)] == x :
+#         return True
+#     raise NotHandled()
+
+
 #
 # The effective container of a container
 #
@@ -736,8 +762,10 @@ def rule_EffectiveContainer_if_supporter(x, world) :
 
 @world.handler(Contents(X) <= IsA(X, "person"))
 def supporter_contents(x, world) :
-    """Gets the things the person immediately has."""
-    return [o["y"] for o in world.query_relation(Has(x, Y))]
+    """Gets the things the person immediately has and is wearing."""
+    possessions = world.query_relation(Has(x, Y), var=Y)
+    clothes = world.query_relation(Wears(x, Y), var=Y)
+    return possessions+clothes
 
 @world.handler(VisibleContainer(X) <= IsA(X, "person"))
 def rule_VisibleContainer_if_person(x, world) :

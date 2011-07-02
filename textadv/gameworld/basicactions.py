@@ -51,12 +51,16 @@ def require_xobj_held(actionsystem, action, only_hint=False, transitive=True) :
         @actionsystem.before(action)
         @docstring("A check that the actor is holding the x in "+repr(action)+".  The holding may be transitive.")
         def _before_xobj_held(actor, x, ctxt, **kwargs) :
+            if ctxt.world.query_relation(Wears(actor, x)) :
+                raise AbortAction(str_with_objs("{Bob|cap} {is} wearing [the $x].", x=x), actor=actor)
             if not __is_held(actor, x, ctxt) :
-                raise AbortAction("{Bob|cap} {isn't} holding that.", actor=actor)
+                raise AbortAction(str_with_objs("{Bob|cap} {isn't} holding [the $x].", x=x), actor=actor)
     else :
         @actionsystem.trybefore(action)
         @docstring("An attempt is made to take the object x from "+repr(action)+" if the actor is not already holding it")
         def _trybefore_xobj_held(actor, x, ctxt, **kwargs) :
+            if ctxt.world.query_relation(Wears(actor, x)) :
+                raise AbortAction(str_with_objs("{Bob|cap} {is} wearing [the $x].", x=x), actor=actor)
             if not __is_held(actor, x, ctxt) :
                 ctxt.actionsystem.do_first(Taking(actor, x), ctxt=ctxt, silently=True)
             # just in case it succeeds, but we don't yet have the object
@@ -65,7 +69,7 @@ def require_xobj_held(actionsystem, action, only_hint=False, transitive=True) :
             else :
                 can_do = ctxt.world.query_relation(Has(actor, x))
             if not __is_held(actor, x, ctxt) :
-                raise AbortAction("{Bob|cap} {doesn't} have that.", actor=actor)
+                raise AbortAction(str_with_objs("{Bob|cap} {isn't} holding [the $x].", x=x), actor=actor)
 
 def hint_xobj_notheld(actionsystem, action) :
     """Adds a rule which makes the action more logical if x is not
@@ -125,7 +129,7 @@ class Examining(BasicAction) :
     verb = "examine"
     gerund = "examining"
     numargs = 2
-parser.understand("examine/x [something x]", Examining(actor, X))
+parser.understand("examine/x/read [something x]", Examining(actor, X))
 
 require_xobj_visible(actionsystem, Examining(actor, X))
 
@@ -150,8 +154,9 @@ hint_xobj_notheld(actionsystem, Taking(actor, X))
 
 @before(Taking(actor, X))
 def before_take_when_already_have(actor, x, ctxt) :
-    """You can't take what you already have."""
-    if ctxt.world.query_relation(Has(actor, x)) :
+    """You can't take what you already have.  Uses the contents of the
+    player to figure this out."""
+    if x in ctxt.world[Contents(actor)] :
         raise AbortAction("{Bob|cap} already {has} that.", actor=actor)
 
 @before(Taking(actor, X))
@@ -224,6 +229,17 @@ class Dropping(BasicAction) :
 parser.understand("drop [something x]", Dropping(actor, X))
 
 require_xobj_held(actionsystem, Dropping(actor, X), only_hint=True)
+
+@before(Dropping(actor, X) <= PEquals(actor, X))
+def before_dropping_self(actor, x, ctxt) :
+    """One can't drop oneself."""
+    raise AbortAction("{Bob|cap} can't be dropped.", actor=actor)
+
+# @before(Dropping(actor, X))
+# def before_dropping_worn_items(actor, x, ctxt) :
+#     """One can't drop what's being worn."""
+#     if ctxt.world.query_relation(Wears(actor, x)) :
+#         raise AbortAction(str_with_objs("{Bob|cap} {is} wearing [the $x].", x=x), actor=actor)
 
 @when(Dropping(actor, X))
 def when_dropping_default(actor, x, ctxt) :
@@ -493,7 +509,7 @@ def before_Exiting_open_container(event, actor, ctxt) :
     """If we are exiting a closed container, try to open it first."""
     if ctxt.world[IsA(event.exit_from, "container")] :
         if ctxt.world[Openable(event.exit_from)] and not ctxt.world[IsOpen(event.exit_from)] :
-            ctxt.actionsystem.do_first(Opening(actor, event.exit_from))
+            ctxt.actionsystem.do_first(Opening(actor, event.exit_from), ctxt, silently=True)
             if not ctxt.world[IsOpen(event.exit_from)] :
                 raise AbortAction(str_with_objs("{Bob|cap} can't exit [the $z] because it is closed.", z=event.exit_from),
                                   actor=actor)
@@ -507,7 +523,7 @@ def when_Exiting_default(event, actor, ctxt) :
 def report_Exiting_default(event, actor, ctxt) :
     """Describes what happened, and describes the new location."""
     ctxt.write(str_with_objs("{Bob|cap} {gets} out of [the $z].[newline]", z=event.exit_from), actor=actor)
-    ctxt.activity.describe_current_location()
+    #ctxt.activity.describe_current_location()
 
 ##
 # Getting off
@@ -619,20 +635,33 @@ class InsertingInto(BasicAction) :
     verb = ("insert", "into")
     gerund = ("inserting", "into")
     numargs = 3
-parser.understand("put/insert [something x] in/into [something y]", InsertingInto(actor, X, Y))
+parser.understand("put/insert/drop [something x] in/into [something y]", InsertingInto(actor, X, Y))
 
 require_xobj_held(actionsystem, InsertingInto(actor, X, Y))
 require_xobj_accessible(actionsystem, InsertingInto(actor, Z, X))
+
+@before(InsertingInto(actor, X, Y) <= PEquals(X, Y))
+def before_InsertingInto_not_on_itself(actor, x, y, ctxt) :
+    """One can't place something in itself."""
+    raise AbortAction(str_with_objs("{Bob|cap} can't put [the $x] into itself.", x=x), actor=actor)
+
+@before(InsertingInto(actor, X, Y) <= Openable(X) & PNot(IsOpen(X)))
+def before_InsertingInto_closed_container(actor, x, y, ctxt) :
+    """One can't place something into a closed container."""
+    ctxt.actionsystem.do_first(Opening(actor, Y))
+    if not ctxt.world[IsOpen(Y)] :
+        raise AbortAction(str_with_objs("[The $y] is closed.", y=y))
 
 @before(InsertingInto(actor, X, Y) <= PNot(IsA(Y, "container")))
 def before_InsertingInto_needs_container(actor, x, y, ctxt) :
     """One can only insert things into a container."""
     raise AbortAction(str_with_objs("{Bob|cap} can't put [the $x] into [the $y].", x=x, y=y), actor=actor)
 
-@before(InsertingInto(actor, X, Y) <= PEquals(X, Y))
-def before_InsertingInto_not_on_itself(actor, x, y, ctxt) :
-    """One can't place something in itself."""
-    raise AbortAction(str_with_objs("{Bob|cap} can't put [the $x] into itself.", x=x), actor=actor)
+# @before(InsertingInto(actor, X, Y))
+# def before_InsertingInto_worn_item(actor, x, y, ctxt) :
+#     """One cannot insert what one is wearing."""
+#     if ctxt.world.query_relation(Wears(actor, x)) :
+#         raise AbortAction(str_with_objs("{Bob|cap} {is} wearing [the $x].", x=x), actor=actor)
 
 @when(InsertingInto(actor, X, Y))
 def when_InsertingInto_default(actor, x, y, ctxt) :
@@ -654,7 +683,7 @@ class PlacingOn(BasicAction) :
     verb = ("place", "on")
     gerund = ("placing", "on")
     numargs = 3
-parser.understand("put/place [something x] on/onto [something y]", PlacingOn(actor, X, Y))
+parser.understand("put/place/drop [something x] on/onto [something y]", PlacingOn(actor, X, Y))
 
 require_xobj_held(actionsystem, PlacingOn(actor, X, Y))
 require_xobj_accessible(actionsystem, PlacingOn(actor, Z, X))
@@ -668,6 +697,13 @@ def before_PlacingOn_needs_supporter(actor, x, y, ctxt) :
 def before_PlacingOn_not_on_itself(actor, x, y, ctxt) :
     """One can't place something on itself."""
     raise AbortAction(str_with_objs("{Bob|cap} can't place [the $x] on itself.", x=x), actor=actor)
+
+# @before(PlacingOn(actor, X, Y))
+# def before_PlacingOn_worn_item(actor, x, y, ctxt) :
+#     """One cannot place what one is wearing on anything."""
+#     if ctxt.world.query_relation(Wears(actor, x)) :
+#         raise AbortAction(str_with_objs("{Bob|cap} {is} wearing [the $x].", x=x), actor=actor)
+
 
 @when(PlacingOn(actor, X, Y))
 def when_PlacingOn_default(actor, x, y, ctxt) :
@@ -696,6 +732,13 @@ require_xobj_accessible(actionsystem, Opening(actor, X))
 def verify_opening_openable(actor, x, ctxt) :
     """That which is openable is more logical to open."""
     return VeryLogicalOperation()
+
+@verify(Opening(actor, X) <= PEquals(X, Location(actor)))
+def verify_opening_actor_location(actor, x, ctxt) :
+    """We can get into the case that we are inside a box that we
+    trapped ourselves in without light.  We want to still be able to
+    open it."""
+    raise ActionHandled(VeryLogicalOperation())
 
 @before(Opening(actor, X) <= PNot(Openable(X)))
 def before_opening_unopenable(actor, x, ctxt) :
@@ -815,7 +858,7 @@ require_xobj_accessible(actionsystem, Unlocking(actor, X))
 @before(Unlocking(actor, X))
 def before_unlocking_fail(actor, x, ctxt) :
     """Unlocking requires a key."""
-    raise AbortAction(str_with_objs("Unlock [the $x] with what?", x=x), actor=actor)
+    raise AbortAction(str_with_objs("Unlocking requires a key.", x=x), actor=actor)
 
 
 ##
@@ -871,7 +914,72 @@ require_xobj_accessible(actionsystem, Locking(actor, X))
 @before(Locking(actor, X))
 def before_locking_fail(actor, x, ctxt) :
     """Locking requires a key."""
-    raise AbortAction(str_with_objs("Lock [the $x] with what?", x=x), actor=actor)
+    raise AbortAction(str_with_objs("Locking requires a key.", x=x), actor=actor)
+
+
+##
+# Wearing
+##
+class Wearing(BasicAction) :
+    """Wearing(actor, x)"""
+    verb = "wear"
+    gerund = "wearing"
+    numargs = 2
+parser.understand("wear [something x]", Wearing(actor, X))
+parser.understand("put on [something x]", Wearing(actor, X))
+
+require_xobj_held(actionsystem, Wearing(actor, X))
+
+@before(Wearing(actor, X) <= PNot(IsWearable(X)))
+def before_wearing_unwearable(actor, x, ctxt) :
+    """Wearing requires something wearable."""
+    raise AbortAction(str_with_objs("[The $x] can't be worn.", x=x), actor=actor)
+
+@before(Wearing(actor, X))
+def before_wearing_worn(actor, x, ctxt) :
+    """You can't put on something already worn."""
+    if ctxt.world.query_relation(Wears(actor, x)) :
+        raise AbortAction("{Bob|cap} {is} already wearing that.", actor=actor)
+
+@when(Wearing(actor, X))
+def when_wearing_default(actor, x, ctxt) :
+    """Makes the actor wear the wearable."""
+    ctxt.world.activity.make_wear(actor, x)
+
+@report(Wearing(actor, X))
+def report_wearing_default(actor, x, ctxt) :
+    """Just reports the wearing."""
+    ctxt.write(str_with_objs("{Bob|cap} now {wears} [the $x].", x=x), actor=actor)
+
+
+##
+# Taking off
+##
+class TakingOff(BasicAction) :
+    """TakingOff(actor, x)"""
+    verb = "take off"
+    gerund = "taking off"
+    numargs = 2
+parser.understand("take off [something x]", TakingOff(actor, X))
+parser.understand("take [something x] off", TakingOff(actor, X))
+parser.understand("remove [something x]", TakingOff(actor, X))
+
+@before(TakingOff(actor, X))
+def before_takingoff_not_worn(actor, x, ctxt) :
+    """Clothes must be presently worn to be taken off."""
+    if not ctxt.world.query_relation(Wears(actor, x)) :
+        raise AbortAction("{Bob|cap} {is} not wearing that.", actor=actor)
+
+@when(TakingOff(actor, X))
+def when_takingoff_default(actor, x, ctxt) :
+    """Moves the worn thing into the possessions of the actor (which
+    removes the Wears relation)."""
+    ctxt.world.activity.give_to(x, actor)
+
+@report(TakingOff(actor, X))
+def report_takingoff_default(actor, x, ctxt) :
+    """Reports that the actor took it off."""
+    ctxt.write(str_with_objs("{Bob|cap} {takes} off [the $x].", x=x), actor=actor)
 
 #### to deal with later
 

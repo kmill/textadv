@@ -1,8 +1,4 @@
-# just a scrap idea of what should be the syntax
-
-#from textadv.gameworld.basicrules import *
-#from textadv.gamesystem.parser import *
-#from textadv.gamesystem.utilities import *
+# Just a silly test file.
 
 from textadv.basicsetup import *
 
@@ -59,14 +55,22 @@ world[IsEnterable("whatchamacallit")] = True
 world.activity.def_obj("oak table", "supporter")
 world[Description("oak table")] = "It's a very old looking oak table which is in need of a refinishing."
 world[Scenery("oak table")] = True
-world[IsEnterable("oak table")] = True
+#world[IsEnterable("oak table")] = True
 world.activity.put_in("oak table", "room1")
+
+world.activity.def_obj("cupboard", "container")
+world[IsEnterable("cupboard")] = True
+world.activity.make_part_of("cupboard", "oak table")
 
 world.activity.def_obj("candlestick", "thing")
 world.activity.put_on("candlestick", "oak table")
 
 world.activity.def_obj("wick", "thing")
 world.activity.make_part_of("wick", "candlestick")
+
+world.activity.def_obj("neat shirt", "thing")
+world.activity.make_wear("player", "neat shirt")
+world[IsWearable("neat shirt")] = True
 
 @actoractivities.to("terse_obj_description", insert_first=True, wants_table=True)
 def terse_obj_desc_disable_for_woo(table, actor, o, notables, mentioned, ctxt) :

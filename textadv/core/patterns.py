@@ -137,7 +137,7 @@ class PatternConjunction(AbstractPattern) :
     def __and__(self, b) :
         if not isinstance(b, AbstractPattern) :
             raise Exception("Not anding with a BasicPattern")
-        return PatternConjunction(*(self.support+[b]))
+        return PatternConjunction(*(list(self.support)+[b]))
     def __repr__(self) :
         return " & ".join(repr(s) for s in self.support)
 

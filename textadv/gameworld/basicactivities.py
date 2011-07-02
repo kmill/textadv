@@ -401,6 +401,11 @@ def describe_possession_indefinite_name(actor, o, numtabs, ctxt) :
     indentations."""
     ctxt.write("[break]"+"[indent]"*numtabs+ctxt.world[IndefiniteName(o)])
 @actoractivities.to("describe_possession")
+def describe_possession_if_worn(actor, o, numtabs, ctxt) :
+    """Just writes (worn) if the thing is worn."""
+    if ctxt.world.query_relation(Wears(actor, o)) :
+        ctxt.write("(worn)")
+@actoractivities.to("describe_possession")
 def describe_possession_openable(actor, o, numtabs, ctxt) :
     """Prints (open) or (closed) if the thing is openable."""
     if ctxt.world[Openable(o)] :

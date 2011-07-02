@@ -132,6 +132,10 @@ class ActorContext(GameContext) :
                     self.actionsystem.run_action(action, self, write_action=True)
                 else :
                     self.actionsystem.run_action(action, self)
+                if self.world.get_property("Global", "end_game_message") :
+                    self.activity.end_game_actions()
+                    if self.world.get_property("Global", "end_game_message") :
+                        return (None, {})
                 self.activity.step_turn()
             except parser.NoSuchWord as ex :
                 esc = escape_str(ex.word)

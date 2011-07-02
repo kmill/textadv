@@ -38,6 +38,10 @@ class AbstractPattern(object) :
         return type(self)
     def __le__(self, b) :
         return PatternRequires(self, b)
+    def __and__(self, b) :
+        if not isinstance(b, AbstractPattern) :
+            raise Exception("Not anding with a pattern")
+        return PatternConjunction(self, b)
     def __hash__(self) :
         return hash(repr(self))
 
@@ -101,10 +105,6 @@ class BasicPattern(AbstractPattern) :
         return type(self)(*newargs)
     def test(self, world) :
         return world[self]
-    def __and__(self, b) :
-        if not isinstance(b, BasicPattern) and not isinstance(b, PNot) :
-            raise Exception("Not anding with a basicpattern")
-        return PatternConjunction(self, b)
     def __repr__(self) :
         return "%s(%s)" % (self.__class__.__name__, ",".join(repr(a) for a in self.args))
     def __eq__(self, other) :
@@ -151,7 +151,7 @@ class PNot(AbstractPattern) :
     def __repr__(self) :
         return "PNot(%r)" % self.to_not
 
-class PEquals(object) :
+class PEquals(AbstractPattern) :
     def __init__(self, a, b) :
         self.a, self.b = a, b
     def test(self, world) :

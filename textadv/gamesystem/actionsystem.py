@@ -144,8 +144,8 @@ class ActionSystem(object) :
             self.run_action(ix.instead, ctxt, write_action=msg)
             return
         did_something = self.action_when.notify(action, {"ctxt" : ctxt}, {"world" : ctxt.world})
-        if not did_something :
-            raise AbortAction("There was nothing to do.")
+        #if not did_something :
+        #    raise AbortAction("There was nothing to do.") # this doesn't seem to be the right thing to do.
         if not silently :
             self.action_report.notify(action, {"ctxt" : ctxt}, {"world" : ctxt.world})
     def do_first(self, action, ctxt, silently=False) :

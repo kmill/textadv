@@ -29,14 +29,25 @@ before = make_rule_decorator(actionsystem.action_before)
 when = make_rule_decorator(actionsystem.action_when)
 report = make_rule_decorator(actionsystem.action_report)
 
+def quickdef(world, obname, kind, props) :
+    """Defines an object with less typing.  The props argument is a
+    dictionary of things like "Scenery: True", which is taken to mean
+    "world[Scenery(obname)] = True"""
+    world.activity.def_obj(obname, kind)
+    for prop, val in props.iteritems() :
+        world[prop(obname)] = val
+
 class TerminalGameIO(object) :
     """This class may be replaced in the GameContext by anything which
     implements the following two methods."""
     def get_input(self, prompt=">") :
         return raw_input("\n"+prompt + " ")
     def write(self, *data) :
-        for d in data :
-            print d.replace("[newline]", "\n\n").replace("[break]", "\n").replace("[indent]","  "),
+        d = " ".join(data)
+        d = " ".join(re.split("\\s+", d))
+        pars = d.replace("[newline]", "\n\n").replace("[break]", "\n").replace("[indent]","  ").split("\n")
+        wrapped = ["\n".join(textwrap.wrap(p)) for p in pars]
+        print "\n".join(wrapped),
         return
         paragraphs = re.split("\n\\s*\n", " ".join(data))
         to_print = []

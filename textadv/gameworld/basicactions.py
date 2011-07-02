@@ -267,6 +267,10 @@ class Going(BasicAction) :
     gerund = "going"
     dereference_dobj = False
     numargs = 2
+    def get_direction(self) :
+        """An accessor method for the direction of the going
+        action."""
+        return self.args[1]
 parser.understand("go [direction direction]", Going(actor, direction))
 parser.understand("[direction direction]", Going(actor, direction))
 
@@ -927,6 +931,7 @@ class Wearing(BasicAction) :
     numargs = 2
 parser.understand("wear [something x]", Wearing(actor, X))
 parser.understand("put on [something x]", Wearing(actor, X))
+parser.understand("put [something x] on", Wearing(actor, X))
 
 require_xobj_held(actionsystem, Wearing(actor, X))
 

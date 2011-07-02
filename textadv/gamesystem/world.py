@@ -82,7 +82,7 @@ class World(object) :
     def r_path_to(self, r, a, b) :
         return r.path_to(self.relations[r], a, b)
     def get_relation(self, name) :
-        return self.relation_handlers[name]
+        return self.name_to_relation[name]
 
     def define_activity(self, name, **kwargs) :
         self._activities[name] = ActivityTable(**kwargs)

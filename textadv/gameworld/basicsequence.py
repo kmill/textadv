@@ -59,3 +59,33 @@ def act_step_turn_check_current_location(ctxt) :
         ctxt.activity.describe_current_location()
     ctxt.world[Global("last_location")] = ctxt.world[Global("current_location")]
     ctxt.world[Global("last_light")] = ctxt.world[Global("currently_lit")]
+
+
+actoractivities.define_activity("end_game_saying",
+                                doc="""Sets the end_game_message
+                                global variable to the given message
+                                to tell the current context to end the
+                                game.""")
+
+world[Global("end_game_message")] = None
+
+@actoractivities.to("end_game_saying")
+def act_end_game_saying_default(msg, ctxt) :
+    """Sets the end_game_message global to its argument.  If the
+    message is false, then it is by default "The end"."""
+    ctxt.world[Global("end_game_message")] = msg if msg else "The end"
+
+
+actoractivities.define_activity("end_game_actions",
+                                doc="""Various actions to run when the
+                                game is ending.  Includes writing the
+                                end_game_message.  If one wants to
+                                cancel ending a game, then one should
+                                set the end_game_message to false.""")
+
+@actoractivities.to("end_game_actions")
+def act_end_game_actions_write_message(ctxt) :
+    """Writes something like "*** You have won ***", depending on the
+    end_game_message global variable."""
+    if ctxt.world[Global("end_game_message")] :
+        ctxt.write("[newline]*** %s ***[newline]" % ctxt.world[Global("end_game_message")])

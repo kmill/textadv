@@ -266,36 +266,39 @@ def add_str_eval_func(name) :
     return _add_str_eval_func
 
 # treat args as lists, append args
-_str_eval_functions["append"] = lambda context, *x : itertools.chain.from_iterable(x)
+_str_eval_functions["append"] = lambda ctxt, *x : itertools.chain.from_iterable(x)
 # evals to true
-_str_eval_functions["true"] = lambda context : [True]
+_str_eval_functions["true"] = lambda ctxt : [True]
 # evals to false
-_str_eval_functions["false"] = lambda context : [False]
+_str_eval_functions["false"] = lambda ctxt : [False]
 # negates arg
-_str_eval_functions["not"] = lambda context, x : [not x[0]]
+_str_eval_functions["not"] = lambda ctxt, x : [not x[0]]
 # gets prop(*args) property from world
-_str_eval_functions["get"] = lambda context, prop, *args : [context.world.get_property(prop,*args)]
+_str_eval_functions["get"] = lambda ctxt, prop, *args : [ctxt.world.get_property(prop,*args)]
 # gets definite_name property
-_str_eval_functions["the"] = lambda context, ob : [context.world.get_property("DefiniteName", ob)]
+_str_eval_functions["the"] = lambda ctxt, ob : [eval_str(ctxt.world.get_property("DefiniteName", ob), ctxt)]
 # gets indefinite_name property
-_str_eval_functions["a"] = lambda context, ob : [context.world.get_property("IndefiniteName", ob)]
+_str_eval_functions["a"] = lambda ctxt, ob : [ctxt.world.get_property("IndefiniteName", ob)]
 # gets definite_name property, capitalized
-_str_eval_functions["The"] = lambda context, ob : [_cap(context.world.get_property("DefiniteName", ob))]
+_str_eval_functions["The"] = lambda ctxt, ob : [_cap(eval_str(ctxt.world.get_property("DefiniteName", ob), ctxt))]
 # gets indefinite_name property, capitalized
-_str_eval_functions["A"] = lambda context, ob : [_cap(context.world.get_property("IndefiniteName", ob))]
+_str_eval_functions["A"] = lambda ctxt, ob : [_cap(eval_str(ctxt.world.get_property("IndefiniteName", ob), ctxt))]
 # capitalizes a word
-_str_eval_functions["cap"] = lambda context, s : [_cap(s[0])+s[1:]]
+_str_eval_functions["cap"] = lambda ctxt, s : [_cap(s[0])+s[1:]]
 # number to char
-_str_eval_functions["char"] = lambda context, s : [chr(int(s))]
+_str_eval_functions["char"] = lambda ctxt, s : [chr(int(s))]
+
+# call eval_str on the current context again
+_str_eval_functions["eval_str"] = lambda ctxt, x : [eval_str(x, ctxt)]
 
 # gets subject_pronoun property
-_str_eval_functions["he"] = lambda context, ob : [context.world.get_property("SubjectPronoun", ob)]
+_str_eval_functions["he"] = lambda ctxt, ob : [eval_str(ctxt.world.get_property("SubjectPronoun", ob), ctxt)]
 # gets object_pronoun property
-_str_eval_functions["him"] = lambda context, ob : [context.world.get_property("ObjectPronoun", ob)]
+_str_eval_functions["him"] = lambda ctxt, ob : [eval_str(ctxt.world.get_property("ObjectPronoun", ob), ctxt)]
 # gets subject_pronoun property, capitalized
-_str_eval_functions["He"] = lambda context, ob : [_cap(context.world.get_property("SubjectPronoun", ob))]
+_str_eval_functions["He"] = lambda ctxt, ob : [_cap(eval_str(ctxt.world.get_property("SubjectPronoun", ob), ctxt))]
 # gets object_pronoun property, capitalized
-_str_eval_functions["Him"] = lambda context, ob : [_cap(context.world.get_property("ObjectPronoun", ob))]
+_str_eval_functions["Him"] = lambda ctxt, ob : [_cap(eval_str(ctxt.world.get_property("ObjectPronoun", ob), ctxt))]
 
 # text formatting
 _str_eval_functions["newline"] = lambda context : ["[newline]"]

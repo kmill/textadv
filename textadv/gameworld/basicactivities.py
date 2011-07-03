@@ -220,7 +220,7 @@ def describe_location_property_heading_location(actor, loc, vis_cont, ctxt) :
             __DESCRIBE_LOCATION_mentioned.append(loc)
         else :
             return
-        loc = ctxt.world[Location(loc)]
+        loc = ctxt.world[ParentEnterable(loc)] # hopefully the vis_cont is always an enterable!
 
 ##
 ## Activity: terse_obj_description

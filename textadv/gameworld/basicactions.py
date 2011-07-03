@@ -526,7 +526,7 @@ def when_Exiting_default(event, actor, ctxt) :
 @report(Exiting(actor), wants_event=True)
 def report_Exiting_default(event, actor, ctxt) :
     """Describes what happened, and describes the new location."""
-    ctxt.write(str_with_objs("{Bob|cap} {gets} out of [the $z].[newline]", z=event.exit_from), actor=actor)
+    ctxt.write(str_with_objs("{Bob|cap} {gets} out of [the $z].", z=event.exit_from), actor=actor)
     #ctxt.activity.describe_current_location()
 
 ##
@@ -581,7 +581,7 @@ def when_GettingOff_default(event, actor, ctxt) :
 @report(GettingOff(actor), wants_event=True)
 def report_GettingOff_default(event, actor, ctxt) :
     """Describes what happened, and describes the new location."""
-    ctxt.write(str_with_objs("{Bob|cap} {gets} off of [the $z].[newline]", z=event.get_off_from), actor=actor)
+    ctxt.write(str_with_objs("{Bob|cap} {gets} off of [the $z].", z=event.get_off_from), actor=actor)
     ctxt.activity.describe_current_location()
 
 
@@ -631,7 +631,7 @@ def before_GettingOffParticular_needs_to_be_on_x(actor, x, ctxt) :
 
 
 ##
-# Insert something into something
+# Inserting something into something
 ##
 
 class InsertingInto(BasicAction) :
@@ -648,6 +648,16 @@ require_xobj_accessible(actionsystem, InsertingInto(actor, Z, X))
 def before_InsertingInto_not_on_itself(actor, x, y, ctxt) :
     """One can't place something in itself."""
     raise AbortAction(str_with_objs("{Bob|cap} can't put [the $x] into itself.", x=x), actor=actor)
+
+@before(InsertingInto(actor, X, Y))
+def before_InsertingInto_object_into_own_contents(actor, x, y, ctxt) :
+    """One can't place something into something which is in it."""
+    loc = ctxt.world[Location(y)]
+    while not ctxt.world[IsA(loc, "room")] :
+        if loc == x :
+            raise AbortAction(str_with_objs("{Bob|cap} will have to remove [the $y] from [the $x] first.",
+                                            x=x, y=y), actor=actor)
+        loc = ctxt.world[Location(loc)]
 
 @before(InsertingInto(actor, X, Y) <= Openable(X) & PNot(IsOpen(X)))
 def before_InsertingInto_closed_container(actor, x, y, ctxt) :
@@ -692,15 +702,25 @@ parser.understand("put/place/drop [something x] on/onto [something y]", PlacingO
 require_xobj_held(actionsystem, PlacingOn(actor, X, Y))
 require_xobj_accessible(actionsystem, PlacingOn(actor, Z, X))
 
-@before(PlacingOn(actor, X, Y) <= PNot(IsA(Y, "supporter")))
-def before_PlacingOn_needs_supporter(actor, x, y, ctxt) :
-    """One can only place things on a supporter."""
-    raise AbortAction(str_with_objs("{Bob|cap} can't place [the $x] on [the $y].", x=x, y=y), actor=actor)
-
 @before(PlacingOn(actor, X, Y) <= PEquals(X, Y))
 def before_PlacingOn_not_on_itself(actor, x, y, ctxt) :
     """One can't place something on itself."""
     raise AbortAction(str_with_objs("{Bob|cap} can't place [the $x] on itself.", x=x), actor=actor)
+
+@before(PlacingOn(actor, X, Y))
+def before_PlacingOn_object_onto_own_contents(actor, x, y, ctxt) :
+    """One can't place something onto something which is on it."""
+    loc = ctxt.world[Location(y)]
+    while not ctxt.world[IsA(loc, "room")] :
+        if loc == x :
+            raise AbortAction(str_with_objs("{Bob|cap} will have to take [the $y] off [the $x] first.",
+                                            x=x, y=y), actor=actor)
+        loc = ctxt.world[Location(loc)]
+
+@before(PlacingOn(actor, X, Y) <= PNot(IsA(Y, "supporter")))
+def before_PlacingOn_needs_supporter(actor, x, y, ctxt) :
+    """One can only place things on a supporter."""
+    raise AbortAction(str_with_objs("{Bob|cap} can't place [the $x] on [the $y].", x=x, y=y), actor=actor)
 
 # @before(PlacingOn(actor, X, Y))
 # def before_PlacingOn_worn_item(actor, x, y, ctxt) :

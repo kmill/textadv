@@ -18,7 +18,7 @@ world.activity.put_in("player", "Foyer")
 quickdef(world, "cloak", "thing",
          {
         Name : "black velvet cloak",
-        Words : ["dark", "black", "satin", "velvet", "@cloak"],
+        Words : ["handsome", "dark", "black", "satin", "velvet", "@cloak"],
         Description : """A handsome cloak, of velvet trimmed with
 satin, and slightly splattered with raindrops.  Its blackness is so
 deep that it almost seems to suck light from the room.""",
@@ -28,7 +28,7 @@ world.activity.make_wear("player", "cloak")
 
 @before(Dropping(actor, "cloak") <= PNot(PEquals(Location(actor), "Cloakroom")))
 @before(PlacingOn(actor, "cloak", X) <= PNot(PEquals(Location(actor), "Cloakroom")))
-def can_drop_cloak_only_in_cloakroom(actor, ctxt) :
+def can_drop_cloak_only_in_cloakroom(actor, ctxt, x=None) :
     raise AbortAction("This isn't the best place to leave a smart cloak lying around.")
 
 ### The Foyer

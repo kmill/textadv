@@ -135,11 +135,12 @@ class ActorContext(GameContext) :
                 if self.world.get_property("Global", "end_game_message") :
                     self.activity.end_game_actions()
                     if self.world.get_property("Global", "end_game_message") :
+                        self.io.flush()
                         return (None, {})
                 self.activity.step_turn()
             except parser.NoSuchWord as ex :
                 esc = escape_str(ex.word)
-                self.write("I don't know what you mean by %r." % esc)
+                self.write("I don't know what you mean by '%s'." % esc)
             except parser.NoUnderstand :
                 self.write("Huh?")
             except parser.NoInput :

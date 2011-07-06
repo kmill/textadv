@@ -4,4 +4,6 @@ if len(sys.argv) < 2 :
     print "Usage: startgame gamefile"
 else :
     execfile(sys.argv[1])
-    basic_begin_game()
+    from textadv.terminalgame import TerminalGameIO
+    game_context = make_actorcontext_with_io(TerminalGameIO())
+    basic_begin_game(game_context)

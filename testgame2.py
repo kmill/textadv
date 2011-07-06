@@ -30,7 +30,7 @@ world[Words("red ball")] = ["run-of-the-mill", "red", "@ball"]
 world.activity.put_in("red ball", "room1")
 
 world.activity.def_obj("blue ball", "thing")
-world[Name("blue ball")] = "blue ball of light"
+#world[Name("blue ball")] = "blue ball of light"
 world[MakesLight("blue ball")] = True
 world.activity.put_in("blue ball", "big box")
 #world.activity.give_to("blue ball", "player")

@@ -56,7 +56,7 @@ send_ping = function() {
 
 run_action = function(command) {
   input_prompt = $("#input_text").text();
-  $("#content").append("<p><b>"+input_prompt+" "+command+"</b></p>"); // should escape!
+  $("#content").append('<p class="user_response">'+input_prompt+" "+command+"</p>"); // should escape!
   
   $.ajax({
     type: "POST",

@@ -28,7 +28,7 @@ def act_start_game_describe_game(ctxt) :
     gd = ctxt.world[Global("game_description")]
     if gd :
         ctxt.write(gd+"[newline]")
-    ctxt.write("<b><font size=\"+2\">"+ctxt.world[Global("game_title")]+"</font></b>"+"[break]")
+    ctxt.write("<span class=\"game_title\">"+ctxt.world[Global("game_title")]+"</span>"+"[break]")
     ctxt.write(ctxt.world[Global("game_headline")], "by", ctxt.world[Global("game_author")])
     ctxt.write("[break]Release number", str(ctxt.world[Global("release_number")]), "[newline]")
     ctxt.write("Type 'help' for help.[newline]")

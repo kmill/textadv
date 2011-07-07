@@ -8,7 +8,19 @@ a.action {
   color: #002;
 }
 a.action:hover {
-  color: #222;
+  color: #226;
+}
+span.location_heading {
+/*  font-weight: bold; */
+  font-size: 120%;
+  font-family: sans-serif;
+}
+span.game_title {
+  font-weight: bold;
+  font-size: 150%;
+}
+.user_response {
+  font-weight: bold;
 }
 </style>
 </head>
@@ -19,8 +31,8 @@ a.action:hover {
 </div>
 
 <table border="0px">
-  <tr><td id="input_text">&gt;</td><td>
-    <form style="margin:0;padding:0;" action="javascript:send_command()" method="" autocomplete="off">
+  <tr><td><span class="user_response" id="input_text">&gt;</span>
+    <form style="margin:0;padding:0;display:inline;" action="javascript:send_command()" method="" autocomplete="off">
     <input type="text" id="command" name="command" size="100" style="border:0;"/>
     <input type="hidden" id="session" name="session" value="{{url_escape(session)}}"/>
     </form>

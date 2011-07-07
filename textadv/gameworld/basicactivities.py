@@ -216,9 +216,9 @@ def describe_location_set_visited(actor, loc, vis_cont, ctxt) :
 def describe_location_heading_Name(actor, loc, vis_cont, ctxt) :
     """Prints the name of the visible container."""
     if ctxt.world[IsA(vis_cont, "thing")] :
-        ctxt.write(str_with_objs("<b>[The $z]</b>", z=vis_cont), actor=actor)
+        ctxt.write(str_with_objs("<span class=\"location_heading\">[The $z]</span>", z=vis_cont), actor=actor)
     else :
-        ctxt.write(str_with_objs("<b>[get Name $z]</b>", z=vis_cont), actor=actor)
+        ctxt.write(str_with_objs("<span class=\"location_heading\">[get Name $z]</span>", z=vis_cont), actor=actor)
 
 @actoractivities.to("describe_location_heading")
 def describe_location_property_heading_location(actor, loc, vis_cont, ctxt) :

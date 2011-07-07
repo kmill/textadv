@@ -39,9 +39,9 @@ Then, point your browser to the URL http://localhost:8888/
 Generating documentation
 ------------------------
 
-Much of the engine is self-documenting.  Run ./make-documentation from
+Much of the engine is self-documenting.  Run ./make_documentation from
 the root of the repository.  To document a specific game, such as
-Cloak of Darkness, then run ./make-documentation cloak.py
+Cloak of Darkness, then run ./make_documentation cloak.py
 
 The output is in ./doc (you may need to create this directory first).
 
@@ -103,20 +103,6 @@ the basic actions a player may attempt on these objects.
 This contains the web interface for playing the games.  One runs
 'python textadv/tornado/server.py' in the main repository, and then
 points a web browser to the URL 'http://localhost:8888/' to play.
-
------------
-Future work
------------
-
-There will be a way to take games written in this system and then play
-them from within a web browser with the game being server side.  There
-will also be support for multimedia (partly because then the game
-writer can use HTML).
-
-There are classes like Readable and Container which are readily
-composible.  It should be possible to add classes together so that one
-could create a new object of type Readable+Container, and then make
-sure the setup methods are sequenced.
 
 
 ----------------

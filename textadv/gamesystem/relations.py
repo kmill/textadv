@@ -155,13 +155,13 @@ class ManyToManyRelation(Relation) :
             try :
                 self.match(type(self)(*data[i]))
                 del data[i] # implicit i++
-            except NoMatchError :
+            except NoMatchException :
                 i += 1
     def query_relation(self, data) :
         out = []
         for r in data :
             try :
-                out.append(self.match(type(self)(r)))
+                out.append(self.match(type(self)(*r)))
             except NoMatchException :
                 pass
         return out

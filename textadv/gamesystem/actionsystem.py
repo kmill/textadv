@@ -129,7 +129,7 @@ class ActionSystem(object) :
 
         silently, if true, prevents reporting the action."""
         if (write_action or is_implied) :
-            if type(write_action) is not str : write_action = "(%s)"
+            if write_action is True : write_action = "(%s)"
             ctxt.write(write_action % action.gerund_form(ctxt))
             ctxt.write("[newline]")
         reasonable = self.verify_action(action, ctxt)

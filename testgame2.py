@@ -1,6 +1,7 @@
 # Just a silly test file.
 
-from textadv.basicsetup import *
+execfile("textadv/basicsetup.py")
+#from textadv.basicsetup import *
 
 world[Global("game_title")] = "Test Game"
 world[Global("game_author")] = "Kyle Miller"
@@ -71,6 +72,9 @@ world.activity.make_part_of("wick", "candlestick")
 world.activity.def_obj("neat shirt", "thing")
 world.activity.make_wear("player", "neat shirt")
 world[IsWearable("neat shirt")] = True
+
+world.activity.def_obj("mouse", "backdrop")
+world[BackdropLocations("mouse")] = ["room0", "room1"]
 
 @actoractivities.to("terse_obj_description", insert_first=True, wants_table=True)
 def terse_obj_desc_disable_for_woo(table, actor, o, notables, mentioned, ctxt) :

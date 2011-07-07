@@ -5,32 +5,25 @@
 # a reimplementation of Island Adventure, which I had written before
 # in Inform 7
 
-from textadv.basiclibrary import *
-
+execfile("textadv/basicsetup.py")
+#from textadv.basicsetup import *
 
 ##
 ## Fun and games
 ##
 
-@when(StartGame())
-def _when_game_start(context) :
-    context.write_line("""
+world[Global("game_title")] = "Island Adventure"
+world[Global("game_author")] = "Kyle Miller"
+world[Global("game_description")] = """
 You decided to stop what you were doing and wash up on an island.
 
 You're not quite sure how you got here, or what you're supposed to do,
-but you feel that Adventure is afoot.
-
-ISLAND ADVENTURE
-
-a short work by Kyle Miller""")
-    raise ActionHandled()
+but you feel that Adventure is afoot."""
 
 
-@before(Attack(actor, player))
+@before(Attacking(actor, X) <= PEquals(actor, X))
 def _before_suicide(actor, context) :
     raise AbortAction("Suicide is not the answer.", actor=actor)
-
-remove_obj(hands)
 
 ##
 ## Properties
@@ -38,569 +31,628 @@ remove_obj(hands)
 
 
 # Attachment
+@world.define_relation
+class AttachedTo(DirectedManyToManyRelation) :
+    """AttachedTo(x, y) for x is attached to y (non-commutative)."""
 
-class AttachedTo(BasicPattern) :
-    def __init__(self, attached, attacher) :
-        self.args = [attached, attacher]
+@world.to("attach_to")
+def prop_set_attached(x, y, world) :
+    """Attaches x and y together.  Does not remove prior relations."""
+    world.add_relation(AttachedTo(x, y))
 
-str_eval_register_relation("attachedto", AttachedTo)
+@world.to("detach")
+def prop_detach(x, world) :
+    """Removes attachment of x to anything else."""
+    world.remove_relation(AttachedTo(x, Y))
 
-def prop_set_attached(world, attached, attacher) :
-    world.db["relations"].insert(AttachedTo(obj_to_id(attached), obj_to_id(attacher)))
-def prop_detach(world, attached) :
-    world.db["relations"].delete(AttachedTo(obj_to_id(attached), x))
-
-@before(Take(actor, BObject(x)))
-def _before_take_attached(actor, x, context) :
-    a = x.s_R_x(AttachedTo)
+@before(Taking(actor, X))
+def before_taking_attached(actor, x, ctxt) :
+    a = ctxt.world.query_relation(AttachedTo(x, Y), var=Y)
     if a :
-        raise AbortAction(str_with_objs("It's attached to [the $z].", z=a[0]))
+        raise AbortAction(str_with_objs("It's attached to [the $y].", y=a[0]))
 
 # Fishing
 
-class FishingRod(BObject) :
-    pass
+world.add_relation(KindOf("fishing rod", "thing"))
 
-class Fish(BasicAction) :
+class Fishing(BasicAction) :
     verb = "fish"
     gerund = "fishing"
-class FishWith(BasicAction) :
+    numargs = 1
+class FishingWith(BasicAction) :
     verb = "fish"
     gerund = "fishing with"
+    numargs = 2
 
-understand("fish", Fish(actor))
-understand("fish with [something x]", FishWith(actor, x))
-understand("catch fish with [something x]", FishWith(actor, x))
+parser.understand("fish", Fishing(actor))
+parser.understand("fish with [something x]", FishingWith(actor, X))
+parser.understand("catch fish with [something x]", FishingWith(actor, X))
 
-@before(Fish(actor))
-def _before_fish_default(actor, context) :
-    rods = context.world.lookup("relations", Has(actor, FishingRod(x)), res=get_x)
+@before(Fishing(actor))
+def before_fishing_default(actor, ctxt) :
+    rods = [rod for rod in ctxt.world.query_relation(Has(actor, X), var=X) if ctxt.world[IsA(rod, "fishing rod")]]
     if len(rods) > 1 :
-        raise Ambiguous(rods)
+        raise Ambiguous(FishingWith(actor, X), {X : rods})
     elif len(rods) == 1 :
-        raise DoInstead(FishWith(actor, rods[0]))
+        raise DoInstead(FishingWith(actor, rods[0]))
     else :
         raise AbortAction("The last time I checked it was very hard to catch fish without a pole.")
 
-xobj_held(FishWith(actor, BObject(x)))
-@before(FishWith(actor, BObject(x)))
-def _before_fishwith_default(actor, x, context) :
-    if not isinstance(x, FishingRod) :
-        if isinstance(x, Actor) :
+require_xobj_held(actionsystem, FishingWith(actor, X))
+
+@before(FishingWith(actor, X))
+def before_fishingwith_default(actor, x, ctxt) :
+    if not ctxt.world[IsA(x, "fishing rod")] :
+        if ctxt.world[IsA(x, "person")] :
             raise AbortAction(str_with_objs("""It doesn't look like [the $x] wants to help.""",
                                             x=x))
         else :
             raise AbortAction(str_with_objs("""{Bob|cap} would have a
                                             hard time catching fish with [the $x]""", x=x))
 
-@before(FishWith(actor, FishingRod(x)))
-def _before_fishwith_rod(actor, x, context) :
-    if not context.world["fishing_dock"].s_R_x(In, actor.get_location()) :
+@before(FishingWith(actor, X) <= IsA(X, "fishing rod"))
+def before_fishingwith_rod(actor, x, ctxt) :
+    if not ctxt.world[ContainingRoom(actor)] == "room_the_dock" :
         raise AbortAction("""You have to be on a fishing dock to have
         deep enough water to fish.""")
-    elif actor.s_R_x(Has, "the_fish") :
+    elif ctxt.world.query_relation(Has(actor, "the_fish")) :
         raise AbortAction("""You have a fish already. You don't need
         another.""")
     else :
         raise ActionHandled()
 
-@when(FishWith(actor, FishingRod(x)))
-def _when_fishwith_rod(actor, x, context) :
-    context.world["the_fish"].give_to(actor)
+@when(FishingWith(actor, X) <= IsA(X, "fishing rod"))
+def when_fishingwith_rod(actor, x, ctxt) :
+    ctxt.world.activity.give_to("the_fish", actor)
 
-@after(FishWith(actor, FishingRod(x)))
-def _after_fishwith_rod(actor, x, context) :
-    context.write_line("""As soon as the hook reaches the surface of
-    the water, a swarm of fish swim at it.  One lucky fish bites and
-    you pull.  You catch a fish.
-    
-    Taken.""")
+@report(FishingWith(actor, X) <= IsA(X, "fishing rod"))
+def report_fishingwith_rod(actor, x, ctxt) :
+    ctxt.write("""As soon as the hook reaches the surface of the
+    water, a swarm of fish swim at it.  One lucky fish bites and you
+    pull.  You catch a fish.[newline]Taken.""")
 
 
-the_fish = world.new_obj("the_fish", BObject, "fish", """It is a
-flounder.  It doesn't look that appetizing, as both eyes are on one
-side of its head.""")
-@before(Eat(actor, the_fish))
-def _before_eat_fish(actor, context) :
+quickdef(world, "the_fish", "thing", {
+        Name : "fish",
+        Description : """It is a flounder.  It doesn't look that
+appetizing, as both eyes are on one side of its head.""",
+        })
+
+@before(Eating(actor, "the_fish"))
+def before_eating_fish(actor, ctxt) :
     raise AbortAction("It doesn't look that appetizing.")
 
 # Sky region
 
-region_sky = world.new_obj("region_sky", Region, "Sky Area")
-region_sky.add_rooms(["region_beach", "region_village", "room_west_volcano"])
+quickdef(world, "region_sky", "region")
+world.activity.put_in("region_beach", "region_sky")
+world.activity.put_in("region_village", "region_sky")
+world.activity.put_in("room_west_volcano", "region_sky")
 
-the_sky = world.new_obj("the_sky", Scenery, "sky",
-"""The sky is cloudless and full of sun.  A bird flies by
-occasionally.""")
-the_sky.move_to(region_sky)
+quickdef(world, "the_sky", "backdrop", {
+        Name : "sky",
+        BackdropLocations : ["region_sky"],
+        Description : """The sky is cloudless and full of sun.  A bird
+        flies by occasionally.""",
+        })
 
 ###
 ### Beach region
 ###
 
-region_beach = world.new_obj("region_beach", Region, "Beach Area")
-beach_ocean = world.new_obj("beach_ocean", Scenery, "ocean",
-"""The water is aquamarine with perfect white sand underfoot.""")
-beach_ocean.move_to(region_beach)
+quickdef(world, "region_beach", "region")
+world.activity.put_in("room_the_beach", "region_beach")
+world.activity.put_in("room_the_dock", "region_beach")
+world.activity.put_in("room_more_beach", "region_beach")
 
-region_beach.add_rooms(["room_the_beach", "room_the_dock", "room_more_beach"])
+quickdef(world, "beach_ocean", "backdrop", {
+        Name : "ocean",
+        BackdropLocations : ["region_beach"],
+        Description : """The water is aquamarine with perfect white
+        sand underfoot.""",
+        })
 
-@before(Go(actor, "south"))
-def _before_south_beach_area(actor, context) :
-    if actor.get_location().transitive_in("region_beach") :
-        raise AbortAction("You can't just go swimming without a swim suit, heaven forbid!")
+@before(Going(actor, "south") <= Contains("region_beach", actor))
+def _before_going_south_beach_area(actor, ctxt) :
+    raise DoInstead(SwimmingIn(actor, "beach_ocean"))
 
-class Swim(BasicAction) :
-    verb = "swim"
-    gerund = "swimming"
-class SwimIn(BasicAction) :
-    verb = "swim"
-    gerund = "swimming in"
-understand("swim", Swim(actor))
-understand("swim in [something x]", SwimIn(actor, x))
 
-@before(Swim(actor))
-def _before_swimming(actor, context) :
-    if actor.obj_accessible("beach_ocean") :
-        raise DoInstead(SwimIn(actor, "beach_ocean"))
-    else :
-        raise AbortAction("There's no place to swim.")
+@before(Swimming(actor))
+def _before_swimming(actor, ctxt) :
+    if ctxt.world[AccessibleTo("beach_ocean", actor)] :
+        raise DoInstead(SwimmingIn(actor, "beach_ocean"))
 
-xobj_accessible(SwimIn(actor, x))
-
-@before(SwimIn(actor, x))
-def _before_swimin(actor, x, context) :
+@before(SwimmingIn(actor, X))
+def _before_swimming_in(actor, x, ctxt) :
     raise AbortAction("You can't just swim without a swimsuit. Heaven forbid!")
 
 ##
 ## The beach
 ##
 
-player.move_to("room_the_beach")
+world.activity.put_in("player", "room_the_beach")
 
-room_the_beach = world.new_obj("room_the_beach", Room, "The Beach",
-"""Crystal clear water and lots of sand.  The air is warm but not too
-humid, and it seems it would be the perfect place to go swimming.
-Some docks are visible to the west.""")
-room_the_beach["no_go_msgs"]["east"] = """The beach just keeps going.
-Long walks on the beach aren't going to solve anything."""
-room_the_beach["no_go_msgs"]["north"] = """The jungle is too thick.
-Besides, the wild animals might be dangerous."""
+quickdef(world, "room_the_beach", "room", {
+        Name : "The Beach",
+        Description : """Crystal clear water and lots of sand.  The
+        air is warm but not too humid, and it seems it would be the
+        perfect place to go swimming.  Some docks are visible to the
+        west."""
+        })
+world[NoGoMessage("room_the_beach", "east")] = """The beach just keeps
+going.  Long walks on the beach aren't going to solve anything."""
+world[NoGoMessage("room_the_beach", "north")] = """The jungle is too
+thick.  Besides, the wild animals might be dangerous."""
 
-informational_plaque = world.new_obj("informational_plaque", Readable, "informational plaque",
-"""Some writing can be made out, quite easily actually, since, by the
-look of it, it is burnt into a sheet of titanium by a carbon dioxide
-laser.""")
-informational_plaque.move_to(room_the_beach)
-informational_plaque["read_msg"] = """It reads 'Go to the volcano --
-something insidious is occurring.  Good luck, bye.'"""
-informational_plaque["takeable"] = False
-informational_plaque["no_take_msg"] = """It's fairly securely affixed
-to whatever it's securely affixed to."""
+world.activity.connect_rooms("room_the_beach", "west", "room_the_dock")
 
-room_the_beach.connect("room_the_dock", "west")
+quickdef(world, "informational plaque", "thing", {
+        Description : """Some writing can be made out, quite easily
+        actually, since, by the look of it, it is burnt into a sheet
+        of titanium by a carbon dioxide laser.  It reads 'Go to the
+        volcano -- something insidious is occurring.  Good luck, bye.'""",
+        FixedInPlace : True,
+        NoTakeMessage : """It's fairly securely affixed to whatever
+        it's securely affixed to."""
+        })
+world.activity.put_in("informational plaque", "room_the_beach")
 
 ##
 ## The dock
 ##
 
-room_the_dock = world.new_obj("room_the_dock", Room, "The Dock",
-"""Here is a long dock leading off into the ocean from the beach.  It
-is made of driftwood tied together in such a manner that suggests
-whoever made it was clearly not a boy scout.  Judging by the smell of
-old fish, it seems like people fish here regularly.  Beaches lie to
-the west and the east, and a dirt path leads to the north.""")
+quickdef(world, "room_the_dock", "room", {
+        Name : "The Dock",
+        Description : """Here is a long dock leading off into the
+        ocean from the beach.  It is made of driftwood tied together
+        in such a manner that suggests whoever made it was clearly not
+        a boy scout.  Judging by the smell of old fish, it seems like
+        people fish here regularly.  Beaches lie to the west and the
+        east, and a dirt path leads to the north."""
+        })
 
-fishing_dock = world.new_obj("fishing_dock", Scenery, "long fishing dock",
-"""There are many pieces of driftwood held together by some worn rope.""")
-fishing_dock.move_to(room_the_dock)
+quickdef(world, "long fishing dock", "supporter", {
+        Scenery : True,
+        IsEnterable : True,
+        Description : """There are many pieces of driftwood held
+        together by some worn rope."""
+        })
+world.activity.put_in("long fishing dock", "room_the_dock")
 
-old_rope = world.new_obj("old_rope", Scenery, "worn old rope",
-"""It's just hanging in there keeping the dock together.""")
-old_rope.move_to(room_the_dock)
-old_rope["no_take_msg"] = """The driftwood is attached to the dock
-with the rope."""
+quickdef(world, "old_rope", "thing", {
+        Name : "worn old rope",
+        Scenery : True,
+        NoTakeMessage : """The rope is affixed to the dock.""",
+        Description : """It's just hanging in there keeping the dock
+        together."""
+        })
+world.activity.put_in("old_rope", "room_the_dock")
+
 #  Instead of taking the old rope when the old rope is
 #joined to the driftwood, say "It seems to be knotted up with no
 # beginning nor end.  It's a mobius rope."""
 
-driftwood = world.new_obj("driftwood", BObject, "long piece of driftwood",
-"""[if [when driftwood attachedto old_rope]]If it weren't attached to
-the dock, it could be an excellent baseball bat or even a
-lever.[else]An excellent baseball bat or lever.[endif]""")
-driftwood["words"] = ["long", "piece", "of", "@driftwood", "@wood"]
-driftwood.move_to(room_the_dock)
-prop_set_attached(world, driftwood, old_rope)
-driftwood["reported"] = False
+quickdef(world, "driftwood", "thing", {
+        Name : "long piece of driftwood",
+        Words : ["long", "piece", "of", "@driftwood", "@wood"],
+        Reported : False,
+        Description : """[if [when driftwood AttachedTo old_rope]]If
+        it weren't attached to the dock, it could be an excellent
+        baseball bat or even a lever.[else]An excellent baseball bat
+        or lever.[endif]"""
+        })
+world.activity.put_in("driftwood", "room_the_dock")
+world.activity.attach_to("driftwood", "old_rope")
 
-@before(Cut(actor, "old_rope"))
-def _before_cut_rope_default(actor, context) :
+@before(Cutting(actor, "old_rope"))
+def _before_cutting_rope_default(actor, ctxt) :
     raise AbortAction("What, with your hands?")
 
-@before(CutWith(actor, old_rope, BObject(y)))
-def _before_cutwith_rope_default(actor, y, context) :
-    raise AbortAction(str_with_objs("[the $y] isn't sharp enough to cut cooked pasta.", y=y))
+@before(CuttingWith(actor, "old_rope", Y))
+def _before_cuttingwith_rope_default(actor, y, ctxt) :
+    raise AbortAction(str_with_objs("[The $y] isn't sharp enough to cut cooked pasta.", y=y), actor=actor)
 
-@before(CutWith(actor, old_rope, "knife"))
-def _before_cutwith_rope_knife(actor, context) :
-    raise ActionHandled()
+@before(CuttingWith(actor, "old_rope", "knife"))
+def _before_cuttingwith_rope_knife(actor, ctxt) :
+    if "knife" in ctxt.world[Contents(actor)] :
+        raise ActionHandled()
 
-@when(CutWith(actor, old_rope, "knife"))
-def _when_cutwith_rope_knife(actor, context) :
-    driftwood = context.world["driftwood"]
-    driftwood["reported"] = True
-    prop_detach(context.world, driftwood)
-    driftwood.give_to(actor)
-    remove_obj(context.world["old_rope"])
-    context.write_line(str_with_objs("""After a few pulls of of [the
-    $y], with a few of those said pulls passing through due to [the
-    $y]'s lack of total existence, [the $x] completely disintegrates.
-    The driftwood is freed.\n\nTaken.""", x="old_rope", y="knife"))
+@when(CuttingWith(actor, "old_rope", "knife"))
+def _when_cuttingwith_rope_knife(actor, ctxt) :
+    ctxt.world[Reported("driftwood")] = True
+    ctxt.world.activity.detach("driftwood")
+    ctxt.world.activity.give_to("driftwood", actor)
+    ctxt.world.activity.remove_obj("old_rope")
+    ctxt.write(str_with_objs("""After a few pulls of of [the $y], with
+    a few of those said pulls passing through due to [the $y]'s lack
+    of total existence, [the $x] completely disintegrates.  The
+    driftwood is freed.[newline]Taken.""", x="old_rope", y="knife"), actor=actor)
 
 ##
 ## More beach
 ##
 
-room_more_beach = world.new_obj("room_more_beach", Room, "More Beach",
-"""Again, more crystal clear water and a lot of sand, except in this
-case sand dunes cover the beach.  Apparently, another person thought
-the beach was to die for as, next to the shore soaking in the rays, is
-a skeleton.""")
-room_more_beach["no_go_msgs"]["west"] = """The beach just keeps going.
-Long walks on the beach aren't going to solve anything."""
-room_more_beach["no_go_msgs"]["north"] = """The jungle is too thick.
-Besides, the wild animals might be dangerous."""
-room_more_beach.connect(room_the_dock, "east")
+quickdef(world, "room_more_beach", "room", {
+        Name : "More Beach",
+        Description : """Again, more crystal clear water and a lot of
+        sand, except in this case sand dunes cover the beach.
+        Apparently, another person thought the beach was to die for
+        as, next to the shore soaking in the rays, is a skeleton."""
+        })
+world[NoGoMessage("room_more_beach", "west")] = """The beach just
+keeps going.  Long walks on the beach aren't going to solve anything."""
+world[NoGoMessage("room_more_beach", "north")] = """The jungle is too
+thick.  Besides, the wild animals might be dangerous."""
+world.activity.connect_rooms("room_more_beach", "east", "room_the_dock")
 
-class MySkeleton(Actor, Scenery) :
-    def setup(self, name, desc) :
-        Actor.setup(self, name, desc)
-        Scenery.setup(self, name, desc)
-    def ask_about(self, text, context) :
-        res = parse_something(context, text)
-        if context.world["knife"] in res :
-            if context.world["skeleton_hand"].x_R_s(In, "knife") :
-                context.write_line("""'Do you like it?  It's my
-                favorite knife.  Though, the sun is a bit hot.  I
-                might give it to you if you help me out a bit...'""")
-            else :
-                context.write_line("""'Isn't it a great knife?'""")
-        else :
-            context.write_line("""The skeleton seems unmoved by your question.""")
+quickdef(world, "skeleton", "person", {
+        Gender : "male",
+        Reported : False,
+        Description : """He appears to be enjoying himself, or, at
+        least was enjoying himself when he was still alive.[if [when
+        skeleton_hand Contains knife]] Something shiny is embedded in
+        his hand.[endif][if [when skeleton Has good_fronds]] He is
+        under some good, sun-blocking palm fronds.[endif]"""
+        })
+world.activity.put_in("skeleton", "room_more_beach")
 
-@before(GiveTo(actor, "good_fronds", "skeleton"))
-def _before_give_fronds(actor, context) :
-    raise ActionHandled()
-@when(GiveTo(actor, "good_fronds", "skeleton"))
-def _when_give_fronds(actor, context) :
-    context.world["good_fronds"].give_to("skeleton")
-    context.world["knife"].give_to(actor)
-    raise ActionHandled()
-@after(GiveTo(actor, "good_fronds", "skeleton"))
-def _after_give_fronds(actor, context) :
-    context.write_line("""The skeleton covers himself in the fronds
-    and says: 'Thank you.  These will work -- they seem to block the
-    sun very well.  I'll give you my knife in return.'\n\nTaken.""")
+#     def ask_about(self, text, context) :
+#         res = parse_something(context, text)
+#         if context.world["knife"] in res :
+#             if context.world["skeleton_hand"].x_R_s(In, "knife") :
+#                 context.write_line("""'Do you like it?  It's my
+#                 favorite knife.  Though, the sun is a bit hot.  I
+#                 might give it to you if you help me out a bit...'""")
+#             else :
+#                 context.write_line("""'Isn't it a great knife?'""")
+#         else :
+#             context.write_line("""The skeleton seems unmoved by your question.""")
 
+# @before(GiveTo(actor, "good_fronds", "skeleton"))
+# def _before_give_fronds(actor, context) :
+#     raise ActionHandled()
+# @when(GiveTo(actor, "good_fronds", "skeleton"))
+# def _when_give_fronds(actor, context) :
+#     context.world["good_fronds"].give_to("skeleton")
+#     context.world["knife"].give_to(actor)
+#     raise ActionHandled()
+# @after(GiveTo(actor, "good_fronds", "skeleton"))
+# def _after_give_fronds(actor, context) :
+#     context.write_line("""The skeleton covers himself in the fronds
+#     and says: 'Thank you.  These will work -- they seem to block the
+#     sun very well.  I'll give you my knife in return.'\n\nTaken.""")
 
-skeleton = world.new_obj("skeleton", MySkeleton, "skeleton",
-"""He appears to be enjoying himself, or, at least was enjoying
-himself when he was still alive.[if [when knife in skeleton_hand]]
-Something shiny is embedded in his hand.[endif][if [when skeleton has
-good_fronds]] He is under some good, sun-blocking palm fronds.[endif]""")
-skeleton.set_gender("male")
-skeleton.move_to(room_more_beach)
+quickdef(world, "skeleton_hand", "container", {
+        Name : "hand",
+        Words : ["@hand", "@hands"],
+        Openable : True,
+        IsOpen : False,
+        IsOpaque : False,
+        SuppressContentDescription : True,
+        Description : """Very white, and many bones, all phalanges,
+        carpals, and metacarpals are here in this [get IsOpenMsg
+        skeleton_hand] hand.  It is quite impressive how many parts
+        there are.  [if [when skeleton_hand Contains knife]]A
+        strangely translucent metal knife is concealed within.[endif]"""
+        })
+world.activity.make_part_of("skeleton_hand", "skeleton")
 
-skeleton_hand = world.new_obj("skeleton_hand", Openable, "hand",
-"""Very white, and many bones, all phalanges, carpals, and metacarpals
-are here in this [get skeleton_hand is_open_msg] hand.  It is quite
-impressive how many parts there are.  [if [when knife in
-skeleton_hand]]A strangely translucent metal knife is concealed
-within.[endif]""")
-skeleton_hand["words"] = ["@hand", "@hands"]
-skeleton_hand.give_to(skeleton)
+quickdef(world, "knife", "thing", {
+        Name : "somewhat existant knife",
+        Words : ["strangely", "translucent", "metal", "somewhat", "existant", "@knife"],
+        Description : """It is semi-transparent.  Maybe the guy tried
+        to take it with him.  It seems to be a very high-quality
+        knife, except for the lack of total existance."""
+        })
+world.activity.put_in("knife", "skeleton_hand")
 
-knife = world.new_obj("knife", BObject, "somewhat existant knife",
-"""It is semi-transparent.  Maybe the guy tried to take it with him.
-It seems to be a very high-quality knife, except for the lack of total
-existance.""")
-knife["words"] = ["strangely", "translucent", "metal", "somewhat", "existant", "@knife"]
-knife.move_to(skeleton_hand)
-#knife.give_to(player)
-
-@before(Take(actor, knife))
-def _before_take_knife(actor, context) :
-    knife = context.world["knife"]
-    hand = context.world["skeleton_hand"]
-    if knife.s_R_x(In, hand) :
-        if hand["open"] :
-            hand["open"] = False
+@before(Taking(actor, "knife"))
+def _before_take_knife(actor, ctxt) :
+    if ctxt.world.query_relation(Contains("skeleton_hand", "knife")) :
+        if ctxt.world[IsOpen("skeleton_hand")] :
+            ctxt.world[IsOpen("skeleton_hand")] = False
             raise AbortAction("""Surprisingly, the skeleton snaps his
             hand shut and begins to move his jaw, almost in
             anticipation of being asked about the knife perhaps.""")
         else :
             raise AbortAction("The hand is closed around the knife.")
 
-sand_dunes = world.new_obj("sand_dunes", Scenery, "sand dunes", """Lots
-of sand, and lots of dunes.  Some vegetation is growing on top of some
-of them.""")
-sand_dunes.move_to(room_more_beach)
+quickdef(world, "sand dunes", "thing", {
+        Scenery : True,
+        Description : """Lots of sand, and lots of dunes.  Some
+        vegetation is growing on top of some of them."""
+        })
+world.activity.put_in("sand dunes", "room_more_beach")
 
 ###
 ### Village area
 ###
 
-region_village = world.new_obj("region_village", Region, "Village Area")
+quickdef(world, "region_village", "region")
 
-@before(Go(actor, direction))
-def _before_go_village_area(actor, direction, context) :
-    if actor.transitive_in("region_village") :
-        if not actor.get_location().get_exit(direction) :
-            raise AbortAction("""I think it is evidence enough that if
-            the villagers decided not to build a trail that way, you
-            should not go that way either.""")
+world[NoGoMessage(X, direction) <= Contains("region_village", X)] = """
+I think it is evidence enough that if the villagers decided not to
+build a trail that way, you should not go that way either."""
+
+world.activity.put_in("room_village", "region_village")
+world.activity.put_in("room_well", "region_village")
 
 ##
 ## Village
 ##
 
-room_village = world.new_obj("room_village", Room, "The Village",
-"""This is a small village consisting of exactly three and a half palm
-huts.  One of them was smitten by an angry charged stream of ions.  At
-least, that's what the explanatory sign in front of it says.  On the
-remaining three, palm fronds line the roofs.  Well-used paths lead to
-the west and south while to the north is a slight opening in the
-jungle.""")
-room_village.move_to(region_village)
-room_village.connect(room_the_dock, "south")
-room_village.connect("room_jungle", "north")
+quickdef(world, "room_village", "room", {
+        Name : "The Village",
+        Description : """This is a small village consisting of exactly
+        three and a half palm huts.  One of them was smitten by an
+        angry charged stream of ions.  At least, that's what the
+        explanatory sign in front of it says.  On the remaining three,
+        palm fronds line the roofs.  Well-used paths lead to the west
+        and south while to the north is a slight opening in the
+        jungle."""
+        })
+world.activity.connect_rooms("room_village", "south", "room_the_dock")
+world.activity.connect_rooms("room_village", "north", "room_jungle")
 
-halfhut = world.new_obj("halfhut", Scenery, "half hut",
-"""Only half of it is there, the rest is wreckage.  Some of the
-previous owner's stuff is lying around.  Outside the hut is a sign
-explaining what happened.""")
-halfhut.move_to(room_village)
+quickdef(world, "half hut", "container", {
+        Scenery : True,
+        SuppressContentDescription : True,
+        Description : """Only half of it is there, the rest is
+        wreckage.  Some of the previous owner's stuff is lying around.
+        Outside the hut is a sign explaining what happened."""
+        })
+world.activity.put_in("half hut", "room_village")
 
-wreckage = world.new_obj("wreckage", Scenery, "wreckage",
-"""Mostly rocks.[if [when fishing_rod in halfhut]] The only thing of
-value is a fishing rod.[endif]""")
-wreckage["words"] = ["@wreckage", "@stuff"]
-wreckage.move_to(halfhut)
+quickdef(world, "wreckage", "thing", {
+        Words : ["@wreckage", "@stuff"],
+        Scenery : True,
+        Description : """Mostly rocks.[if [when <half hut> Contains
+        fishing_rod]] The only thing of value is a fishing
+        rod.[endif]"""
+        })
+world.activity.put_in("wreckage", "half hut")
 
-explanatory_sign = world.new_obj("explanatory_sign", Readable, "explanatory sign",
-"""The sign says: 'The gods shot their blue spears at this hut because
-he was too good at fishing.'""")
-explanatory_sign["takeable"] = False
-explanatory_sign.move_to(halfhut)
+quickdef(world, "explanatory sign", "thing", {
+        Scenery : True,
+        Description : """The sign says: 'The gods shot their blue
+        spears at this hut because he was too good at fishing.'"""
+        })
+world.activity.put_in("explanatory sign", "half hut")
 
-fishing_rod = world.new_obj("fishing_rod", FishingRod, "carbon fiber fishing rod",
-"""A long, thin fish catching contraption.  Surprisingly it's carbon
-fiber and not made of island materials as one would expect.""")
-fishing_rod["words"] = ["carbon", "fiber", "fishing", "@rod", "@pole"]
-fishing_rod.move_to(halfhut)
+quickdef(world, "fishing_rod", "fishing rod", {
+        Name : "carbon fiber fishing rod",
+        Words : ["carbon", "fiber", "fishing", "@rod", "@pole"],
+        Description : """A long, thin fish catching contraption.
+        Surprisingly it's carbon fiber and not made of island
+        materials as one would expect."""
+        })
+world.activity.put_in("fishing_rod", "half hut")
 
-@before(Go(actor, "north"))
-def _before_go_to_jungle_from_village(actor, context) :
-    if actor.s_R_x(In, "room_village") :
-        context.write_line("""The underbrush is almost completely
-        unlike a stone wall.  You succeed in passing to make your way
-        to...""")
+@when(Going(actor, "north") <= Contains("room_village", actor))
+def _when_going_to_jungle_from_village(actor, ctxt) :
+    ctxt.write("""The underbrush is almost completely unlike a stone
+    wall.  You succeed in passing to make your way to...""")
 
 ##
 ## Well
 ##
-room_well = world.new_obj("room_well", Room, "The Well",
-"""A circle of bare dirt encircles a lonely but well-visited well in
-the middle.  The village is over to the east.""")
-room_well.move_to(region_village)
-room_well.connect(room_village, "east")
 
-well_shaft = world.new_obj("well_shaft", Scenery, "well shaft",
-"""A circle of stones with a cylindrical pit in the middle.  The water
-in the cylinder isn't that deep.  [if [when key_card in well_shaft]]A
-key card is floating in the water.[endif]""")
-well_shaft["words"] = ["well", "@shaft", "water"]
-well_shaft.move_to(room_well)
+quickdef(world, "room_well", "room", {
+        Name : "The Well",
+        Description : """A circle of bare dirt encircles a lonely but
+        well-visited well in the middle.  The village is over to the
+        east."""
+        })
+world.activity.connect_rooms("room_well", "east", "room_village")
 
-key_card = world.new_obj("key_card", BObject, "blue key card",
-"""Like a blue credit card, but has super secret flotation protection.
-Along the body of the key card is the writing 'Super Secret Express
-Elevator Access Card.'""")
-key_card["words"] = ["blue", "key", "@card", "@keycard"]
-key_card.move_to(well_shaft)
+quickdef(world, "well shaft", "container", {
+        Words : ["well", "@shaft", "water"],
+        Scenery : True,
+        SuppressContentDescription : True,
+        Description : """A circle of stones with a cylindrical pit in
+        the middle.  The water in the cylinder isn't that deep.  [if
+        [when <well shaft> Contains <key card>]]A key card is floating
+        in the water.[endif]"""
+        })
+world.activity.put_in("well shaft", "room_well")
 
-@before(Take(actor, key_card))
-def _before_take_key_card(actor, context) :
-    if world["key_card"].transitive_in("well_shaft") :
+quickdef(world, "key card", "thing", {
+        Name : "blue key card", 
+        Words : ["blue", "key", "@card", "@keycard"],
+        Description : """Like a blue credit card, but has super secret
+        flotation protection.  Along the body of the key card is the
+        writing 'Super Secret Express Elevator Access Card.'"""
+        })
+world.activity.put_in("key card", "well shaft")
+
+@before(Taking(actor, "key card"))
+def _before_taking_key_card(actor, ctxt) :
+    if ctxt.world[Contains("well shaft", "key card")] :
         raise AbortAction("It is too far down in the well to reach.")
 
-bucket = world.new_obj("bucket", BObject, "bucket",
-"""It is a tin bucket and looks like it is mostly water tight, except
-for [if [not [get bucket plugged]]]a hole[else]an insignificant
-plugged hole[endif] near the bottom.[if [when bucket in animal_trap]]
-It is hanging from a branch as part of the animal trap.[else][if [when
-bucket attachedto animal_trap_catch]] It is still connected to the
-catch by a rope.[else] It has a length of rope attached to its
-handle.[endif][endif]""")
-bucket["words"] = ["@bucket", "@pail"]
-bucket["plugged"] = True
-bucket.move_to("animal_trap") # putting code next to well for puzzle clarity
+@world.define_property
+class Plugged(Property) :
+    """Represents whether the thing is plugged.  Used for the
+    bucket."""
+    numargs = 1
 
-bucket_hole = world.new_obj("bucket_hole", Scenery, "hole",
-"""[if [get bucket plugged]]Bits of stuff fill the hole, limiting any
-water flow.[else]The hole is a good enough size to let the water out
-of the bucket rather quickly.[endif]""")
-bucket_hole.move_to(bucket)
+# putting bucket code next to well for puzzle clarity
+quickdef(world, "bucket", "container", {
+        Words : ["@bucket", "@pail"],
+        Plugged : True,
+        Description : """It is a tin bucket and looks like it is
+        mostly water tight, except for [if [not [get Plugged
+        bucket]]]a hole[else]an insignificant plugged hole[endif] near
+        the bottom.[if [when animal_trap Contains bucket]] It is
+        hanging from a branch as part of the animal trap.[else][if
+        [when bucket AttachedTo animal_trap_catch]] It is still
+        connected to the catch by a rope.[else] It has a length of
+        rope attached to its handle.[endif][endif]"""
+        })
 
-class Unplug(BasicAction) :
+world.activity.make_part_of("bucket", "animal trap")
+
+quickdef(world, "bucket hole", "thing", {
+        Name : "hole",
+        Description : """[if [get Plugged bucket]]Bits of stuff fill
+        the hole, limiting any water flow.[else]The hole is a good
+        enough size to let the water out of the bucket rather
+        quickly.[endif]"""
+        })
+world.activity.make_part_of("bucket hole", "bucket")
+
+class Unplugging(BasicAction) :
+    """Unplugging(actor, X)."""
     verb = "unplug"
     gerund = "unplugging"
-understand("unplug [something x]", Unplug(actor, x))
-understand("unclog [something x]", Unplug(actor, x))
-xobj_held(Unplug(actor, x))
+    numargs = 2
+parser.understand("unplug/unclog [something x]", Unplugging(actor, X))
+require_xobj_held(actionsystem, Unplugging(actor, X))
 
-@before(Unplug(actor, BObject(x)))
-def _before_unplug(actor, x, context) :
+@before(Unplugging(actor, X))
+def _before_unplugging(actor, x, ctxt) :
     try :
-        plugged = x["plugged"]
+        plugged = ctxt.world[Plugged(x)]
         if not plugged :
             raise AbortAction(str_with_objs("[The $x] has already been unplugged.", x=x))
     except KeyError :
         raise AbortAction("That cannot be unplugged.")
 
-@when(Unplug(actor, BObject(x)))
-def _when_unplug(actor, x, context) :
-    x["plugged"] = False
+@when(Unplugging(actor, X))
+def _when_unplugging(actor, x, ctxt) :
+    ctxt.world[Plugged(x)] = False
 
-@after(Unplug(actor, BObject(x)))
-def _after_unplug(actor, x, context) :
-    context.write_line(str_with_objs("""You dislodge little twigs and
-                                     bits of cloth from [the $x],
-                                     unplugging the hole.""", x=x))
+@report(Unplugging(actor, X))
+def _report_unplug(actor, x, ctxt) :
+    ctxt.write(str_with_objs("""You dislodge little twigs and bits of
+                             cloth from [the $x], unplugging the hole.""", x=x))
 
-@verify(Unplug(actor, bucket_hole))
-def _verify_unplug_bucket_hole(actor, context) :
-    raise DoInstead(Unplug(actor, "bucket"))
+@verify(Unplugging(actor, "bucket hole"))
+def _verify_unplugging_bucket_hole(actor, ctxt) :
+    raise ActionHandled(ctxt.actionsystem.verify_action(Unplugging(actor, "bucket"), ctxt))
 
-understand("drop [object bucket] in [something x]", InsertInto(actor, "bucket", x))
-understand("drop [object bucket] into [something x]", InsertInto(actor, "bucket", x))
+@before(Unplugging(actor, "bucket hole"))
+def _before_unplugging_bucket_hole(actor, ctxt) :
+    raise DoInstead(Unplugging(actor, "bucket"))
 
-@before(Drop(actor, bucket))
-def _before_drop_bucket(actor, context) :
-    if actor.s_R_x(In, "room_well") :
-        raise DoInstead(InsertInto(actor, "bucket", "well_shaft"))
+parser.understand("drop [something x] in/into [object well shaft]", InsertingInto(actor, X, "well shaft"))
 
-@before(InsertInto(actor, bucket, well_shaft))
-def _before_insertinto_bucket_well(actor, context) :
+@before(Dropping(actor, "bucket") <= PEquals(Location(actor), "room_well"))
+def _before_dropping_bucket(actor, ctxt) :
+    raise DoInstead(InsertingInto(actor, "bucket", "well shaft"))
+
+@when(InsertingInto(actor, "bucket", "well shaft"))
+def _when_insertinginto_bucket_well(actor, ctxt) :
+    ctxt.write("You lower [the bucket] into [the <well shaft>].")
+    if ctxt.world[Location("key card")] == "well shaft" :
+        ctxt.world.activity.put_in("key card", "bucket")
+        ctxt.write("The key card floats into the bucket.")
+
+@report(InsertingInto(actor, "bucket", "well shaft"))
+def _report_insertinginto_bucket_well(actor, ctxt) :
+    """We needed to report it in the "when" because of the possibility
+    of the key card floating into the bucket."""
     raise ActionHandled()
 
-@when(InsertInto(actor, bucket, well_shaft))
-def _when_insertinto_bucket_well(actor, context) :
-    bucket = world["bucket"]
-    context.write_line("You put [the bucket] into [the well_shaft].")
-    bucket.move_to("well_shaft")
-    key_card = world["key_card"]
-    if key_card.s_R_x(In, "well_shaft") :
-        key_card.move_to("bucket")
-        context.write_line("The key card floats into the bucket.")
-
-@before(InsertInto(actor, key_card, bucket))
-def _before_insert_key_into_bucket(actor, context) :
-    raise AbortAction("You don't want to put that back in.")
-
-@when(Take(actor, bucket))
-def _when_take_bucket(actor, context) :
-    bucket = world["bucket"]
-    key_card = world["key_card"]
-    if key_card.s_R_x(In, bucket) and bucket.s_R_x(In, "well_shaft") :
-        if bucket["plugged"] :
-            key_card.move_to(well_shaft)
-            context.write_line("""The key floated out of the bucket
-            due to excess water on the way up.""")
+@when(Taking(actor, "bucket"))
+def _when_taking_bucket(actor, ctxt) :
+    if ctxt.world[Location("key card")] == "bucket" and ctxt.world[Location("bucket")] == "well shaft" :
+        if ctxt.world[Plugged("bucket")] :
+            ctxt.world.activity.put_in("key card", "well shaft")
+            ctxt.write("""The key floated out of the bucket due to
+            excess water on the way up.[newline]""")
         else :
-            context.write_line("""The water drains through the hole
-            and leaves the key card within the metallic walls of the
-            bucket.""")
+            ctxt.write("""The water drains through the hole and leaves
+            the key card within the metallic walls of the bucket.[newline]""")
 
 ###
 ### The Jungle Area
 ###
 
-region_jungle = world.new_obj("region_jungle", Region, "The Jungle Area")
-region_jungle.add_rooms(["room_jungle", "room_helicopter_pad",
-                         "room_clearing", "room_crevice"])
+quickdef(world, "region_jungle", "region")
+world.activity.put_in("room_jungle", "region_jungle")
+world.activity.put_in("room_helicopter_pad", "region_jungle")
+world.activity.put_in("room_clearing", "region_jungle")
+world.activity.put_in("room_crevice", "region_jungle")
 
-@before(Go(actor, direction))
-def _before_go_village_area(actor, direction, context) :
-    if actor.transitive_in("region_jungle") :
-        if not actor.get_location().get_exit(direction) :
-            raise AbortAction("""The jungle is too thick.  Besides,
-            the wild animals might be dangerous.""")
+world[NoGoMessage(X, direction) <= Contains("region_jungle", X)] = """
+The jungle is too thick.  Besides, the wild animals might be
+dangerous."""
 
 ##
 ## The Jungle
 ##
 
-room_jungle = world.new_obj("room_jungle", Room, "The Jungle",
-"""This is a crossroad of sorts in the middle of a bunch of nearly
-impenetrable trees.  The trees occlude enough light to make it very
-dark.  An animal trap is dimly visible on a tree.  Trails lead north,
-south, east, and west.""")
+quickdef(world, "room_jungle", "room", {
+        Name : "The Jungle",
+        Description : """This is a crossroad of sorts in the middle of
+        a bunch of nearly impenetrable trees.  The trees occlude
+        enough light to make it very dark.  An animal trap is dimly
+        visible on a tree.  Trails lead north, south, east, and
+        west."""
+        })
 
-jungle_tree = world.new_obj("jungle_tree", Scenery, "tree",
-"""It is very... woody... and has leaves.  Hanging from the tree is a
-trap.""")
-jungle_tree.move_to(room_jungle)
+quickdef(world, "jungle_tree", "thing", {
+        Name : "tree",
+        Scenery : True,
+        Description : """It is very... woody... and has leaves.
+        Hanging from the tree is a trap."""
+        })
+world.activity.put_in("jungle_tree", "room_jungle")
 
-@before(Climb(actor, jungle_tree))
+@before(Climbing(actor, "jungle_tree"))
 def _before_climb_tree(actor, context) :
-    raise AbortAction("That would be too simple.")
+    raise AbortAction("That would be far too simple.")
 
-animal_trap = world.new_obj("animal_trap", BObject, "animal trap",
-"""It consists of a bucket hanging from a branch with a loop of rope
-running down to a catch.  It is rough but workable.""")
-animal_trap["takeable"] = False
-animal_trap.move_to(jungle_tree)
+quickdef(world, "animal trap", "thing", {
+        Scenery : True,
+        Description : """It consists of a bucket hanging from a branch
+        with a loop of rope running down to a catch.  It is rough but
+        workable."""
+        })
+world.activity.put_in("animal trap", "room_jungle")
 
-animal_trap_catch = world.new_obj("animal_trap_catch", BObject, "catch",
-"""It looks like it would be set off by something roughly fish sized.
-That's odd engineering -- when would a fish be running through a
-jungle?""")
-animal_trap_catch.move_to(animal_trap)
+quickdef(world, "animal_trap_catch", "thing", {
+        Name : "catch",
+        Description : """It looks like it would be set off by
+        something roughly fish sized.  That's odd engineering -- when
+        would a fish be running through a jungle?"""
+        })
+world.activity.make_part_of("animal_trap_catch", "animal trap")
 
-new_rope = world.new_obj("new_rope", Scenery, "new rope",
-"""It is attached to the bucket and the catch and is used as the
-bucket retainer when the trap is set.""")
-new_rope.move_to(animal_trap)
-prop_set_attached(world, new_rope, animal_trap)
+quickdef(world, "new rope", "thing", {
+        Description : """It is attached to the bucket and the catch
+        and is used as the bucket retainer when the trap is set."""
+        })
+world.activity.make_part_of("new rope", "animal trap")
 
-prop_set_attached(world, bucket, new_rope)
+world.activity.attach_to("bucket", "new rope")
 
-class MakeTrapGoWith(BasicAction) :
-    verb = "make trap go"
-    gerund = "making the trap go with"
-understand("make [object animal_trap] go with [something x]", MakeTrapGoWith(actor, x))
-understand("set [object animal_trap] with [something x]", MakeTrapGoWith(actor, x))
-understand("set [object animal_trap] off with [something x]", MakeTrapGoWith(actor, x))
-understand("put [something x] in [object animal_trap]", MakeTrapGoWith(actor, x))
-understand("throw [something x] on [object animal_trap]", MakeTrapGoWith(actor, x))
-understand("make [object animal_trap_catch] go with [something x]", MakeTrapGoWith(actor, x))
-understand("set [object animal_trap_catch] with [something x]", MakeTrapGoWith(actor, x))
-understand("set [object animal_trap_catch] off with [something x]", MakeTrapGoWith(actor, x))
-understand("put [something x] on [object animal_trap_catch]", MakeTrapGoWith(actor, x))
-understand("throw [something x] on [object animal_trap_catch]", MakeTrapGoWith(actor, x))
+class MakingTrapGoWith(BasicAction) :
+     verb = "make trap go"
+     gerund = "making the trap go with"
+     numargs = 2
+parser.understand("make [object animal trap] go with [something x]", MakingTrapGoWith(actor, X))
+parser.understand("set [object animal trap] with [something x]", MakingTrapGoWith(actor, X))
+parser.understand("set [object animal trap] off with [something x]", MakingTrapGoWith(actor, X))
+parser.understand("throw [something x] in/on/into [object animal trap]", MakingTrapGoWith(actor, X))
+parser.understand("make [object animal_trap_catch] go with [something x]", MakingTrapGoWith(actor, X))
+parser.understand("set [object animal_trap_catch] with [something x]", MakingTrapGoWith(actor, X))
+parser.understand("set [object animal_trap_catch] off with [something x]", MakingTrapGoWith(actor, X))
+parser.understand("throw [something x] in/on/into [object animal_trap_catch]", MakingTrapGoWith(actor, X))
 
-@before(InsertInto(actor, x, BObject(y)))
-def _before_insert_animal_trap(actor, x, y, context) :
-    if y == "animal_trap" or y == "animal_trap_catch" :
-        raise DoInstead(MakeTrapGoWith(x), suppress_message=True)
+@before(InsertingInto(actor, X, Y))
+@before(PlacingOn(actor, X, Y))
+def _before_insert_or_placing_animal_trap(actor, x, y, ctxt) :
+    if y in ["animal trap", "animal_trap_catch"] :
+        raise DoInstead(MakingTrapGoWith(actor, x), suppress_message=True)
 
-xobj_held(MakeTrapGoWith(actor, x))
+require_xobj_held(actionsystem, MakingTrapGoWith(actor, X))
 
-@before(MakeTrapGoWith(actor, BObject(x)))
-def _before_maketrapgo(actor, x, context) :
-    if actor.get_location() == "room_jungle" :
-        if world["bucket"].s_R_x(In, "animal_trap") :
+@before(MakingTrapGoWith(actor, X))
+def _before_makingtrapgo(actor, x, ctxt) :
+    if ctxt.world[Location(actor)] == "room_jungle" :
+        if ctxt.world.query_relation(PartOf("bucket", "animal trap")) :
             if x == "the_fish" :
                 raise ActionHandled()
             else :
@@ -610,436 +662,478 @@ def _before_maketrapgo(actor, x, context) :
     else :
         raise AbortAction("You don't see a trap around here.")
 
-@when(MakeTrapGoWith(actor, x))
-def _when_maketrapgo(actor, x, context) :
-    remove_obj(context.world["the_fish"])
-    context.world["bucket"].move_to("room_jungle")
+@when(MakingTrapGoWith(actor, X))
+def _when_makingtrapgo(actor, x, ctxt) :
+    ctxt.world.activity.remove_obj("the_fish")
+    ctxt.world.activity.put_in("bucket", "room_jungle")
 
-@after(MakeTrapGoWith(actor, x))
-def _after_maketrapgo(actor, x, context) :
-    context.write_line("""Upon putting the fish on the catch, the rope
-    was released and the bucket fell with a clang from the tree,
-    landing on the ground, just missing the fish.  It didn't even land
+@report(MakingTrapGoWith(actor, X))
+def _report_makingtrapgo(actor, x, ctxt) :
+    ctxt.write("""Upon putting the fish on the catch, the rope was
+    released and the bucket fell with a clang from the tree, landing
+    on the ground, just missing the fish.  It didn't even land
     open-mouth-side-down.  As soon as this happened, a small jungle
     animal ran by and absconded with the flounder.""")
 
-@before(Cut(actor, "new_rope"))
-def _before_cut_rope_default(actor, context) :
+@before(Cutting(actor, "new rope"))
+def _before_cutting_rope_default(actor, ctxt) :
     raise AbortAction("What, with your hands?")
 
-@before(CutWith(actor, new_rope, BObject(y)))
-def _before_cutwith_rope_default(actor, y, context) :
-    raise AbortAction(str_with_objs("[the $y] isn't sharp enough to cut cooked pasta.", y=y))
+@before(CuttingWith(actor, "new rope", Y))
+def _before_cuttingwith_rope_default(actor, y, ctxt) :
+    raise AbortAction(str_with_objs("[The $y] isn't sharp enough to cut cooked pasta.", y=y), actor=actor)
 
-@before(CutWith(actor, new_rope, "knife"))
-def _before_cutwith_rope_knife(actor, context) :
-    if world["bucket"].s_R_x(In, "animal_trap") :
-        raise AbortAction("You can't get to it while it's hanging from the branch.")
+@before(CuttingWith(actor, "new rope", "knife"))
+def _before_cuttingwith_rope_knife(actor, ctxt) :
+    if ctxt.world.query_relation(PartOf("bucket", "animal trap")) :
+        raise AbortAction("You can't get to it while it's hanging up in the tree.")
     else :
         raise ActionHandled()
 
-@when(CutWith(actor, new_rope, "knife"))
-def _when_cutwith_rope_knife(actor, context) :
-    bucket = context.world["bucket"]
-    prop_detach(context.world, bucket)
-    bucket.give_to(actor)
-    remove_obj(context.world["new_rope"])
-    context.write_line(str_with_objs("""It takes a bit of time, as
-    [the $y] is only somewhat existent, but eventually the rope is
-    severed, freeing the bucket.\n\nTaken.""", y="knife"))
+@when(CuttingWith(actor, "new rope", "knife"))
+def _when_cuttingwith_rope_knife(actor, ctxt) :
+    ctxt.world.activity.detach("bucket")
+    ctxt.world.activity.give_to("bucket", actor)
+    ctxt.world.activity.remove_obj("new rope")
+    ctxt.write(str_with_objs("""It takes a bit of time, as [the $y] is
+    only somewhat existent, but eventually the rope is severed,
+    freeing the bucket.[newline]Taken.""", y="knife"), actor=actor)
 
 ##
 ## Helicopter pad
 ##
 
-room_helicopter_pad = world.new_obj("room_helicopter_pad", Room, "The Helicopter Pad",
-"""Lying on the ground is a small tarmac, square in shape, and it has
-the markings as that of a helicopter pad -- a large circle with an
-inscribed capital letter H.  This previous information is unnecessary
-for the determination of the tarmac being a helicopter pad as a large
-helicopter is presently sitting on the said tarmac.  A trail leads
-south.""")
-room_helicopter_pad.connect(room_jungle, "south")
+quickdef(world, "room_helicopter_pad", "room", {
+        Name : "The Helicopter Pad",
+        Description : """Lying on the ground is a small tarmac, square
+        in shape, and it has the markings as that of a helicopter pad
+        -- a large circle with an inscribed capital letter H.  This
+        previous information is unnecessary for the determination of
+        the tarmac being a helicopter pad as a large helicopter is
+        presently sitting on the said tarmac.  A trail leads south."""
+        })
+world.activity.connect_rooms("room_helicopter_pad", "south", "room_jungle")
 
-tarmac = world.new_obj("tarmac", Scenery, "tarmac",
-"""A cement helicopter landing square of a good size with the standard
-writing signifying it is a cement helicopter landing square.""")
-tarmac.move_to(room_helicopter_pad)
+quickdef(world, "tarmac", "thing", {
+        Scenery : True,
+        Description : """A cement helicopter landing square of a good
+        size with the standard writing signifying it is a cement
+        helicopter landing square."""
+        })
+world.activity.put_in("tarmac", "room_helicopter_pad")
 
-bell_helicopter = world.new_obj("bell_helicopter", BObject, "Bell helicopter",
-"A large helicopter.")
-bell_helicopter["words"] = ["bell", "@helicopter", "@copter"]
-bell_helicopter["takeable"] = False
-bell_helicopter.move_to(room_helicopter_pad)
+quickdef(world, "bell helicopter", "container", {
+        Words : ["bell", "@helicopter", "@copter"],
+        Scenery : True,
+        NoTakeMessage : "That's too big to take.",
+        IsEnterable : True,
+        Description : "A large helicopter."
+        })
+world.activity.put_in("bell helicopter", "room_helicopter_pad")
 
-penny = world.new_obj("penny", BObject, "penny",
-"""A small copper penny.  It was made long before the 70s so there is
-no zinc center, making this a great conductor.  Plus, you're lucky:
-Lincoln is face up.""")
-penny.move_to(room_helicopter_pad)
+quickdef(world, "penny", "thing", {
+        Description : """A small copper penny.  It was made long
+        before the 70s so there is no zinc center, making this a great
+        conductor.  Plus, you're lucky: Lincoln is face up."""
+        })
+world.activity.put_in("penny", "room_helicopter_pad")
 
 ##
 ## The Clearing
 ##
 
-room_clearing = world.new_obj("room_clearing", Room, "The Clearing",
-"""Not much to see here except for a single manhole exactly in the
-center of the cleared jungle.  [if [get valve switched_on]]You can
-hear the hissing of steam coming from the pipe running from the west
-into the ground.[else]A pipe runs from the west into the ground.
-[endif][if [when good_fronds in room_clearing]] A few palm fronds
-litter the ground.[endif]""")
-room_clearing.connect(room_jungle, "east")
+quickdef(world, "room_clearing", "room", {
+        Name : "The Clearing",
+        Description : """Not much to see here except for a single
+        manhole exactly in the center of the cleared jungle.  [if [get
+        IsSwitchedOn valve]]You can hear the hissing of steam coming
+        from the pipe running from the west into the ground.[else]A
+        pipe runs from the west into the ground.[endif]"""
+        })
+world.activity.connect_rooms("room_clearing", "east", "room_jungle")
 
-good_fronds = world.new_obj("good_fronds", BObject, "good palm fronds",
-"""It looks like they were cut right from the tree.  It looks like
-they'd block sunlight very well.""")
-good_fronds["indefinite_name"] = "some good palm fronds"
-good_fronds.move_to(room_clearing)
-good_fronds["reported"] = False
-@when(Take(actor, good_fronds))
-def _when_take_fronds(actor, context) :
-    context.world["good_fronds"]["reported"] = True
+quickdef(world, "good_fronds", "thing", {
+        Name : "good palm fronds",
+        NotableDescription : "A few palm fronds litter the ground.",
+        Description : """It seems they were cut right from the tree,
+        and it looks like they'd block sunlight very well.""",
+        IndefiniteName : "some good palm fronds"
+        })
+world.activity.put_in("good_fronds", "room_clearing")
 
-clearing_pipe = world.new_obj("clearing_pipe", Scenery, "brass pipe",
-"""The brass pipe runs into the ground from the west[if [get valve
-switched_on]], and it is hissing[endif].""")
-clearing_pipe.move_to(room_clearing)
+quickdef(world, "clearing_pipe", "thing", {
+        Name : "brass pipe",
+        Scenery : True,
+        Description : """The brass pipe runs into the ground from the
+        west[if [get IsSwitchedOn valve]], and it is
+        hissing[endif]."""
+        })
+world.activity.put_in("clearing_pipe", "room_clearing")
 
-manhole = world.new_obj("manhole", Door, "manhole",
-"""A circular metal covering with a circular rotary handle which
-happens to look a little weathered and rusty.  It is [get manhole
-is_open_msg].""")
-manhole["words"] = ["rotary", "@handle", "@manhole"]
-manhole["lockable"] = True
-manhole["locked"] = True
-manhole.add_exit_for(room_clearing, "down")
-manhole.unlockable_with(driftwood)
-manhole["no_enter_msg"] = """You try and you try, but you can not seem
-to pass through solid metal.  Try opening it first."""
-manhole["unlock_needs_key_msg"] = manhole["no_open_msg"] = """
-The manhole door and handle are too rusty to open by hand.  Maybe
-something could be used for leverage."""
-manhole["wrong_key_msg"] = """That doesn't give you enough leverage."""
+quickdef(world, "manhole", "door", {
+        Words : ["rotary", "@handle", "@manhole"],
+        Reported : False,
+        Lockable : True,
+        IsLocked : True,
+        KeyOfLock : "driftwood",
+        NoEnterMessage : """You try and you try, but you can not seem
+        to pass through solid metal.  Try opening it first.""",
+        Description : """A circular metal covering with a circular
+        rotary handle which happens to look a little weathered and
+        rusty.  It is [get IsOpenMsg manhole]."""
+        })
+world[NoLockMessages("manhole", "no_open")] = """The manhole door and
+handle are too rusty to open by hand.  Maybe something could be used
+for leverage."""
+world[WrongKeyMessages("manhole", X)] = """That doesn't give you
+enough leverage."""
+world.activity.connect_rooms("room_clearing", "down", "manhole")
 
-@when(Go(actor, "down"))
-def _when_after_down_manhole(actor, context) :
-    if actor.get_location() == "room_clearing" :
-        context.write_line("You climb some ways down a ladder into...")
+@when(Going(actor, "down") <= Contains("room_clearing", actor))
+def _when_going_down_manhole(actor, ctxt) :
+    ctxt.write("You climb some ways down a ladder into...")
 
-@before(OpenWith(actor, "manhole", "driftwood"))
-def _before_openwith_manhole(actor, context) :
-    raise DoInstead(UnlockWith(actor, "manhole", "driftwood"), suppress_message=True)
-
-@when(UnlockWith(actor, "manhole", "driftwood"))
-def _when_unlock_manhole(actor, context) :
-    manhole = context.world["manhole"]
-    manhole["lockable"] = False
-    remove_obj(world["driftwood"])
+@when(UnlockingWith(actor, "manhole", "driftwood"))
+def _when_unlock_manhole(actor, ctxt) :
+    ctxt.world[Lockable("manhole")] = False
+    ctxt.world.activity.remove_obj("driftwood")
     # manhole is set to unlocked by UnlockWith handler
-    manhole["open"] = True
-@after(UnlockWith(actor, "manhole", "driftwood"))
-def _after_unlock_manhole(actor, context) :
-    context.write_line("""The extra torque garnered by the length of
-    the driftwood frees the handle from the rust.  The manhole
-    opens, but your driftwood splinters.\n\nOpened.""")
+    ctxt.world[IsOpen("manhole")] = True
+@report(UnlockingWith(actor, "manhole", "driftwood"))
+def _report_unlock_manhole(actor, ctxt) :
+    ctxt.write("""The extra torque garnered by the length of the
+    driftwood frees the handle from the rust.  The manhole opens, but
+    your driftwood splinters.[newline]Opened.""")
     raise ActionHandled()
 
 ##
 ## The Crevice
 ##
 
-room_crevice = world.new_obj("room_crevice", Room, "The Crevice",
-"""Wisps of steam are eminating from a deep fissure in the ground.
-They dissolve among a pleasantly annoying hiss.  A single pipe runs
-east toward the nondescript clearing.  [if [get valve switched_on]]It
-sounds like steam is rushing through the pipe.[endif]""")
-room_crevice.connect(room_clearing, "east")
+quickdef(world, "room_crevice", "room", {
+        Name : "The Crevice",
+        Description : """Wisps of steam are eminating from a deep
+        fissure in the ground.  They dissolve among a pleasantly
+        annoying hiss.  A single pipe runs east toward the nondescript
+        clearing.  [if [get IsSwitchedOn valve]]It sounds like steam
+        is rushing through the pipe.[endif]"""
+        })
+world.activity.connect_rooms("room_crevice", "east", "room_clearing")
 
-fissure = world.new_obj("fissure", Scenery, "fissure",
-"""The fissure is very deep.  The pipe extends down farther than the
-eye can see with steam swirling about.  It may seem crazy, but it
-almost seems like there are stars and entire universes far below.
-Maybe they are just fireflies.""")
-fissure["words"] = ["@fissure", "@crevice"]
-fissure.move_to(room_crevice)
+quickdef(world, "fissure", "thing", {
+        Words : ["@fissure", "@crevice"],
+        Scenery : True,
+        Description : """The fissure is very deep.  The pipe extends
+        down farther than the eye can see with steam swirling about.
+        It may seem crazy, but it almost seems like there are stars
+        and entire universes far below.  Maybe they are just
+        fireflies."""
+        })
+world.activity.put_in("fissure", "room_crevice")
 
-pipe = world.new_obj("pipe", Scenery, "brass pipe",
-"""A[if [get valve switched_on]]hissing[endif] brass pipe runs from
-deep within the earth to the east.[if [when pile_palm_fronds in
-room_crevice]] A pile of fronds is covering a segment of the
-pipe.[else] Partway down the pipe is a matching brass valve.[endif]""")
-pipe.move_to(room_crevice)
+quickdef(world, "pipe", "thing", {
+        Name : "brass pipe",
+        Scenery : True,
+        Description : """A[if [get IsSwitchedOn valve]] hissing[endif]
+        brass pipe runs from deep within the earth to the east.[if
+        [when room_crevice Contains pile_palm_fronds]] A pile of
+        fronds is covering a segment of the pipe.[else] Partway down
+        the pipe is a matching brass valve.[endif]"""
+        })
+world.activity.put_in("pipe", "room_crevice")
 
-pile_palm_fronds = world.new_obj("pile_palm_fronds", BObject, "pile of palm fronds",
-"""A pile of palm fronds covering the pipe.""")
-pile_palm_fronds.move_to(room_crevice)
-understand("move [object pile_palm_fronds]", Take(actor, "pile_palm_fronds"))
+quickdef(world, "pile_palm_fronds", "thing", {
+        Name : "pile of palm fronds",
+        Description : """A pile of palm fronds covering the pipe."""
+        })
+world.activity.put_in("pile_palm_fronds", "room_crevice")
+parser.understand("move [object pile_palm_fronds]", Taking(actor, "pile_palm_fronds"))
 
-@when(Take(actor, pile_palm_fronds))
-def _when_take_pile_palms(actor, context) :
-    remove_obj(context.world["pile_palm_fronds"])
-    context.world["valve"].move_to("room_crevice")
+@when(Taking(actor, "pile_palm_fronds"))
+def _when_taking_pile_palms(actor, ctxt) :
+    ctxt.world.activity.remove_obj("pile_palm_fronds")
+    ctxt.world.activity.make_part_of("valve", "pipe")
     raise ActionHandled()
-@after(Take(actor, pile_palm_fronds))
-def _after_take_pile_palms(actor, context) :
-    context.write_line("""The palm fronds just disperse in every
-    direction, revealing a small brass valve.""")
+@report(Taking(actor, "pile_palm_fronds"))
+def _report_take_pile_palms(actor, ctxt) :
+    ctxt.write("""The palm fronds just disperse in every direction,
+    revealing a small brass valve.""")
     raise ActionHandled()
 
-valve = world.new_obj("valve", Device, "brass valve",
-"""A standard small-handled valve.""")
-valve["switched_on"] = False
-valve["switch_on_msg"] = """Opening the valve releases a continuous
-hiss of steam into the pipe."""
-valve["switch_off_msg"] = """The hiss abruptly stops."""
+quickdef(world, "valve", "thing", {
+        Name : "brass valve",
+        Switchable : True,
+        IsSwitchedOn : False,
+        Description : """A standard small-handled valve."""
+        })
 
-understand("turn [object valve]", Switch(actor, "valve"))
-understand("open [object valve]", SwitchOn(actor, "valve"))
-understand("close [object valve]", SwitchOff(actor, "valve"))
+@report(SwitchingOn(actor, "valve"))
+def report_switching_on_valve(actor, ctxt) :
+    ctxt.write("""Opening the valve releases a continuous hiss of
+    steam into the pipe.""")
+    raise ActionHandled()
+
+@report(SwitchingOff(actor, "valve"))
+def report_switching_on_valve(actor, ctxt) :
+    ctxt.write("""The hissing abruptly stops.""")
+    raise ActionHandled()
+
+parser.understand("open [object valve]", SwitchingOn(actor, "valve"))
+parser.understand("close [object valve]", SwitchingOff(actor, "valve"))
 
 ###
 ### Underground area
 ###
 
-region_underground = world.new_obj("region_underground", Region, "Underground Area")
-region_underground.add_rooms(["room_power_station", "room_transmission"])
+quickdef(world, "region_underground", "region")
+world.activity.put_in("room_power_station", "region_underground")
+world.activity.put_in("room_transmission", "region_underground")
 
-conduit = world.new_obj("conduit", Scenery, "thick metal conduit",
-"""Each cable is as thick as and in the general form of a twinkie and
-is covered in as many layers of insulation and packing materials.""")
-conduit["words"] = ["think", "metal", "@conduit", "@cable", "@cables"]
-conduit.move_to(region_underground)
+quickdef(world, "conduit", "backdrop", {
+        Name : "thick metal conduit",
+        Words : ["think", "metal", "@conduit", "@cable", "@cables"],
+        BackdropLocations : ["region_underground"],
+        Description : """Each cable is as thick as and in the general
+        form of a twinkie and is covered in as many layers of
+        insulation and packing materials."""
+        })
 
-class UndergroundDefinitions(NonGameObject) :
-    @addproperty()
-    def transformer_on(self) :
-        return (self.world["valve"]["switched_on"]
-                and self.world["penny"].s_R_x(In, "fuse_receptacle")
-                and self.world["knife_switch"]["switched_on"])
-underground_defs = world.new_obj("underground_defs", UndergroundDefinitions)
+@world.handler(Global("transformer_on"))
+def global_transformer_on(world) :
+    return (world[IsSwitchedOn("valve")]
+            and world[Location("penny")] == "fuse_receptacle"
+            and world[IsSwitchedOn("knife_switch")])
 
 ##
 ## Power station
 ##
 
-room_power_station = world.new_obj("room_power_station", Room, "The Power Station",
-"""The pipes from above run along the ladder you came down into a
-large steam turbine.  The air is very murky with swirls of steam
-percolating from the myriad of pipes.  The turbine is [if [get valve
-switched_on]]currently clattering and sputtering from the flow of
-steam from above[else]ominously silent[endif]. A shielded pair of
-cables runs from the generator to the north.""")
+quickdef(world, "room_power_station", "room", {
+        Name : "The Power Station",
+        Description : """The pipes from above run along the ladder you
+        came down into a large steam turbine.  The air is very murky
+        with swirls of steam percolating through the myriad of pipes.
+        The turbine is [if [get IsSwitchedOn valve]]currently
+        clattering and sputtering from the flow of steam from
+        above[else]ominously silent[endif]. A shielded pair of cables
+        runs from the generator to the north."""
+        })
+world.activity.connect_rooms("manhole", "down", "room_power_station")
 
-manhole.add_exit_for(room_power_station, "up")
+quickdef(world, "ladder", "thing", {
+        Scenery : True,
+        Description : """It's the ladder you came down."""
+        })
+world.activity.put_in("ladder", "room_power_station")
 
-ladder = world.new_obj("ladder", Scenery, "ladder",
-"""It's the ladder you came down.""")
-ladder.move_to(room_power_station)
+@before(Climbing(actor, "ladder"))
+def _before_climb_ladder(actor, ctxt) :
+    raise DoInstead(Going(actor, "up"), suppress_message=True)
 
-@before(Climb(actor, "ladder"))
-def _before_climb_ladder(actor, context) :
-    raise DoInstead(Go(actor, "up"), suppress_message=True)
+@when(Going(actor, "up") <= Contains("room_power_station", actor))
+def _when_going_up_manhole(actor, ctxt) :
+    ctxt.write("You climb up the ladder to...")
 
-@when(Go(actor, "up"))
-def _when_after_down_manhole(actor, context) :
-    if actor.get_location() == "room_power_station" :
-        context.write_line("You climb up the ladder to...")
-
-steam_generator = world.new_obj("steam_generator", Scenery, "steam turbine",
-"""A brass power generation relic riveted together.[if [get valve
-switched_on]] From within the depths of the device, the sound of
-spinning and banging metal can be heard.  Signs of electricity can be
-seen in the form of sparks.[else] It is silent.[endif] A thick metal
-conduit runs out of the device.""")
-steam_generator["words"] = ["steam", "@generator", "@turbine"]
-steam_generator.move_to(room_power_station)
+quickdef(world, "steam_generator", "thing", {
+        Name : "steam turbine",
+        Words : ["steam", "@generator", "@turbine"],
+        Scenery : True,
+        Description : """A brass power generation relic riveted
+        together.[if [get IsSwitchedOn valve]] From within the depths
+        of the device, the sound of spinning and banging metal can be
+        heard.  Signs of electricity can be seen in the form of
+        sparks.[else] It is silent.[endif] A thick metal conduit runs
+        out of the device."""
+        })
+world.activity.put_in("steam_generator", "room_power_station")
 
 ##
 ## Transmission room
 ##
 
-room_transmission = world.new_obj("room_transmission", Room, "The Transmission Room",
-"""[if [get underground_defs transformer_on]]A low frequency hum
-permeates the room; it could make a person go crazy. [endif]A single
-transformer sits in the middle of a room with many conduits and wires
-going to and from the device.  The transformer has some controls.""")
-room_transmission.connect(room_power_station, "south")
+quickdef(world, "room_transmission", "room", {
+        Name : "The Transmission Room",
+        Description : """[if [get Global transformer_on]]A low
+        frequency hum permeates the room; it could make a person go
+        crazy. [endif]A single transformer sits in the middle of a
+        room with many conduits and wires going to and from the
+        device.  The transformer has some controls."""
+        })
+world.activity.connect_rooms("room_transmission", "south", "room_power_station")
 
-transformer = world.new_obj("transformer", Scenery, "transformer",
-"""It is a large, iron-cored transformer wrapped in thousands of turns
-of fine copper wire.  Next to the windings are a few devices: a knife
-switch and an emergency fuse receptacle.  The conduits run from the
-power station into the transformer, and others run from the
-transformer into the ground toward the east.[if [get underground_defs
-transformer_on]] A low hum is eminating from the vibrating magnetic
-coils.[endif]""")
-transformer.move_to(room_transmission)
+quickdef(world, "transformer", "thing", {
+        Scenery : True,
+        Description : """It is a large, iron-cored transformer wrapped
+        in thousands of turns of fine copper wire.  Next to the
+        windings are a few devices: a knife switch and an emergency
+        fuse receptacle.  The conduits run from the power station into
+        the transformer, and others run from the transformer into the
+        ground toward the east.[if [get Global transformer_on]] A low
+        hum is emanating from the vibrating magnetic coils.[endif]"""
+        })
+world.activity.put_in("transformer", "room_transmission")
 
-fuse_receptacle = world.new_obj("fuse_receptacle", Container, "emergency fuse receptacle",
-"""It looks like the last fuse burned out.  It takes circular fuses,
-but if safety is ignored briefly, any circular conductor will do.[if
-[get fuse_receptacle contents]] Currently inside the receptacle
-[is_are_list [get fuse_receptacle contents]][endif].""")
-fuse_receptacle["takeable"] = False
-fuse_receptacle.move_to(transformer)
+quickdef(world, "fuse_receptacle", "container", {
+        Name : "emergency fuse receptacle",
+        Description : """It looks like the last fuse burned out.  It
+        takes circular fuses, but if safety is ignored briefly, any
+        circular conductor will do.[if [get Contents fuse_receptacle]]
+        Currently inside the receptacle [is_are_list [get Contents
+        fuse_receptacle]][endif]."""
+        })
+world.activity.make_part_of("fuse_receptacle", "transformer")
 
-knife_switch = world.new_obj("knife_switch", Device, "knife switch",
-"""A sheet of metal with a handle that is moved between a pair of
-metal contacts to make or break a circuit.  This one is a single-pole,
-single-throw switch.  It is currently [get knife_switch
-is_switched_msg].""")
-knife_switch["takeable"] = False
-knife_switch["switched_on"] = True
-knife_switch.move_to(transformer)
+quickdef(world, "knife_switch", "thing", {
+        Name : "knife switch",
+        Switchable : True,
+        IsSwitchedOn : True,
+        Description : """A sheet of metal with a handle that is moved
+        between a pair of metal contacts to make or break a circuit.
+        This one is a single-pole, single-throw switch.  It is
+        currently [get IsSwitchedOnMsg knife_switch]."""
+        })
+world.activity.make_part_of("knife_switch", "transformer")
 
-@before(InsertInto(actor, x, "fuse_receptacle"))
-def _before_insert_fuse(actor, x, context) :
-    if context.world["knife_switch"]["switched_on"] :
-        raise AbortAction("To prevent electrical shock, you ought to turn off the knife switch.")
+@before(InsertingInto(actor, X, "fuse_receptacle") <= IsSwitchedOn("knife_switch"))
+def _before_inserting_fuse(actor, x, ctxt) :
+    raise AbortAction("To prevent electrical shock, you ought to turn off the knife switch.")
 
-@before(InsertInto(actor, x, "fuse_receptacle"))
-def _before_insert_fuse(actor, x, context) :
-    if context.world["fuse_receptacle"]["contents"] :
-        raise AbortAction("There's already something in the fuse receptacle.")
+@before(InsertingInto(actor, X, "fuse_receptacle") <= Contents("fuse_receptacle"))
+def _before_insert_fuse(actor, x, ctxt) :
+    raise AbortAction("There's already something in the fuse receptacle.")
 
-@after(InsertInto(actor, x, "fuse_receptacle"))
-def _after_insert_fuse(actor, x, context) :
-    context.write_line(str_with_objs("You put [the $x] into [the fuse_receptacle].", x=x))
-    raise ActionHandled()
-
-@after(SwitchOn(actor, "knife_switch"))
-def _after_switchon_knifeswitch(actor, context) :
-    context.write_line("You switch [the knife_switch] on.")
-    if context.world["underground_defs"]["transformer_on"] :
-        context.write_line("A low hum permeates the underground complex.")
+@report(SwitchingOn(actor, "knife_switch"))
+def _report_switchingon_knifeswitch(actor, ctxt) :
+    ctxt.write("You switch on [the knife_switch].", actor=actor)
+    if ctxt.world[Global("transformer_on")] :
+        ctxt.write("A low hum permeates the underground complex.")
     else :
-        context.write_line("Nothing happens.")
+        ctxt.write("Nothing happens.")
     raise ActionHandled()
 
-###
-### The Volcano
-###
+# ###
+# ### The Volcano
+# ###
 
-##
-## West side of volcano
-##
+# ##
+# ## West side of volcano
+# ##
 
-room_west_volcano = world.new_obj("west_volcano", Room, "The Western Side of the Volcano",
-"""This is one side of a volcano.  Acrid smoke is billowing from the
-top of the cinder cone and rolling down the sides.  A secret door is
-hidden on the side of the volcano.""")
-room_west_volcano["no_go_msg"] = "Sulfur-laden rocks bar the way."
-room_west_volcano.connect(room_jungle, "west")
+# room_west_volcano = world.new_obj("west_volcano", Room, "The Western Side of the Volcano",
+# """This is one side of a volcano.  Acrid smoke is billowing from the
+# top of the cinder cone and rolling down the sides.  A secret door is
+# hidden on the side of the volcano.""")
+# room_west_volcano["no_go_msg"] = "Sulfur-laden rocks bar the way."
+# room_west_volcano.connect(room_jungle, "west")
 
-smoke = world.new_obj("smoke", Scenery, "acrid smoke",
-"""The smoke smells strangly of rocket fuel.""")
-smoke.move_to(room_west_volcano)
+# smoke = world.new_obj("smoke", Scenery, "acrid smoke",
+# """The smoke smells strangly of rocket fuel.""")
+# smoke.move_to(room_west_volcano)
 
-elevator_door = world.new_obj("elevator_door", Door, "secret elevator door",
-"""It's secret and express, as the sign above the door does not say.""")
-elevator_door.add_exit_for(room_west_volcano, "east")
-elevator_door["lockable"] = True
-elevator_door["locked"] = True
-elevator_door.unlockable_with(key_card)
+# elevator_door = world.new_obj("elevator_door", Door, "secret elevator door",
+# """It's secret and express, as the sign above the door does not say.""")
+# elevator_door.add_exit_for(room_west_volcano, "east")
+# elevator_door["lockable"] = True
+# elevator_door["locked"] = True
+# elevator_door.unlockable_with(key_card)
 
-secret_sign = world.new_obj("secret_sign", Readable, "secret sign",
-"""In bold, clear writing in carbon dioxide laser writing on titanium,
-the sign says: 'This is not a secret and express elevator door.'""")
-secret_sign["takeable"] = False
-secret_sign["reported"] = False
-secret_sign.move_to(room_west_volcano)
+# secret_sign = world.new_obj("secret_sign", Readable, "secret sign",
+# """In bold, clear writing in carbon dioxide laser writing on titanium,
+# the sign says: 'This is not a secret and express elevator door.'""")
+# secret_sign["takeable"] = False
+# secret_sign["reported"] = False
+# secret_sign.move_to(room_west_volcano)
 
-##
-## Secret Express Elevator
-##
+# ##
+# ## Secret Express Elevator
+# ##
 
-room_secret_elevator = world.new_obj("room_secret_elevator", Room, "The Secret Express Elevator",
-"""Next to the [get elevator_door is_open_msg] elevator door is a
-small control panel with a single button and a small indicator light
-which is currently [if [get underground_defs transformer_on]]on[else]off[endif].""")
-elevator_door.add_exit_for(room_secret_elevator, "west")
+# room_secret_elevator = world.new_obj("room_secret_elevator", Room, "The Secret Express Elevator",
+# """Next to the [get elevator_door is_open_msg] elevator door is a
+# small control panel with a single button and a small indicator light
+# which is currently [if [get underground_defs transformer_on]]on[else]off[endif].""")
+# elevator_door.add_exit_for(room_secret_elevator, "west")
 
-control_panel = world.new_obj("control_panel", Scenery, "control panel",
-"""A brushed aluminum panel.  It is very sparse with only two
-features: a small blue button, and an indicator light which [if [get
-underground_defs transformer_on]]is[else]isn't[endif] currently
-lit.""")
-control_panel.move_to(room_secret_elevator)
+# control_panel = world.new_obj("control_panel", Scenery, "control panel",
+# """A brushed aluminum panel.  It is very sparse with only two
+# features: a small blue button, and an indicator light which [if [get
+# underground_defs transformer_on]]is[else]isn't[endif] currently
+# lit.""")
+# control_panel.move_to(room_secret_elevator)
 
-indicator_light = world.new_obj("indicator_light", Scenery, "small indicator light",
-"""It is a pilot light, red in color.  [if [get underground_defs
-transformer_on]]It is shining brightly.[else]No light is being
-emitted.[endif]""")
-indicator_light.move_to(control_panel)
+# indicator_light = world.new_obj("indicator_light", Scenery, "small indicator light",
+# """It is a pilot light, red in color.  [if [get underground_defs
+# transformer_on]]It is shining brightly.[else]No light is being
+# emitted.[endif]""")
+# indicator_light.move_to(control_panel)
 
-blue_button = world.new_obj("blue_button", BObject, "small blue button",
-"""It's a small blue button on the control panel.  It's glowing
-slightly, eager for you to push it.""")
-blue_button["takeable"] = False
-blue_button.move_to(control_panel)
+# blue_button = world.new_obj("blue_button", BObject, "small blue button",
+# """It's a small blue button on the control panel.  It's glowing
+# slightly, eager for you to push it.""")
+# blue_button["takeable"] = False
+# blue_button.move_to(control_panel)
 
-@before(Push(actor, blue_button))
-def _before_push_blue_button(actor, context) :
-    if context.world["underground_defs"]["transformer_on"] :
-        if world["elevator_door"]["open"] :
-            raise AbortAction("""A voice booms from the control panel:
-                                 'Please close the elevator door.'""")
-        else :
-            raise ActionHandled()
-    else :
-        raise AbortAction("Nothing happens.")
+# @before(Push(actor, blue_button))
+# def _before_push_blue_button(actor, context) :
+#     if context.world["underground_defs"]["transformer_on"] :
+#         if world["elevator_door"]["open"] :
+#             raise AbortAction("""A voice booms from the control panel:
+#                                  'Please close the elevator door.'""")
+#         else :
+#             raise ActionHandled()
+#     else :
+#         raise AbortAction("Nothing happens.")
 
-@when(Push(actor, blue_button))
-def _when_push_blue_button(actor, context) :
-    actor.move_to("room_lab")
+# @when(Push(actor, blue_button))
+# def _when_push_blue_button(actor, context) :
+#     actor.move_to("room_lab")
 
-@after(Push(actor, blue_button))
-def _after_push_blue_button(actor, context) :
-    context.write_line("""The red light begins to blink, and, without
-    warning, a trap door opens up underneath you and deposits you
-    in...""")
-    run_action(Look(actor), context=context)
-    context.write_line("""You get up and recover from the fall.""")
+# @after(Push(actor, blue_button))
+# def _after_push_blue_button(actor, context) :
+#     context.write_line("""The red light begins to blink, and, without
+#     warning, a trap door opens up underneath you and deposits you
+#     in...""")
+#     run_action(Look(actor), context=context)
+#     context.write_line("""You get up and recover from the fall.""")
 
-##
-## The lab
-##
+# ##
+# ## The lab
+# ##
 
-room_lab = world.new_obj("room_lab", Room, "The Lab",
-"""Lots of equipment, all evil.  The horror...""")
+# room_lab = world.new_obj("room_lab", Room, "The Lab",
+# """Lots of equipment, all evil.  The horror...""")
 
-red_button = world.new_obj("red_button", BObject, "large red button",
-"""It looks like nothing good will come out of pushing this button
-that has inscribed lettering of 'Do not push.'""")
-red_button["takeable"] = False
-red_button.move_to(room_lab)
+# red_button = world.new_obj("red_button", BObject, "large red button",
+# """It looks like nothing good will come out of pushing this button
+# that has inscribed lettering of 'Do not push.'""")
+# red_button["takeable"] = False
+# red_button.move_to(room_lab)
 
-@before(Push(actor, red_button))
-def _before_push_red_button(actor, context) :
-    raise ActionHandled()
+# @before(Push(actor, red_button))
+# def _before_push_red_button(actor, context) :
+#     raise ActionHandled()
 
-@when(Push(actor, red_button))
-def _when_push_red_button(actor, context) :
-    finish_game(EndGameWin())
+# @when(Push(actor, red_button))
+# def _when_push_red_button(actor, context) :
+#     finish_game(EndGameWin())
 
 
-###
-### Game endings
-###
+# ###
+# ### Game endings
+# ###
 
-@when(EndGameWin())
-def _end_game_win(context) :
-    context.write_line("""Just kidding, the button actually said 'Do
-    push for a party.'  There was a surprise party for you.  The whole
-    thing was set up because you like adventures.  You ate a lot of
-    cake.
+# @when(EndGameWin())
+# def _end_game_win(context) :
+#     context.write_line("""Just kidding, the button actually said 'Do
+#     push for a party.'  There was a surprise party for you.  The whole
+#     thing was set up because you like adventures.  You ate a lot of
+#     cake.
 
-    You won!""")
+#     You won!""")
 
-###
-### Begin the game
-###
+# ###
+# ### Begin the game
+# ###
 
-if __name__=="__main__" :
-    basic_begin_game(see_world_size=False)
+# if __name__=="__main__" :
+#     basic_begin_game(see_world_size=False)

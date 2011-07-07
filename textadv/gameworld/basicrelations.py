@@ -17,8 +17,16 @@
 # with the position of an object in the world.
 
 @world.define_relation
-class Contains(OneToManyRelation) :
-    """Contains(x,y) for "x Contains y"."""
+@world.define_property
+class Contains(OneToManyRelation, Property) :
+    """Contains(x,y) for "x Contains y".  As a property, represents
+    whether something contains something transitively."""
+    numargs = 2
+
+@world.handler(Contains(X,Y))
+def property_handler_IsA(x, y, world) :
+    """Lets one ask whether X contains Y transitively."""
+    return world.r_path_to(Contains, x, y)
 
 @world.define_relation
 class Supports(OneToManyRelation) :
@@ -46,23 +54,15 @@ def default_put_in(x, y, world) :
     """Called with put_in(x, y).  Puts x into y, first removing all
     Contains, Supports, Has, PartOf, and Wears relations.  This should
     be used for y being a container or a room."""
-    world.remove_relation(Contains(Z, x))
-    world.remove_relation(Supports(Z, x))
-    world.remove_relation(Has(Z, x))
-    world.remove_relation(PartOf(x, Z))
-    world.remove_relation(Wears(Z, x))
+    world.activity.remove_obj(x)
     world.add_relation(Contains(y, x))
 
 # put X on Y (so then Y Supports X)
 @world.to("put_on")
 def default_put_on(x, y, world) :
     """Called with put_on(x, y).  Puts x onto y, first removing all
-    Contains, Supports, Has, PartOf, and Waers relations."""
-    world.remove_relation(Contains(Z, x))
-    world.remove_relation(Supports(Z, x))
-    world.remove_relation(Has(Z, x))
-    world.remove_relation(PartOf(x, Z))
-    world.remove_relation(Wears(Z, x))
+    Contains, Supports, Has, PartOf, and Wears relations."""
+    world.activity.remove_obj(x)
     world.add_relation(Supports(y, x))
 
 # give X to Y (so then Y Has X)
@@ -70,11 +70,7 @@ def default_put_on(x, y, world) :
 def default_give_to(x, y, world) :
     """Called with give_to(x, y).  Gives x to y, first removing all
     Contains, Supports, Has, PartOf, and Wears relations."""
-    world.remove_relation(Contains(Z, x))
-    world.remove_relation(Supports(Z, x))
-    world.remove_relation(Has(Z, x))
-    world.remove_relation(PartOf(x, Z))
-    world.remove_relation(Wears(Z, x))
+    world.activity.remove_obj(x)
     world.add_relation(Has(y, x))
 
 # make X part of Y (so then X PartOf Y)
@@ -83,11 +79,7 @@ def default_make_part_of(x, y, world) :
     """Called with make_part_of(x, y).  Makes x a part of y, first
     removing all Contains, Supports, Has, PartOf, and Wears
     relations."""
-    world.remove_relation(Contains(Z, x))
-    world.remove_relation(Supports(Z, x))
-    world.remove_relation(Has(Z, x))
-    world.remove_relation(PartOf(x, Z))
-    world.remove_relation(Wears(Z, x))
+    world.activity.remove_obj(x)
     world.add_relation(PartOf(x, y))
 
 # make X wear Y (so then X Wears Y)
@@ -95,11 +87,7 @@ def default_make_part_of(x, y, world) :
 def default_make_part_of(x, y, world) :
     """Called with make_wear(x, y).  Makes x wear y, first removing
     all Contains, Supports, Has, PartOf, and Wears relations."""
-    world.remove_relation(Contains(Z, y))
-    world.remove_relation(Supports(Z, y))
-    world.remove_relation(Has(Z, y))
-    world.remove_relation(PartOf(y, Z))
-    world.remove_relation(Wears(Z, y))
+    world.activity.remove_obj(y)
     world.add_relation(Wears(x, y))
 
 @world.to("remove_obj")
@@ -206,6 +194,12 @@ def referenceable_things_Default(world) :
     things = [o for o in objects if world[IsA(o, "thing")]]
     return things
 
+world.define_activity("objects_of_kind", accumulator=list_append)
+@world.to("objects_of_kind")
+def objects_of_type_Default(kind, world) :
+    """Gets all objects of a given kind."""
+    objects = world.query_relation(IsA(X, Y), var=X)
+    return [o for o in objects if world[IsA(o, kind)]]
 
 ###
 ### Connecting rooms and doors together

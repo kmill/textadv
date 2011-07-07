@@ -198,7 +198,10 @@ class Parser(object) :
         - [text x] for taking some number of arbitrary words, and then
         binding x to the resulting string.
         
-        - [object oid] for matching against a particular object."""
+        - [object oid] for matching against a particular object.
+
+        The whitespace in the variable is turned into a single space.
+        For instance, [object  my    ball] is the same as [object my ball]."""
         
         parts = []
         lastindex = 0
@@ -208,7 +211,7 @@ class Parser(object) :
                 parts.append(tp.split("/"))
             lastindex = match.end()
             if self.subparsers.has_key(match.group(1).lower()) :
-                csp = CallSubParser(match.group(1), match.group(2))
+                csp = CallSubParser(match.group(1), " ".join(match.group(2).split()))
                 parts.append(csp)
             else :
                 raise Exception("No such subparser %r" % match.group(1))

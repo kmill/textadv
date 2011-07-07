@@ -128,7 +128,8 @@ def eval_str(input, context) :
 def _eval_parse(input, i=0, in_code=False) :
     """Pulls out [] and {} expressions, labeling them as such.  Also
     makes it so [] expressions split by whitespace.  The characters <
-    and > delimit strings when in_code."""
+    and > delimit strings when in_code.  Note that all whitespace is
+    collapsed into a single space for < and >."""
     parsed = []
     j = i
     while i < len(input) :
@@ -157,7 +158,7 @@ def _eval_parse(input, i=0, in_code=False) :
         elif input[i] == "<" and in_code :
             start = i+1
             while input[i] != ">" : i += 1
-            parsed.append(input[start:i])
+            parsed.append(" ".join(input[start:i].split()))
             i += 1
             j = i
         elif in_code and input[i] in string.whitespace :

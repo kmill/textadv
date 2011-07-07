@@ -2,7 +2,8 @@
 #
 # Cloak of Darkness (http://www.firthworks.com/roger/cloak)
 
-from textadv.basicsetup import *
+execfile("textadv/basicsetup.py")
+#from textadv.basicsetup import *
 
 world[Global("game_title")] = "Cloak of Darkness"
 world[Global("game_author")] = "Kyle Miller (adapted from http://www.firthworks.com/roger/cloak)"
@@ -15,8 +16,7 @@ world.activity.put_in("player", "Foyer")
 
 ## The Cloak
 
-quickdef(world, "cloak", "thing",
-         {
+quickdef(world, "cloak", "thing", {
         Name : "black velvet cloak",
         Words : ["handsome", "dark", "black", "satin", "velvet", "@cloak"],
         Description : """A handsome cloak, of velvet trimmed with
@@ -33,8 +33,7 @@ def can_drop_cloak_only_in_cloakroom(actor, ctxt, x=None) :
 
 ### The Foyer
 
-quickdef(world, "Foyer", "room",
-         {
+quickdef(world, "Foyer", "room", {
         Name : "Foyer of the Opera House",
         Description : """You are standing in a spacious hall,
 splendidly decorated in red and gold, with glittering chandeliers
@@ -49,8 +48,7 @@ and besides, the weather outside seems to be getting worse."""
 
 ### The Bar
 
-quickdef(world, "Bar", "room",
-         {
+quickdef(world, "Bar", "room", {
         Name : "Foyer bar",
         Description : """The bar, much rougher than you'd have guessed
 after the opulence of the foyer to the north, is completely
@@ -62,15 +60,11 @@ on the floor.""",
 def light_in_bar(world) :
     """If the cloak is not in the cloakroom or on the hook, then the
     bar contains no light."""
-    loc = world[Location("cloak")]
-    if loc in ["Cloakroom", "hook"] :
-        return True
-    else : return False
+    return world[ContainingRoom("cloak")] == "Cloakroom"
 
 ## The message
 
-quickdef(world, "message", "thing",
-         {
+quickdef(world, "message", "thing", {
         Words : ["sawdust", "saw", "@dust", "@message", "@floor"],
         Scenery : True
         })
@@ -102,7 +96,7 @@ def before_anything_in_bar(x, ctxt) :
         if x.get_direction() != "north" :
             world[Global("message_disturbance")] += 2
             raise AbortAction("Blundering around in the dark isn't a good idea!")
-    elif type(x) == Looking :
+    elif type(x) in [Looking, TakingInventory] :
         raise NotHandled()
     else :
         world[Global("message_disturbance")] += 1
@@ -110,15 +104,13 @@ def before_anything_in_bar(x, ctxt) :
 
 ### The Cloakroom
 
-quickdef(world, "Cloakroom", "room",
-         {
+quickdef(world, "Cloakroom", "room", {
         Description : """The walls of this small room were clearly
 once lined with hooks, though now only one remains. The exit is a door
 to the east.""",
         })
 
-quickdef(world, "hook", "supporter",
-         {
+quickdef(world, "hook", "supporter", {
         Words : ["small", "brass", "@hook", "@peg"],
         Scenery : True,
         Description : """It's just a small brass hook, [if [when hook

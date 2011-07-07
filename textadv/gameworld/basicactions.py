@@ -85,6 +85,21 @@ def hint_xobj_notheld(actionsystem, action) :
 ###
 
 ##
+# Help
+##
+
+class GettingHelp(BasicAction) :
+    """GettingHelp(actor)"""
+    verb = "help"
+    gerund = "helping"
+    numargs = 1
+parser.understand("help", GettingHelp(actor))
+
+@when(GettingHelp(actor))
+def when_getting_help(actor, ctxt) :
+    ctxt.write("For help, please take a look at <a href=\"http://eblong.com/zarf/if.html\" target=\"_blank\">http://eblong.com/zarf/if.html</a> for a reference card of perhaps-possible things to try.")
+
+##
 # Look
 ##
 
@@ -94,6 +109,7 @@ class Looking(BasicAction) :
     gerund = "looking"
     numargs = 1
 parser.understand("look/l", Looking(actor))
+parser.understand("look around", Looking(actor))
 
 @when(Looking(actor))
 def when_looking_default(actor, ctxt) :
@@ -170,7 +186,7 @@ def before_taking_check_ownership(actor, x, ctxt) :
 def before_taking_check_fixedinplace(actor, x, ctxt) :
     """One cannot take what is fixed in place."""
     if ctxt.world[FixedInPlace(x)] :
-        raise AbortAction("That's fixed in place.")
+        raise AbortAction(ctxt.world[NoTakeMessage(x)], actor=actor)
 
 @before(Taking(actor, X))
 def before_taking_check_if_part_of_something(actor, x, ctxt) :
@@ -596,6 +612,7 @@ class ExitingParticular(BasicAction) :
     numargs = 2
 parser.understand("exit [something x]", ExitingParticular(actor, X))
 parser.understand("leave [something x]", ExitingParticular(actor, X))
+parser.understand("get out of [something x]", ExitingParticular(actor, X))
 
 require_xobj_visible(actionsystem, ExitingParticular(actor, X))
 
@@ -1006,6 +1023,240 @@ def report_takingoff_default(actor, x, ctxt) :
     """Reports that the actor took it off."""
     ctxt.write(str_with_objs("{Bob|cap} {takes} off [the $x].", x=x), actor=actor)
 
+
+##
+# Switching on
+##
+
+class SwitchingOn(BasicAction) :
+    """SwitchingOn(actor, x)"""
+    verb = "switch on"
+    gerund = "switching on"
+    numargs = 2
+parser.understand("switch/turn on [something x]", SwitchingOn(actor, X))
+parser.understand("switch/turn [something x] on", SwitchingOn(actor, X))
+
+require_xobj_accessible(actionsystem, SwitchingOn(actor, X))
+
+@verify(SwitchingOn(actor, X) <= Switchable(X))
+def verify_switching_on_switchable(actor, x, ctxt) :
+    """That which is switchable is more logical to switch on."""
+    return VeryLogicalOperation()
+
+@before(SwitchingOn(actor, X) <= PNot(Switchable(X)))
+def before_switching_on_unswitchable(actor, x, ctxt) :
+    """That which isn't switchable can't be switched on."""
+    raise AbortAction(ctxt.world[NoSwitchMessages(x, "no_switch_on")], actor=actor)
+
+@before(SwitchingOn(actor, X) <= Switchable(X) & IsSwitchedOn(X))
+def before_switching_on_already_switched_on(actor, x, ctxt) :
+    """That which is switched on can't be switched on again."""
+    raise AbortAction(ctxt.world[NoSwitchMessages(x, "already_on")], actor=actor)
+
+@when(SwitchingOn(actor, X))
+def when_switching_on(actor, x, ctxt) :
+    """Sets the IsSwitchedOn property to True."""
+    ctxt.world[IsSwitchedOn(x)] = True
+
+@report(SwitchingOn(actor, X))
+def report_switching_on(actor, x, ctxt) :
+    """Writes 'Switched on.'"""
+    ctxt.write("Switched on.")
+
+##
+# Switching Off
+##
+
+class SwitchingOff(BasicAction) :
+    """SwitchingOff(actor, x)"""
+    verb = "switch off"
+    gerund = "switching off"
+    numargs = 2
+parser.understand("switch/turn off [something x]", SwitchingOff(actor, X))
+parser.understand("switch/turn [something x] off", SwitchingOff(actor, X))
+
+require_xobj_accessible(actionsystem, SwitchingOff(actor, X))
+
+@verify(SwitchingOff(actor, X) <= Switchable(X))
+def verify_switching_off_switchable(actor, x, ctxt) :
+    """That which is switchable is more logical to switch off."""
+    return VeryLogicalOperation()
+
+@before(SwitchingOff(actor, X) <= PNot(Switchable(X)))
+def before_switching_off_unswitchable(actor, x, ctxt) :
+    """That which isn't switchable can't be switched off."""
+    raise AbortAction(ctxt.world[NoSwitchMessages(x, "no_switch_off")], actor=actor)
+
+@before(SwitchingOff(actor, X) <= Switchable(X) & PNot(IsSwitchedOn(X)))
+def before_switching_off_already_switched_off(actor, x, ctxt) :
+    """That which is switched off can't be switched off again."""
+    raise AbortAction(ctxt.world[NoSwitchMessages(x, "already_off")], actor=actor)
+
+@when(SwitchingOff(actor, X))
+def when_switching_off(actor, x, ctxt) :
+    """Sets the IsSwitchedOn property to False."""
+    ctxt.world[IsSwitchedOn(x)] = False
+
+@report(SwitchingOff(actor, X))
+def report_switching_off(actor, x, ctxt) :
+    """Writes 'Switched off.'"""
+    ctxt.write("Switched off.")
+
+##
+# Switching
+##
+
+class Switching(BasicAction) :
+    """Switching(actor, x)"""
+    verb = "switch"
+    gerund = "switching"
+    numargs = 2
+parser.understand("switch/turn [something x]", Switching(actor, X))
+
+require_xobj_accessible(actionsystem, Switching(actor, X))
+
+@before(Switching(actor, X) <= Switchable(X))
+def verify_switching_switchable(actor, x, ctxt) :
+    """That which is switchable is more logical to switch."""
+    return VeryLogicalOperation()
+
+@before(Switching(actor, X) <= PNot(Switchable(X)))
+def before_switching_unswitchable(actor, x, ctxt) :
+    """That which isn't switchable can't be switched."""
+    raise AbortAction(ctxt.world[NoSwitchMessages(x, "no_switch")], actor=actor)
+
+@before(Switching(actor, X) <= Switchable(X))
+def before_switching_switchable(actor, x, ctxt) :
+    """Does the proper switching on/off."""
+    if ctxt.world[IsSwitchedOn(x)] :
+        raise DoInstead(SwitchingOff(actor, x), suppress_message=True)
+    else :
+        raise DoInstead(SwitchingOn(actor, x), suppress_message=True)
+
+###
+### Actions that don't do anything
+###
+
+##
+# Attacking
+##
+class Attacking(BasicAction) :
+    """Attacking(actor, x)"""
+    verb = "attack"
+    gerund = "attacking"
+    numargs = 2
+parser.understand("attack/kill [something x]", Attacking(actor, X))
+
+require_xobj_accessible(actionsystem, Attacking(actor, X))
+
+@before(Attacking(actor, X))
+def before_attacking_default(actor, x, ctxt) :
+    """By default, you can't attack."""
+    raise AbortAction("Violence isn't the answer to this one.", actor=actor)
+
+##
+# Eating
+##
+class Eating(BasicAction) :
+    """Eating(actor, x)"""
+    verb = "eat"
+    gerund = "eating"
+    numargs = 2
+parser.understand("eat [something x]", Eating(actor, X))
+
+require_xobj_accessible(actionsystem, Eating(actor, X))
+
+@before(Eating(actor, X))
+def before_eating_default(actor, x, ctxt) :
+    """By default, you can't eat."""
+    raise AbortAction("{Bob|cap} {doesn't} feel like eating that.", actor=actor)
+
+##
+# Swimming and SwimmingIn
+##
+
+class Swimming(BasicAction) :
+    """Swimming(actor)"""
+    verb = "swim"
+    gerund = "swimming"
+    numargs = 1
+class SwimmingIn(BasicAction) :
+    """SwimmingIn(actor, X)"""
+    verb = "swim"
+    gerund = "swimming in"
+    numargs = 2
+parser.understand("swim", Swimming(actor))
+parser.understand("swim in [something x]", SwimmingIn(actor, X))
+
+require_xobj_accessible(actionsystem, SwimmingIn(actor, X))
+
+@before(Swimming(actor))
+def before_swimming_default(actor, ctxt) :
+    """By default, you can't swim."""
+    raise AbortAction("There's no place to swim.", actor=actor)
+
+@before(SwimmingIn(actor, X))
+def before_swimming_in_default(actor, x, ctxt) :
+    """By default, you can't swim in anything."""
+    raise AbortAction("{Bob|cap} can't swim in that.", actor=actor)
+
+##
+# Cutting and CuttingWith
+##
+
+class Cutting(BasicAction) :
+    """Cutting(actor, X)"""
+    verb = "cut"
+    gerund = "cutting"
+    numargs = 2
+parser.understand("cut [something x]", Cutting(actor, X))
+
+require_xobj_accessible(actionsystem, Cutting(actor, X))
+
+@before(Cutting(actor, X))
+def before_cutting_default(actor, x, ctxt) :
+    """By default, you can't cut."""
+    raise AbortAction("{Bob|cap} can't cut that.", actor=actor)
+
+class CuttingWith(BasicAction) :
+    """CuttingWith(actor, X, Y)"""
+    verb = ("cut", "with")
+    gerund = ("cutting", "with")
+    numargs = 3
+parser.understand("cut [something x] with [something y]", CuttingWith(actor, X, Y))
+
+require_xobj_accessible(actionsystem, CuttingWith(actor, X, Y))
+require_xobj_held(actionsystem, CuttingWith(actor, Z, X))
+
+@before(CuttingWith(actor, X, Y))
+def before_cutting_with_default(actor, x, y, ctxt) :
+    """By default, you can't cut with anything."""
+    raise AbortAction(str_with_objs("{Bob|cap} can't cut [the $x] with [the $y].", x=x, y=y), actor=actor)
+
+@before(CuttingWith(actor, X, Y) <= IsA(X, "person"))
+def before_cutting_a_person_with(actor, x, y, ctxt) :
+    """Make the default CuttingWith more entertaining when it's a person."""
+    raise AbortAction("Violence isn't the answer to this one.")
+
+
+##
+# Climbing
+##
+
+class Climbing(BasicAction) :
+    """Climbing(actor, X)"""
+    verb = "climb"
+    gerund = "climbing"
+    numargs = 2
+parser.understand("climb [something x]", Climbing(actor, X))
+
+require_xobj_accessible(actionsystem, Climbing(actor, X))
+
+@before(Climbing(actor, X))
+def before_climbing_default(actor, x, ctxt) :
+    """By default, you can't climb."""
+    raise AbortAction(str_with_objs("{Bob|cap} can't climb [the $x].", x=x), actor=actor)
+
 #### to deal with later
 
 class AskTo(BasicAction) :
@@ -1044,3 +1295,15 @@ def report_destroy(actor, x, ctxt) :
 
 
 
+class MagicallyTaking(BasicAction) :
+    verb = "magically take"
+    gerund = "magically taking"
+    numargs = 2
+parser.understand("magically take [something x]", MagicallyTaking(actor, X))
+
+@when(MagicallyTaking(actor, X))
+def when_magically_taking(actor, x, ctxt) :
+    ctxt.world.activity.give_to(x, actor)
+@report(MagicallyTaking(actor, X))
+def report_magically_taking(actor, x, ctxt) :
+    ctxt.write("*poof*[newline]Taken.")

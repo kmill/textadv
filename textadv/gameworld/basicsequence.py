@@ -16,6 +16,12 @@ world[Global("release_number")] = 1
 world[Global("game_description")] = None
 
 @actoractivities.to("start_game")
+def act_start_game_move_backdrops(ctxt) :
+    """Moves the backdrops to where they ought to be."""
+    current_location = ctxt.world[VisibleContainer(ctxt.world[Location(ctxt.actor)])]
+    ctxt.world.activity.move_backdrops(current_location)
+
+@actoractivities.to("start_game")
 def act_start_game_describe_game(ctxt) :
     """Prints out the description of the game using global variables
     defined in basicsequence.py."""
@@ -25,6 +31,7 @@ def act_start_game_describe_game(ctxt) :
     ctxt.write("<b><font size=\"+2\">"+ctxt.world[Global("game_title")]+"</font></b>"+"[break]")
     ctxt.write(ctxt.world[Global("game_headline")], "by", ctxt.world[Global("game_author")])
     ctxt.write("[break]Release number", str(ctxt.world[Global("release_number")]), "[newline]")
+    ctxt.write("Type 'help' for help.[newline]")
 
 @actoractivities.to("start_game")
 def act_start_game_describe_location(ctxt) :
@@ -55,10 +62,25 @@ def act_step_turn_check_current_location(ctxt) :
     last_light = ctxt.world[Global("last_light")]
     currently_lit = ctxt.world[ContainsLight(current_location)]
     if current_location != last_location or last_light != currently_lit :
-        ctxt.write("[newline]")
-        ctxt.activity.describe_current_location()
+        ctxt.activity.player_has_moved()
     ctxt.world[Global("last_location")] = ctxt.world[Global("current_location")]
     ctxt.world[Global("last_light")] = ctxt.world[Global("currently_lit")]
+
+
+actoractivities.define_activity("player_has_moved",
+                                doc="""To be run during step_turn after the player has moved.""")
+
+@actoractivities.to("player_has_moved")
+def act_player_has_moved_update_backdrops(ctxt) :
+    """Moves the backdrops to where they ought to be."""
+    current_location = ctxt.world[VisibleContainer(ctxt.world[Location(ctxt.actor)])]
+    ctxt.world.activity.move_backdrops(current_location)
+
+@actoractivities.to("player_has_moved")
+def act_player_has_moved_describe_location(ctxt) :
+    """Describes the current location after the player has moved."""
+    ctxt.write("[newline]")
+    ctxt.activity.describe_current_location()
 
 
 actoractivities.define_activity("end_game_saying",
@@ -88,4 +110,4 @@ def act_end_game_actions_write_message(ctxt) :
     """Writes something like "*** You have won ***", depending on the
     end_game_message global variable."""
     if ctxt.world[Global("end_game_message")] :
-        ctxt.write("[newline]*** %s ***[newline]" % ctxt.world[Global("end_game_message")])
+        ctxt.write("[newline]<b>*** %s ***</b>[newline]" % ctxt.world[Global("end_game_message")])

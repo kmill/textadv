@@ -3,6 +3,7 @@
 $(document).ready(function() {
     update_contents();
     $("input#command").focus();
+    window.setTimeout(send_ping, 10000);
   });
 
 send_command = function () {
@@ -12,8 +13,8 @@ send_command = function () {
   
   $.ajax({
     type: "POST",
-    url: "input",
-    data: {command: command},
+    url: "/input",
+    data: {command: command, session: $("input#session").val()},
     dataType: "json"
   });
 
@@ -39,9 +40,10 @@ print_result = function(r) {
 
 update_contents = function() {
   $.ajax({
-    url: "output",
+    url: "/output",
     type: "GET",
     dataType: "json",
+    data: {session: $("input#session").val()},
     success: function(data) {
       print_result(data);
       update_contents();
@@ -54,4 +56,14 @@ update_contents = function() {
       }
     }
   });
+}
+
+send_ping = function() {
+  $.ajax({
+    url: "/ping",
+    type: "POST",
+    dataType: "json",
+    data: {session: $("input#session").val()},
+  });
+  window.setTimeout(send_ping, 10000);
 }

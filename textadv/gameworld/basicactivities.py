@@ -18,6 +18,18 @@ def default_def_obj(name, kind, world) :
     world.add_relation(IsA(name, kind))
 
 
+world.define_activity("move_backdrops", doc="""Updates the locations of backdrops given a current location.""")
+
+@world.to("move_backdrops")
+def default_move_backdrops(curr_loc, world) :
+    """Moves all relevant backdrops to curr_loc."""
+    for backdrop in world.activity.objects_of_kind("backdrop") :
+        locations = world[BackdropLocations(backdrop)]
+        for loc in locations :
+            if world[Contains(loc, curr_loc)] : # for handling regions
+                world.activity.put_in(backdrop, curr_loc)
+                break
+
 ##
 ## Activity: get the doors in a room
 ##
@@ -100,7 +112,7 @@ def describe_location_Heading(actor, loc, vis_cont, ctxt) :
         ctxt.activity.describe_location_heading(actor, loc, vis_cont)
     else :
         ctxt.world[Global("currently_lit")] = False
-        ctxt.write("Darkness")
+        ctxt.write("<b>Darkness</b>")
 
 @actoractivities.to("describe_location")
 def describe_location_Description(actor, loc, vis_cont, ctxt) :
@@ -358,6 +370,8 @@ def describe_object_container(actor, o, ctxt) :
     """Writes a line about the contents of a container if the container is not opaque."""
     global __DESCRIBE_OBJECT_described
     if ctxt.world[IsA(o, "container")] :
+        if ctxt.world[SuppressContentDescription(o)] :
+            raise NotHandled()
         if not ctxt.world[IsOpaque(o)] :
             contents = [ctxt.world[IndefiniteName(c)] for c in ctxt.world[Contents(o)] if ctxt.world[Reported(c)]]
             if contents :
@@ -374,6 +388,8 @@ def describe_object_container(actor, o, ctxt) :
 def describe_object_supporter(actor, o, ctxt) :
     """Writes a line about the contents of a supporter."""
     if ctxt.world[IsA(o, "supporter")] :
+        if ctxt.world[SuppressContentDescription(o)] :
+            raise NotHandled()
         contents = [ctxt.world[IndefiniteName(c)] for c in ctxt.world[Contents(o)] if ctxt.world[Reported(c)]]
         if contents :
             global __DESCRIBE_OBJECT_described # print a newline if needed.

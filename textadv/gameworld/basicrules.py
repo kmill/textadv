@@ -228,6 +228,27 @@ def rule_EffectiveContainer_if_thing(x, world) :
     its location."""
     return world[EffectiveContainer(world[Location(x)])]
 
+##
+# Property: ContainingRoom
+##
+
+@world.define_property
+class ContainingRoom(Property) :
+    """Gets the room which contains the given object."""
+    numargs = 1
+
+@world.handler(ContainingRoom(X))
+def rule_ContainingRoom_default(x, world) :
+    """Walks up the Location chain until the object IsA room."""
+    loc = world[Location(x)]
+    if not loc :
+        return None
+    while not world[IsA(loc, "room")] :
+        loc = world[Location(loc)]
+        if not loc :
+            return None
+    return loc
+
 
 ##
 # Property: NotableDescription
@@ -356,6 +377,13 @@ class FixedInPlace(Property) :
 # by default, things are not fixed in place
 world[FixedInPlace(X) <= IsA(X, "thing")] = False
 
+@world.define_property
+class NoTakeMessage(Property) :
+    """Represents the message for trying to take something which is
+    fixed in place."""
+    numargs = 1
+
+world[NoTakeMessage(X) <= FixedInPlace(X)] = "That's fixed in place."
 
 ##
 # VisibleTo
@@ -489,10 +517,14 @@ def rule_ParentEnterable_by_Location(x, world) :
     """Gets either the next room or enterable by repeated calling of
     Location."""
     loc = world[Location(x)]
+    if not loc :
+        return None
     while not world[IsA(loc, "room")] :
         if world[IsEnterable(loc)] :
             return loc
         loc = world[Location(loc)]
+        if not loc :
+            return None
     return loc
 
 ##
@@ -572,6 +604,14 @@ world[NoOpenMessages(X, "no_close")] = "{Bob|cap} can't close that."
 world[NoOpenMessages(X, "already_open")] = "That's already open."
 world[NoOpenMessages(X, "already_closed")] = "That's already closed."
 
+@world.define_property
+class IsOpenMsg(Property) :
+    """Is a string representing whether the given openable is open."""
+    numargs = 1
+
+world[IsOpenMsg(X) <= Openable(X)] = "closed"
+world[IsOpenMsg(X) <= Openable(X) & IsOpen(X)] = "open"
+
 ##
 # Property: Lockable, IsLocked
 ##
@@ -633,6 +673,15 @@ world[WrongKeyMessages(X, Y)] = "That doesn't fit the lock."
 def container_contents(x, world) :
     """Gets the immediate contents of the container."""
     return [o["y"] for o in world.query_relation(Contains(x, Y))]
+
+
+@world.define_property
+class SuppressContentDescription(Property) :
+    """Represents whether to suppress the description of the contents
+    of an object when examining it."""
+    numargs = 1
+
+world[SuppressContentDescription(X) <= IsA(X, "container")] = False
 
 
 #
@@ -714,6 +763,8 @@ def rule_EffectiveContainer_if_x_in_container(x, world) :
 def supporter_contents(x, world) :
     """Gets the things the supporter immediately supports."""
     return [o["y"] for o in world.query_relation(Supports(x, Y))]
+
+world[SuppressContentDescription(X) <= IsA(X, "supporter")] = False
 
 
 #
@@ -864,10 +915,21 @@ def rule_ContributesLight_possessions_can_light_person(x, world) : # maybe shoul
         return True
     else : raise NotHandled()
 
+###
+### Defining: region
+###
 
 ###
-### Other properties
+### Defining: backdrop
 ###
+
+@world.define_property
+class BackdropLocations(Property) :
+    """A list of rooms or regions in which the backdrop can be
+    seen."""
+    numargs = 1
+
+world[BackdropLocations(X) <= IsA(X, "backdrop")] = []
 
 ##
 # Scenery
@@ -886,3 +948,44 @@ world[Scenery(X) <= IsA(X, "thing")] = False
 world[FixedInPlace(X) <= Scenery(X)] = True
 # scenery is not reported
 world[Reported(X) <= Scenery(X)] = False
+
+
+world[Scenery(X) <= IsA(X, "backdrop")] = True
+
+###
+### Other properties
+###
+
+@world.define_property
+class Switchable(Property) :
+    """Represents whether a thing can be switched on and off."""
+    numargs = 1
+
+world[Switchable(X) <= IsA(X, "thing")] = False
+
+@world.define_property
+class IsSwitchedOn(Property) :
+    """Represents whether a device is switched on."""
+    numargs = 1
+
+world[IsSwitchedOn(X) <= Switchable(X)] = False
+
+@world.define_property
+class IsSwitchedOnMsg(Property) :
+    """A string representing the SwitchedOn property."""
+    numargs = 1
+
+world[IsSwitchedOnMsg(X) <= Switchable(X)] = "off"
+world[IsSwitchedOnMsg(X) <= Switchable(X) & IsSwitchedOn(X)] = "on"
+
+@world.define_property
+class NoSwitchMessages(Property) :
+    """Represents the messages for not being able to switch on or
+    switch off an object."""
+    numargs = 2
+
+world[NoSwitchMessages(X, "no_switch")] = "{Bob|cap} can't switch that."
+world[NoSwitchMessages(X, "no_switch_on")] = "{Bob|cap} can't switch that on."
+world[NoSwitchMessages(X, "no_switch_off")] = "{Bob|cap} can't switch that off."
+world[NoSwitchMessages(X, "already_on")] = "That's already switched on."
+world[NoSwitchMessages(X, "already_off")] = "That's already switched off."

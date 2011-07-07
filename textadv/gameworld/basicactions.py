@@ -20,7 +20,12 @@ def require_xobj_accessible(actionsystem, action) :
             if not ctxt.world[VisibleTo(x, actor)] :
                 return IllogicalOperation(as_actor("{Bob|cap} {can} see no such thing.", actor=actor))
             else :
-                return IllogicalOperation(as_actor("{Bob|cap} {can't} get to that.", actor=actor))
+                effcont = ctxt.world[EffectiveContainer(ctxt.world[Location(x)])]
+                if ctxt.world[Openable(effcont)] and not ctxt.world[IsOpen(effcont)] :
+                    return IllogicalOperation(as_actor(str_with_objs("That's inside [the $y], which is closed.", y=effcont),
+                                                       actor=actor))
+                else :
+                    return IllogicalOperation(as_actor("{Bob|cap} {can't} get to that.", actor=actor))
 
 def require_xobj_visible(actionsystem, action) :
     """Adds a rule which ensures that x is visible to the actor in
@@ -493,13 +498,13 @@ class Exiting(BasicAction) :
     exit_from = None
     def gerund_form(self, ctxt) :
         if self.exit_from :
-            dobj = ctxt.world[DefiniteName(self.exit_from)]
+            dobj = str_with_objs("[the $x]", x=self.exit_from)
             return "exiting "+dobj
         else :
             return "exiting"
     def infinitive_form(self, ctxt) :
         if self.exit_from :
-            dobj = ctxt.world[DefiniteName(self.exit_from)]
+            dobj = str_with_objs("[the $x]", x=self.exit_from)
             return "exit "+dobj
         else :
             return "exit"
@@ -557,13 +562,13 @@ class GettingOff(BasicAction) :
     get_off_from = None
     def gerund_form(self, ctxt) :
         if self.get_off_from :
-            dobj = ctxt.world[DefiniteName(self.get_off_from)]
+            dobj = str_with_objs("[the $x]", x=self.get_off_from)
             return "getting off "+dobj
         else :
             return "getting off"
     def infinitive_form(self, ctxt) :
         if self.get_off_from :
-            dobj = ctxt.world[DefiniteName(self.get_off_from)]
+            dobj = str_with_objs("[the $x]", x=self.get_off_from)
             return "get off "+dobj
         else :
             return "getting off"
@@ -1362,11 +1367,11 @@ class AskTo(BasicAction) :
     gerund = ("asking", "to")
     numargs = 3
     def gerund_form(self, ctxt) :
-        dobj = ctxt.world.get_property("DefiniteName", self.args[1])
+        dobj = str_with_objs("[the $x]", x=self.args[1])
         comm = self.args[2].infinitive_form(ctxt)
         return self.gerund[0] + " " + dobj + " to " + comm
     def infinitive_form(self, ctxt) :
-        dobj = ctxt.world.get_property("DefiniteName", self.args[1])
+        dobj = str_with_objs("[the $x]", x=self.args[1])
         comm = self.args[2].infinitive_form(ctxt)
         return self.verb[0] + " " + dobj + " to " + comm
 parser.understand("ask [something x] to [action y]", AskTo(actor, X, Y))

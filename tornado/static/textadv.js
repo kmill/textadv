@@ -8,21 +8,7 @@ $(document).ready(function() {
 
 send_command = function () {
   command = $("input#command").val();
-  input_prompt = $("#input_text").text();
-  $("#content").append("<p><b>"+input_prompt+" "+command+"</b></p>"); // should escape!
-  
-  $.ajax({
-    type: "POST",
-    url: "/input",
-    data: {command: command, session: $("input#session").val()},
-    dataType: "json"
-  });
-
-  $("input#command").val("");
-  $("input#command").focus();
-  container = $("html, body");
-  scrollTo = $("input#command");
-  container.scrollTop(scrollTo.offset().top - container.offset().top);
+  run_action(command)
 }
 
 print_result = function(r) {
@@ -66,4 +52,23 @@ send_ping = function() {
     data: {session: $("input#session").val()},
   });
   window.setTimeout(send_ping, 10000);
+}
+
+run_action = function(command) {
+  input_prompt = $("#input_text").text();
+  $("#content").append("<p><b>"+input_prompt+" "+command+"</b></p>"); // should escape!
+  
+  $.ajax({
+    type: "POST",
+    url: "/input",
+    data: {command: command, session: $("input#session").val()},
+    dataType: "json"
+  });
+
+  $("input#command").val("");
+  $("input#command").focus();
+  container = $("html, body");
+  scrollTo = $("input#command");
+  container.scrollTop(scrollTo.offset().top - container.offset().top);
+  return false;
 }

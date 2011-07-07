@@ -5,6 +5,7 @@
 
 from textadv.core.patterns import BasicPattern
 from textadv.core.rulesystem import ActivityTable, RuleTable, AbortAction, make_rule_decorator
+from textadv.gamesystem.utilities import str_with_objs
 
 ###
 ### Actions
@@ -40,17 +41,17 @@ class BasicAction(BasicPattern) :
             return self.gerund
         elif len(self.args) == 2 :
             if self.dereference_dobj :
-                dobj = ctxt.world.get_property("DefiniteName", self.args[1])
+                dobj = str_with_objs("[the $x]", x=self.args[1])
             else :
                 dobj = self.args[1]
             return self.gerund + " " + dobj
         elif len(self.args) == 3 :
             if self.dereference_dobj :
-                dobj = ctxt.world.get_property("DefiniteName", self.args[1])
+                dobj = str_with_objs("[the $x]", x=self.args[1])
             else :
                 dobj = self.args[1]
             if self.dereference_iobj :
-                iobj = ctxt.world.get_property("DefiniteName", self.args[2])
+                iobj = str_with_objs("[the $x]", x=self.args[2])
             else :
                 iobj = self.args[1]
             return (self.gerund[0] + " " + dobj + " " + self.gerund[1] + " " + iobj)
@@ -62,17 +63,17 @@ class BasicAction(BasicPattern) :
             return self.verb
         elif len(self.args) == 2 :
             if self.dereference_dobj :
-                dobj = ctxt.world.get_property("DefiniteName", self.args[1])
+                dobj = str_with_objs("[the $x]", x=self.args[1])
             else :
                 dobj = self.args[1]
             return self.verb + " " + dobj
         elif len(self.args) == 3 :
             if self.dereference_dobj :
-                dobj = ctxt.world.get_property("DefiniteName", self.args[1])
+                dobj = str_with_objs("[the $x]", x=self.args[1])
             else :
                 dobj = self.args[1]
             if self.dereference_iobj :
-                iobj = ctxt.world.get_property("DefiniteName", self.args[2])
+                iobj = str_with_objs("[the $x]", x=self.args[2])
             else :
                 iobj = self.args[1]
             return (self.verb[0] + " " + dobj + " " + self.verb[1] + " " + iobj)

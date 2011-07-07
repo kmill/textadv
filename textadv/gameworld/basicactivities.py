@@ -175,17 +175,17 @@ def describe_location_Objects(actor, loc, vis_cont, ctxt) :
                         elif ctxt.world[IsA(o_loc, "container")] :
                             mentioned.append(o_loc)
                             if is_first_sentence :
-                                current_start = "In "+ctxt.world[DefiniteName(o_loc)]+" you see "
+                                current_start = str_with_objs("In [the $x] you see ", x=o_loc)
                                 is_first_sentence = False
                             else :
-                                current_start = "In "+ctxt.world[DefiniteName(o_loc)]+" you also see "
+                                current_start = str_with_objs("In [the $x] you also see ", x=o_loc)
                         elif ctxt.world[IsA(o_loc, "supporter")] :
                             mentioned.append(o_loc)
                             if is_first_sentence :
-                                current_start = "On "+ctxt.world[DefiniteName(o_loc)]+" you see "
+                                current_start = str_with_objs("On [the $x] you see ", x=o_loc)
                                 is_first_sentence = False
                             else :
-                                current_start = "On "+ctxt.world[DefiniteName(o_loc)]+" you also see "
+                                current_start = str_with_objs("On [the $x] you also see ", x=o_loc)
                         else :
                             raise Exception("Unknown kind of location for "+o_loc)
                         current_descs = []
@@ -202,7 +202,7 @@ def describe_location_Objects(actor, loc, vis_cont, ctxt) :
             loc = ctxt.world[Location(loc)]
 
     if curr_msgs :
-        ctxt.write("[newline]"+"[newline]".join(curr_msgs))
+        ctxt.write("[newline]"+"[newline]".join(curr_msgs), actor=actor)
 
 @actoractivities.to("describe_location")
 def describe_location_set_visited(actor, loc, vis_cont, ctxt) :
@@ -226,10 +226,10 @@ def describe_location_property_heading_location(actor, loc, vis_cont, ctxt) :
     the visible container."""
     while loc != vis_cont :
         if ctxt.world[IsA(loc, "container")] :
-            ctxt.write("(in",ctxt.world[DefiniteName(loc)]+")")
+            ctxt.write(str_with_objs("(in [the $x])", x=loc), actor=actor)
             __DESCRIBE_LOCATION_mentioned.append(loc)
         elif ctxt.world[IsA(loc, "supporter")] :
-            ctxt.write("(on",ctxt.world[DefiniteName(loc)]+")")
+            ctxt.write(str_with_objs("(on [the $x])", x=loc), actor=actor)
             __DESCRIBE_LOCATION_mentioned.append(loc)
         else :
             return
@@ -258,7 +258,7 @@ def terse_obj_description_IndefiniteName(actor, o, notables, mentioned, ctxt) :
         ctxt.write(d)
         raise ActionHandled()
     else :
-        return ctxt.world[IndefiniteName(o)]
+        return str_with_objs("[a $o]", o=o)
 
 @actoractivities.to("terse_obj_description")
 def terse_obj_description_container(actor, o, notables, mentioned, ctxt) :
@@ -374,12 +374,12 @@ def describe_object_container(actor, o, ctxt) :
         if ctxt.world[SuppressContentDescription(o)] :
             raise NotHandled()
         if not ctxt.world[IsOpaque(o)] :
-            contents = [ctxt.world[IndefiniteName(c)] for c in ctxt.world[Contents(o)] if ctxt.world[Reported(c)]]
+            contents = [str_with_objs("[a $c]", c=c) for c in ctxt.world[Contents(o)] if ctxt.world[Reported(c)]]
             if contents :
                 if __DESCRIBE_OBJECT_described : # print a newline if needed.
                     ctxt.write("[newline]")
                 __DESCRIBE_OBJECT_described = True
-                ctxt.write("In "+ctxt.world[DefiniteName(o)]+" "+is_are_list(contents)+".", actor=actor)
+                ctxt.write(str_with_objs("In [the $o] ", o=o)+is_are_list(contents)+".", actor=actor)
         elif ctxt.world[Openable(o)] and not ctxt.world[IsOpen(o)] :
             if __DESCRIBE_OBJECT_described :
                 ctxt.write("[newline]")
@@ -391,13 +391,13 @@ def describe_object_supporter(actor, o, ctxt) :
     if ctxt.world[IsA(o, "supporter")] :
         if ctxt.world[SuppressContentDescription(o)] :
             raise NotHandled()
-        contents = [ctxt.world[IndefiniteName(c)] for c in ctxt.world[Contents(o)] if ctxt.world[Reported(c)]]
+        contents = [str_with_objs("[a $c]", c=c) for c in ctxt.world[Contents(o)] if ctxt.world[Reported(c)]]
         if contents :
             global __DESCRIBE_OBJECT_described # print a newline if needed.
             if __DESCRIBE_OBJECT_described :
                 ctxt.write("[newline]")
             __DESCRIBE_OBJECT_described = True
-            ctxt.write("On "+ctxt.world[DefiniteName(o)]+" "+is_are_list(contents)+".", actor=actor)
+            ctxt.write(str_with_objs("On [the $o] ", o=o)+is_are_list(contents)+".", actor=actor)
 @actoractivities.to("describe_object")
 def describe_object_default(actor, o, ctxt) :
     """Runs if none of the previous were successful.  Prints a default message."""
@@ -416,7 +416,7 @@ actoractivities.define_activity("describe_possession",
 def describe_possession_indefinite_name(actor, o, numtabs, ctxt) :
     """Prints the indefinite name of the object preceded by numtabs
     indentations."""
-    ctxt.write("[break]"+"[indent]"*numtabs+ctxt.world[IndefiniteName(o)])
+    ctxt.write("[break]"+"[indent]"*numtabs+str_with_objs("[a $o]", o=o))
 @actoractivities.to("describe_possession")
 def describe_possession_if_worn(actor, o, numtabs, ctxt) :
     """Just writes (worn) if the thing is worn."""

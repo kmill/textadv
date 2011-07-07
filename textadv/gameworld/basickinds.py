@@ -30,7 +30,8 @@ world.add_relation(KindOf("region", "kind"))
 # 
 # Containers and supporters are things which can contain and support
 # things, respectively.  These are distinct because it simplifies the
-# core library.
+# core library (as enterables, these two end up being mutually
+# exclusive).
 #
 # Persons represent objects with which one can communicate.  This also
 # encompasses the player character.

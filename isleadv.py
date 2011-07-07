@@ -15,8 +15,7 @@ execfile("textadv/basicsetup.py")
 world[Global("game_title")] = "Island Adventure"
 world[Global("game_author")] = "Kyle Miller"
 world[Global("game_description")] = """
-You decided to stop what you were doing and wash up on an island.
-
+You decided to stop what you were doing and wash up on an island.[newline]
 You're not quite sure how you got here, or what you're supposed to do,
 but you feel that Adventure is afoot."""
 
@@ -177,7 +176,7 @@ quickdef(world, "room_the_beach", "room", {
         Description : """Crystal clear water and lots of sand.  The
         air is warm but not too humid, and it seems it would be the
         perfect place to go swimming.  Some docks are visible to the
-        west."""
+        [dir west]."""
         })
 world[NoGoMessage("room_the_beach", "east")] = """The beach just keeps
 going.  Long walks on the beach aren't going to solve anything."""
@@ -204,18 +203,19 @@ world.activity.put_in("informational plaque", "room_the_beach")
 quickdef(world, "room_the_dock", "room", {
         Name : "The Dock",
         Description : """Here is a long dock leading off into the
-        ocean from the beach.  It is made of driftwood tied together
-        in such a manner that suggests whoever made it was clearly not
-        a boy scout.  Judging by the smell of old fish, it seems like
-        people fish here regularly.  Beaches lie to the west and the
-        east, and a dirt path leads to the north."""
+        ocean from the beach.  It is made of [ob driftwood] tied
+        together in such a manner that suggests whoever made it was
+        clearly not a boy scout.  Judging by the smell of old fish, it
+        seems like people fish here regularly.  Beaches lie to the
+        [dir west] and the [dir east], and a dirt path leads to the
+        [dir north]."""
         })
 
 quickdef(world, "long fishing dock", "supporter", {
         Scenery : True,
         IsEnterable : True,
         Description : """There are many pieces of driftwood held
-        together by some worn rope."""
+        together by some [ob <worn rope>]."""
         })
 world.activity.put_in("long fishing dock", "room_the_dock")
 
@@ -223,8 +223,8 @@ quickdef(world, "old_rope", "thing", {
         Name : "worn old rope",
         Scenery : True,
         NoTakeMessage : """The rope is affixed to the dock.""",
-        Description : """It's just hanging in there keeping the dock
-        together."""
+        Description : """It's just hanging in there keeping the [ob
+        dock] together."""
         })
 world.activity.put_in("old_rope", "room_the_dock")
 
@@ -234,7 +234,7 @@ quickdef(world, "driftwood", "thing", {
         Words : ["long", "piece", "of", "@driftwood", "@wood"],
         Reported : False,
         Description : """[if [when driftwood AttachedTo old_rope]]If
-        it weren't attached to the dock, it could be an excellent
+        it weren't attached to the [ob dock], it could be an excellent
         baseball bat or even a lever.[else]An excellent baseball bat
         or lever.[endif]"""
         })
@@ -263,7 +263,7 @@ def _when_cuttingwith_rope_knife(actor, ctxt) :
     ctxt.write(str_with_objs("""After a few pulls of of [the $y], with
     a few of those said pulls passing through due to [the $y]'s lack
     of total existence, [the $x] completely disintegrates.  The
-    driftwood is freed.[newline]Taken.""", x="old_rope", y="knife"), actor=actor)
+    [ob driftwood] is freed.[newline]Taken.""", x="old_rope", y="knife"), actor=actor)
 
 ##
 ## More beach
@@ -272,9 +272,10 @@ def _when_cuttingwith_rope_knife(actor, ctxt) :
 quickdef(world, "room_more_beach", "room", {
         Name : "More Beach",
         Description : """Again, more crystal clear water and a lot of
-        sand, except in this case sand dunes cover the beach.
-        Apparently, another person thought the beach was to die for
-        as, next to the shore soaking in the rays, is a skeleton."""
+        sand, except in this case [ob <sand dunes>] cover the beach.
+        You can go back [dir east eastward].  Apparently, another
+        person thought the beach was to die for as, next to the shore
+        soaking in the rays, is a [ob skeleton]."""
         })
 world[NoGoMessage("room_more_beach", "west")] = """The beach just
 keeps going.  Long walks on the beach aren't going to solve anything."""
@@ -285,11 +286,13 @@ world.activity.connect_rooms("room_more_beach", "east", "room_the_dock")
 quickdef(world, "skeleton", "person", {
         Gender : "male",
         Reported : False,
+        FixedInPlace : True,
+        NoTakeMessage : "The skeleton wouldn't appreciate that.",
         Description : """He appears to be enjoying himself, or, at
         least was enjoying himself when he was still alive.[if [when
         skeleton_hand Contains knife]] Something shiny is embedded in
-        his hand.[endif][if [when skeleton Has good_fronds]] He is
-        under some good, sun-blocking palm fronds.[endif]"""
+        his [ob hand].[endif][if [when skeleton Has good_fronds]] He
+        is under some good, sun-blocking [ob palm fronds].[endif]"""
         })
 world.activity.put_in("skeleton", "room_more_beach")
 
@@ -313,7 +316,7 @@ def before_askingfor_knife(actor, y, ctxt) :
             ctxt.write("""Isn't it a great knife?  You didn't lose it, did you?""")
             raise ActionHandled()
     else :
-        ctxt.write_line("""The skeleton seems unmoved by your question.""")
+        ctxt.write("""The skeleton seems unmoved by your question.""")
         raise ActionHandled()
 
 @before(PlacingOn(actor, "good_fronds", "skeleton"))
@@ -334,7 +337,7 @@ def when_giving_fronds(actor, ctxt) :
 def report_giving_fronds(actor, ctxt) :
     ctxt.write("""The skeleton covers himself in the fronds and says:
     'Thank you.  These will work -- they seem to block the sun very
-    well.  I'll give you my knife in return.'[newline]Taken.""")
+    well.  I'll give you my [ob knife] in return.'[newline]Taken.""")
     raise ActionHandled()
 
 quickdef(world, "skeleton_hand", "container", {
@@ -348,13 +351,14 @@ quickdef(world, "skeleton_hand", "container", {
         carpals, and metacarpals are here in this [get IsOpenMsg
         skeleton_hand] hand.  It is quite impressive how many parts
         there are.  [if [when skeleton_hand Contains knife]]A
-        strangely translucent metal knife is concealed within.[endif]"""
+        strangely translucent [ob <metal knife>] is concealed
+        within.[endif]"""
         })
 world.activity.make_part_of("skeleton_hand", "skeleton")
 
 quickdef(world, "knife", "thing", {
         Name : "somewhat existant knife",
-        Words : ["strangely", "translucent", "metal", "somewhat", "existant", "@knife"],
+        Words : ["strangely", "translucent", "metal", "somewhat", "existant", "@knife", "shiny", "thing"],
         Description : """It is semi-transparent.  Maybe the guy tried
         to take it with him.  It seems to be a very high-quality
         knife, except for the lack of total existance."""
@@ -399,22 +403,23 @@ world.activity.put_in("room_well", "region_village")
 quickdef(world, "room_village", "room", {
         Name : "The Village",
         Description : """This is a small village consisting of exactly
-        three and a half palm huts.  One of them was smitten by an
-        angry charged stream of ions.  At least, that's what the
-        explanatory sign in front of it says.  On the remaining three,
-        palm fronds line the roofs.  Well-used paths lead to the west
-        and south while to the north is a slight opening in the
-        jungle."""
+        three and a half palm huts.  The [ob <half hut>] was smitten
+        by an angry charged stream of ions.  At least, that's what the
+        [ob <explanatory sign>] in front of it says.  On the remaining
+        three, palm fronds line the roofs.  Well-used paths lead to
+        the [dir west] and [dir south] while to the [dir north] is a
+        slight opening in the jungle."""
         })
 world.activity.connect_rooms("room_village", "south", "room_the_dock")
 world.activity.connect_rooms("room_village", "north", "room_jungle")
 
 quickdef(world, "half hut", "container", {
+        Words : ["half", "palm", "@hut", "@huts"],
         Scenery : True,
         SuppressContentDescription : True,
-        Description : """Only half of it is there, the rest is
-        wreckage.  Some of the previous owner's stuff is lying around.
-        Outside the hut is a sign explaining what happened."""
+        Description : """Only half of it is there, the rest is [ob
+        wreckage].  Some of the previous owner's stuff is lying
+        around.  Outside the hut is a sign explaining what happened."""
         })
 world.activity.put_in("half hut", "room_village")
 
@@ -422,8 +427,8 @@ quickdef(world, "wreckage", "thing", {
         Words : ["@wreckage", "@stuff"],
         Scenery : True,
         Description : """Mostly rocks.[if [when <half hut> Contains
-        fishing_rod]] The only thing of value is a fishing
-        rod.[endif]"""
+        fishing_rod]] The only thing of value is a [ob <fishing
+        rod>].[endif]"""
         })
 world.activity.put_in("wreckage", "half hut")
 
@@ -455,19 +460,19 @@ def _when_going_to_jungle_from_village(actor, ctxt) :
 quickdef(world, "room_well", "room", {
         Name : "The Well",
         Description : """A circle of bare dirt encircles a lonely but
-        well-visited well in the middle.  The village is over to the
-        east."""
+        well-visited [ob well] in the middle.  The village is over to
+        the [dir east]."""
         })
 world.activity.connect_rooms("room_well", "east", "room_village")
 
 quickdef(world, "well shaft", "container", {
-        Words : ["well", "@shaft", "water"],
+        Words : ["well-visited", "well", "@shaft", "water"],
         Scenery : True,
         SuppressContentDescription : True,
         Description : """A circle of stones with a cylindrical pit in
         the middle.  The water in the cylinder isn't that deep.  [if
-        [when <well shaft> Contains <key card>]]A key card is floating
-        in the water.[endif]"""
+        [when <well shaft> Contains <key card>]]A [ob <key card>] is
+        floating in the water.[endif]"""
         })
 world.activity.put_in("well shaft", "room_well")
 
@@ -499,10 +504,10 @@ quickdef(world, "bucket", "container", {
         mostly water tight, except for [if [not [get Plugged
         bucket]]]a hole[else]an insignificant plugged hole[endif] near
         the bottom.[if [when <animal trap> Contains bucket]] It is
-        hanging from a branch as part of the animal trap.[else][if
-        [when bucket AttachedTo animal_trap_catch]] It is still
-        connected to the catch by a rope.[else] It has a length of
-        rope attached to its handle.[endif][endif]"""
+        hanging from a branch as part of the [ob animal
+        trap].[else][if [when bucket AttachedTo animal_trap_catch]] It
+        is still connected to the [ob catch] by a rope.[else] It has a
+        length of rope attached to its handle.[endif][endif]"""
         })
 
 world.activity.make_part_of("bucket", "animal trap")
@@ -561,7 +566,7 @@ def _when_insertinginto_bucket_well(actor, ctxt) :
     ctxt.write("You lower [the bucket] into [the <well shaft>].")
     if ctxt.world[Location("key card")] == "well shaft" :
         ctxt.world.activity.put_in("key card", "bucket")
-        ctxt.write("The key card floats into the bucket.")
+        ctxt.write("The [ob <key card>] floats into the bucket.")
 
 @report(InsertingInto(actor, "bucket", "well shaft"))
 def _report_insertinginto_bucket_well(actor, ctxt) :
@@ -574,11 +579,11 @@ def _when_taking_bucket(actor, ctxt) :
     if ctxt.world[Location("key card")] == "bucket" and ctxt.world[Location("bucket")] == "well shaft" :
         if ctxt.world[Plugged("bucket")] :
             ctxt.world.activity.put_in("key card", "well shaft")
-            ctxt.write("""The key floated out of the bucket due to
-            excess water on the way up.[newline]""")
+            ctxt.write("""The [ob <key card>] floated out of the
+            bucket due to excess water on the way up.[newline]""")
         else :
             ctxt.write("""The water drains through the hole and leaves
-            the key card within the metallic walls of the bucket.[newline]""")
+            the [ob <key card>] within the metallic walls of the bucket.[newline]""")
 
 ###
 ### The Jungle Area
@@ -601,17 +606,18 @@ dangerous."""
 quickdef(world, "room_jungle", "room", {
         Name : "The Jungle",
         Description : """This is a crossroad of sorts in the middle of
-        a bunch of nearly impenetrable trees.  The trees occlude
-        enough light to make it very dark.  An animal trap is dimly
-        visible on a tree.  Trails lead north, south, east, and
-        west."""
+        a bunch of nearly impenetrable [ob trees].  The trees occlude
+        enough light to make it very dark.  An [ob <animal trap>] is
+        dimly visible on a tree.  Trails lead [dir north], [dir
+        south], [dir east], and [dir west]."""
         })
 
 quickdef(world, "jungle_tree", "thing", {
         Name : "tree",
+        Words : ["@tree", "@trees"],
         Scenery : True,
         Description : """It is very... woody... and has leaves.
-        Hanging from the tree is a trap."""
+        Hanging from the tree is a [ob trap]."""
         })
 world.activity.put_in("jungle_tree", "room_jungle")
 
@@ -621,9 +627,11 @@ def _before_climb_tree(actor, ctxt) :
 
 quickdef(world, "animal trap", "thing", {
         Scenery : True,
-        Description : """It consists of a bucket hanging from a branch
-        with a loop of rope running down to a catch.  It is rough but
-        workable."""
+        Description : """[if [when bucket AttachedTo
+        animal_trap_catch]]It consists of a [ob bucket] haning from a
+        branch with a loop of rope running down to a [ob catch].  It
+        is rough but workable.[else]It's been set off, and you can't
+        see any way to reset it.[endif]"""
         })
 world.activity.put_in("animal trap", "room_jungle")
 
@@ -636,8 +644,9 @@ quickdef(world, "animal_trap_catch", "thing", {
 world.activity.make_part_of("animal_trap_catch", "animal trap")
 
 quickdef(world, "new rope", "thing", {
-        Description : """It is attached to the bucket and the catch
-        and is used as the bucket retainer when the trap is set."""
+        Description : """It is attached to the [ob bucket] and the
+        catch and is used as the bucket retainer when the [ob trap] is
+        set."""
         })
 world.activity.make_part_of("new rope", "animal trap")
 
@@ -671,9 +680,9 @@ def _before_makingtrapgo(actor, x, ctxt) :
             if x == "the_fish" :
                 raise ActionHandled()
             else :
-                raise AbortAction("That won't set off a roughly fish-sized catch.")
+                raise AbortAction("That won't set off a roughly fish-sized [ob catch].")
         else :
-            raise AbortAction("The trap has already been used.")
+            raise AbortAction("The [ob trap] has already been used.")
     else :
         raise AbortAction("You don't see a trap around here.")
 
@@ -685,8 +694,8 @@ def _when_makingtrapgo(actor, x, ctxt) :
 @report(MakingTrapGoWith(actor, X))
 def _report_makingtrapgo(actor, x, ctxt) :
     ctxt.write("""Upon putting the fish on the catch, the rope was
-    released and the bucket fell with a clang from the tree, landing
-    on the ground, just missing the fish.  It didn't even land
+    released and the [ob bucket] fell with a clang from the tree,
+    landing on the ground, just missing the fish.  It didn't even land
     open-mouth-side-down.  As soon as this happened, a small jungle
     animal ran by and absconded with the flounder.""")
 
@@ -712,7 +721,7 @@ def _when_cuttingwith_rope_knife(actor, ctxt) :
     ctxt.world.activity.remove_obj("new rope")
     ctxt.write(str_with_objs("""It takes a bit of time, as [the $y] is
     only somewhat existent, but eventually the rope is severed,
-    freeing the bucket.[newline]Taken.""", y="knife"), actor=actor)
+    freeing the [ob bucket].[newline]Taken.""", y="knife"), actor=actor)
 
 ##
 ## Helicopter pad
@@ -720,17 +729,21 @@ def _when_cuttingwith_rope_knife(actor, ctxt) :
 
 quickdef(world, "room_helicopter_pad", "room", {
         Name : "The Helicopter Pad",
-        Description : """Lying on the ground is a small tarmac, square
-        in shape, and it has the markings as that of a helicopter pad
-        -- a large circle with an inscribed capital letter H.  This
-        previous information is unnecessary for the determination of
-        the tarmac being a helicopter pad as a large helicopter is
-        presently sitting on the said tarmac.  A trail leads south."""
+        Description : """Lying on the ground is a small [ob tarmac],
+        square in shape, and it has the markings as that of a
+        helicopter pad -- a large circle with an inscribed capital
+        letter H.  This previous information is unnecessary for the
+        determination of the tarmac being a helicopter pad as a large
+        [ob helicopter] is presently sitting on the said tarmac.  A
+        trail leads [dir south]."""
         })
 world.activity.connect_rooms("room_helicopter_pad", "south", "room_jungle")
 
-quickdef(world, "tarmac", "thing", {
+quickdef(world, "tarmac", "supporter", {
+        Words : ["small", "@tarmac"],
         Scenery : True,
+        IsEnterable : True,
+        SuppressContentDescription : True,
         Description : """A cement helicopter landing square of a good
         size with the standard writing signifying it is a cement
         helicopter landing square."""
@@ -744,7 +757,24 @@ quickdef(world, "bell helicopter", "container", {
         IsEnterable : True,
         Description : "A large helicopter."
         })
-world.activity.put_in("bell helicopter", "room_helicopter_pad")
+world.activity.put_on("bell helicopter", "tarmac")
+
+class Flying(BasicAction) :
+    verb = "fly"
+    gerund = "flying"
+    numargs = 2
+parser.understand("fly [something x]", Flying(actor, X))
+
+require_xobj_accessible(actionsystem, Flying(actor, X))
+
+@before(Flying(actor, X))
+def before_flying_default(actor, x, ctxt) :
+    raise AbortAction("You can't fly that!")
+
+@before(Flying(actor, "bell helicopter"))
+def before_flying_default(actor, x, ctxt) :
+    raise AbortAction("You don't have a license!")
+
 
 quickdef(world, "penny", "thing", {
         Description : """A small copper penny.  It was made long
@@ -759,17 +789,18 @@ world.activity.put_in("penny", "room_helicopter_pad")
 
 quickdef(world, "room_clearing", "room", {
         Name : "The Clearing",
-        Description : """Not much to see here except for a single
-        manhole exactly in the center of the cleared jungle.  [if [get
-        IsSwitchedOn valve]]You can hear the hissing of steam coming
-        from the pipe running from the west into the ground.[else]A
-        pipe runs from the west into the ground.[endif]"""
+        Description : """Not much to see here except for a single [ob
+        manhole] exactly in the center of the cleared jungle.  [if
+        [get IsSwitchedOn valve]]You can hear the hissing of steam
+        coming from the [ob pipe] running from the [dir west] into the
+        ground.[else]A [ob pipe] runs from the [dir west] into the
+        ground.[endif]  A path leads [dir east]."""
         })
 world.activity.connect_rooms("room_clearing", "east", "room_jungle")
 
 quickdef(world, "good_fronds", "thing", {
         Name : "good palm fronds",
-        NotableDescription : "A few palm fronds litter the ground.",
+        NotableDescription : "A few [ob <palm fronds>] litter the ground.",
         Description : """It seems they were cut right from the tree,
         and it looks like they'd block sunlight very well.""",
         IndefiniteName : "some good palm fronds"
@@ -827,21 +858,21 @@ def _report_unlock_manhole(actor, ctxt) :
 
 quickdef(world, "room_crevice", "room", {
         Name : "The Crevice",
-        Description : """Wisps of steam are eminating from a deep
-        fissure in the ground.  They dissolve among a pleasantly
-        annoying hiss.  A single pipe runs east toward the nondescript
-        clearing.  [if [get IsSwitchedOn valve]]It sounds like steam
-        is rushing through the pipe.[endif]"""
+        Description : """Wisps of steam are emanating from a deep [ob
+        fissure] in the ground.  They dissolve among a pleasantly
+        annoying hiss.  A single [ob pipe] runs [dir east] toward the
+        nondescript clearing.  [if [get IsSwitchedOn valve]]It sounds
+        like steam is rushing through the pipe.[endif]"""
         })
 world.activity.connect_rooms("room_crevice", "east", "room_clearing")
 
 quickdef(world, "fissure", "thing", {
-        Words : ["@fissure", "@crevice"],
+        Words : ["deep", "@fissure", "@crevice"],
         Scenery : True,
-        Description : """The fissure is very deep.  The pipe extends
-        down farther than the eye can see with steam swirling about.
-        It may seem crazy, but it almost seems like there are stars
-        and entire universes far below.  Maybe they are just
+        Description : """The fissure is very deep.  The [ob pipe]
+        extends down farther than the eye can see with steam swirling
+        about.  It may seem crazy, but it almost seems like there are
+        stars and entire universes far below.  Maybe they are just
         fireflies."""
         })
 world.activity.put_in("fissure", "room_crevice")
@@ -851,15 +882,16 @@ quickdef(world, "pipe", "thing", {
         Scenery : True,
         Description : """A[if [get IsSwitchedOn valve]] hissing[endif]
         brass pipe runs from deep within the earth to the east.[if
-        [when room_crevice Contains pile_palm_fronds]] A pile of
-        fronds is covering a segment of the pipe.[else] Partway down
-        the pipe is a matching brass valve.[endif]"""
+        [when room_crevice Contains pile_palm_fronds]] A [ob <pile of
+        palm fronds>] is covering a segment of the pipe.[else] Partway
+        down the pipe is a matching [ob <brass valve>].[endif]"""
         })
 world.activity.put_in("pipe", "room_crevice")
 
 quickdef(world, "pile_palm_fronds", "thing", {
         Name : "pile of palm fronds",
-        Description : """A pile of palm fronds covering the pipe."""
+        Description : """A pile of palm fronds covering the [ob
+        pipe]."""
         })
 world.activity.put_in("pile_palm_fronds", "room_crevice")
 parser.understand("move [object pile_palm_fronds]", Taking(actor, "pile_palm_fronds"))
@@ -872,7 +904,7 @@ def _when_taking_pile_palms(actor, ctxt) :
 @report(Taking(actor, "pile_palm_fronds"))
 def _report_take_pile_palms(actor, ctxt) :
     ctxt.write("""The palm fronds just disperse in every direction,
-    revealing a small brass valve.""")
+    revealing a small [ob <brass valve>].""")
     raise ActionHandled()
 
 quickdef(world, "valve", "thing", {
@@ -885,7 +917,7 @@ quickdef(world, "valve", "thing", {
 @report(SwitchingOn(actor, "valve"))
 def report_switching_on_valve(actor, ctxt) :
     ctxt.write("""Opening the valve releases a continuous hiss of
-    steam into the pipe.""")
+    steam into the [ob pipe].""")
     raise ActionHandled()
 
 @report(SwitchingOff(actor, "valve"))
@@ -906,7 +938,7 @@ world.activity.put_in("room_transmission", "region_underground")
 
 quickdef(world, "conduit", "backdrop", {
         Name : "thick metal conduit",
-        Words : ["think", "metal", "@conduit", "@cable", "@cables"],
+        Words : ["think", "metal", "@conduit", "@conduits", "@cable", "@cables"],
         BackdropLocations : ["region_underground"],
         Description : """Each cable is as thick as and in the general
         form of a twinkie and is covered in as many layers of
@@ -926,12 +958,13 @@ def global_transformer_on(world) :
 quickdef(world, "room_power_station", "room", {
         Name : "The Power Station",
         Description : """The pipes from above run along the ladder you
-        came down into a large steam turbine.  The air is very murky
-        with swirls of steam percolating through the myriad of pipes.
-        The turbine is [if [get IsSwitchedOn valve]]currently
+        came down into a large [ob <steam turbine>].  The air is very
+        murky with swirls of steam percolating through the myriad of
+        pipes.  The turbine is [if [get IsSwitchedOn valve]]currently
         clattering and sputtering from the flow of steam from
-        above[else]ominously silent[endif]. A shielded pair of cables
-        runs from the generator to the north."""
+        above[else]ominously silent[endif]. You can go [dir up] the
+        ladder, and a shielded pair of [ob cables] runs from the
+        turbine to the [dir north]."""
         })
 world.activity.connect_rooms("manhole", "down", "room_power_station")
 
@@ -951,14 +984,14 @@ def _when_going_up_manhole(actor, ctxt) :
 
 quickdef(world, "steam_generator", "thing", {
         Name : "steam turbine",
-        Words : ["steam", "@generator", "@turbine"],
+        Words : ["large", "steam", "@generator", "@turbine"],
         Scenery : True,
         Description : """A brass power generation relic riveted
         together.[if [get IsSwitchedOn valve]] From within the depths
         of the device, the sound of spinning and banging metal can be
         heard.  Signs of electricity can be seen in the form of
-        sparks.[else] It is silent.[endif] A thick metal conduit runs
-        out of the device."""
+        sparks.[else] It is silent.[endif] A thick metal [ob conduit]
+        runs out of the device."""
         })
 world.activity.put_in("steam_generator", "room_power_station")
 
@@ -970,21 +1003,24 @@ quickdef(world, "room_transmission", "room", {
         Name : "The Transmission Room",
         Description : """[if [get Global transformer_on]]A low
         frequency hum permeates the room; it could make a person go
-        crazy. [endif]A single transformer sits in the middle of a
-        room with many conduits and wires going to and from the
-        device.  The transformer has some controls."""
+        crazy. [endif]A single [ob transformer] sits in the middle of
+        a room with many [ob conduits] and wires going to and from the
+        device.  The transformer has some controls.  You can go [dir
+        south]."""
         })
 world.activity.connect_rooms("room_transmission", "south", "room_power_station")
 
 quickdef(world, "transformer", "thing", {
+        Words : ["@transformer", "@controls"],
         Scenery : True,
         Description : """It is a large, iron-cored transformer wrapped
         in thousands of turns of fine copper wire.  Next to the
-        windings are a few devices: a knife switch and an emergency
-        fuse receptacle.  The conduits run from the power station into
-        the transformer, and others run from the transformer into the
-        ground toward the east.[if [get Global transformer_on]] A low
-        hum is emanating from the vibrating magnetic coils.[endif]"""
+        windings are a few devices: a [ob <knife switch>] and an [ob
+        <emergency fuse receptacle>].  The conduits run from the power
+        station into the transformer, and others run from the
+        transformer into the ground toward the east.[if [get Global
+        transformer_on]] A low hum is emanating from the vibrating
+        magnetic coils.[endif]"""
         })
 world.activity.put_in("transformer", "room_transmission")
 
@@ -1036,10 +1072,10 @@ def _report_switchingon_knifeswitch(actor, ctxt) :
 
 quickdef(world, "room_west_volcano", "room", {
         Name : "The Western Side of the Volcano",
-        Description : """This is one side of a volcano.  Acrid smoke
-        is billowing from the top of the cinder cone and rolling down
-        the sides.  A secret door is hidden on the side of the
-        volcano."""
+        Description : """This is one side of a [ob volcano].  [ob
+        <Acrid smoke>] is billowing from the top of the cinder cone
+        and rolling down the sides.  A [ob secret door] is hidden on
+        the side of the volcano.  You can go [dir west]"""
         })
 world[NoGoMessage("room_west_volcano", X)] = "Sulfur-laden rocks bar the way."
 
@@ -1052,13 +1088,20 @@ quickdef(world, "smoke", "thing", {
         })
 world.activity.put_in("smoke", "room_west_volcano")
 
+quickdef(world, "volcano", "thing", {
+        Words : ["cinder", "cone", "@volcano"],
+        Scenery : True,
+        Description : """The smoke smells strangly of rocket fuel."""
+        })
+world.activity.put_in("smoke", "room_west_volcano")
+
 quickdef(world, "elevator_door", "door", {
         Name : "secret elevator door",
         Lockable : True,
         IsLocked : True,
         KeyOfLock : "key card",
-        Description : """It's secret and express, as the sign above
-        the door does not say."""
+        Description : """It's secret and express, as the [ob sign]
+        above the door does not say."""
         })
 world.activity.connect_rooms("room_west_volcano", "east", "elevator_door")
 
@@ -1076,18 +1119,19 @@ world.activity.put_in("secret sign", "room_west_volcano")
 
 quickdef(world, "room_secret_elevator", "room", {
         Name : "The Secret Express Elevator",
-        Description : """Next to the [get IsOpenMsg elevator_door]
-        elevator door is a small control panel with a single button
-        and a small indicator light which is currently [if [get
-        Global transformer_on]]on[else]off[endif]."""
+        Description : """Next to the [get IsOpenMsg elevator_door] [ob
+        <elevator door>] is a small [ob <control panel>] with a single
+        [ob button] and a [ob <small indicator light>] which is
+        currently [if [get Global transformer_on]]on[else]off[endif]."""
         })
 world.activity.connect_rooms("elevator_door", "east", "room_secret_elevator")
 
 quickdef(world, "control panel", "thing", {
+        Words : ["small", "control", "@panel"],
         Scenery : True,
         Description : """A brushed aluminum panel.  It is very sparse
-        with only two features: a small blue button, and an indicator
-        light which [if [get Global
+        with only two features: a [ob <small blue button>], and an [ob
+        <indicator light>] which [if [get Global
         transformer_on]]is[else]isn't[endif] currently lit."""
         })
 world.activity.put_in("control panel", "room_secret_elevator")
@@ -1102,8 +1146,8 @@ world.activity.make_part_of("indicator_light", "control panel")
 
 quickdef(world, "blue_button", "thing", {
         Name : "small blue button",
-        Description : """It's a small blue button on the control
-        panel.  It's glowing slightly, eager for you to push it."""
+        Description : """It's a small blue button on the [ob <control
+        panel>].  It's glowing slightly, eager for you to push it."""
         })
 world.activity.make_part_of("blue_button", "control panel")
 
@@ -1112,7 +1156,7 @@ def _before_pushing_blue_button(actor, ctxt) :
     if ctxt.world[Global("transformer_on")] :
         if ctxt.world[IsOpen("elevator_door")] :
             raise AbortAction("""A voice booms from the control panel:
-                                 'Please close the elevator door.'""")
+                                 'Please close the [ob <elevator door>].'""")
         else :
             raise ActionHandled()
     else :

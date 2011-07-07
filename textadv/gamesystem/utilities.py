@@ -38,8 +38,10 @@ def is_are_list(nouns) :
 
 def obj_is_are_list(context, objs, propname=None) :
     if prop is None :
-        prop = "IndefiniteName"
-    objs = [context.world.get_property(prop, o) for o in objs]
+        prop = "a"
+    propstring = "[%s $o]" % prop
+    #objs = [context.world.get_property(prop, o) for o in objs]
+    objs = [str_with_objs(propstring, o=o) for o in objs]
     return is_are_list(objs)
 
 DIRECTION_INVERSES = {"north" : "south",
@@ -59,6 +61,16 @@ def docstring(s) :
         f.__doc__ = s
         return f
     return _docstring
+
+###
+### Web interface stuff
+###
+
+def make_action_link(text, action) :
+    return '<a class="action" href="" onclick="return run_action(\'%s\');">%s</a>' % (action, text)
+
+def wrap_examine(obj, text, ctxt) :
+    return make_action_link(text, "examine "+ctxt.world.get_property("Name", obj))
 
 ###
 ### Object interface for fancy strings
@@ -156,13 +168,15 @@ def _eval_parse(input, i=0, in_code=False) :
         elif input[i] == "}" :
             raise Exception("Unmatched '}' in "+input)
         elif input[i] == "<" and in_code :
+            if i > j :
+                parsed.append(input[j:i])
             start = i+1
             while input[i] != ">" : i += 1
             parsed.append(" ".join(input[start:i].split()))
             i += 1
             j = i
         elif in_code and input[i] in string.whitespace :
-            if i-1 > j :
+            if i > j :
                 parsed.append(input[j:i])
             i += 1
             j = i
@@ -277,13 +291,13 @@ _str_eval_functions["not"] = lambda ctxt, x : [not x[0]]
 # gets prop(*args) property from world
 _str_eval_functions["get"] = lambda ctxt, prop, *args : [ctxt.world.get_property(prop,*args)]
 # gets definite_name property
-_str_eval_functions["the"] = lambda ctxt, ob : [eval_str(ctxt.world.get_property("DefiniteName", ob), ctxt)]
+_str_eval_functions["the"] = lambda ctxt, ob : [wrap_examine(ob, eval_str(ctxt.world.get_property("DefiniteName", ob), ctxt), ctxt)]
 # gets indefinite_name property
-_str_eval_functions["a"] = lambda ctxt, ob : [ctxt.world.get_property("IndefiniteName", ob)]
+_str_eval_functions["a"] = lambda ctxt, ob : [wrap_examine(ob, eval_str(ctxt.world.get_property("IndefiniteName", ob), ctxt), ctxt)]
 # gets definite_name property, capitalized
-_str_eval_functions["The"] = lambda ctxt, ob : [_cap(eval_str(ctxt.world.get_property("DefiniteName", ob), ctxt))]
+_str_eval_functions["The"] = lambda ctxt, ob : [wrap_examine(ob, _cap(eval_str(ctxt.world.get_property("DefiniteName", ob), ctxt)), ctxt)]
 # gets indefinite_name property, capitalized
-_str_eval_functions["A"] = lambda ctxt, ob : [_cap(eval_str(ctxt.world.get_property("IndefiniteName", ob), ctxt))]
+_str_eval_functions["A"] = lambda ctxt, ob : [wrap_examine(ob, _cap(eval_str(ctxt.world.get_property("IndefiniteName", ob), ctxt)), ctxt)]
 # capitalizes a word
 _str_eval_functions["cap"] = lambda ctxt, s : [_cap(s[0])+s[1:]]
 # number to char
@@ -309,20 +323,45 @@ _str_eval_functions["indent"] = lambda context : ["[indent]"]
 def _cap(string) :
     return string[0].upper()+string[1:]
 
-# if no first object, then first defaults to actor (so one can write
-# [when In box] box] instead of [when actor In box])
 @add_str_eval_func("when")
 def _str_eval_fn_when(context, *obs) :
+    """if no first object, then first defaults to actor (so one can
+    write [when In box] box] instead of [when actor In box])"""
     if len(obs) == 2 :
         ob1, relation, ob2 = context.actor, obs[0], obs[1]
     else :
         ob1, relation, ob2 = obs
     return [context.world.query_relation(context.world.get_relation(relation)(ob1, ob2))]
 
-# concatenates list of objects, getting indefinite names, and puts proper is/are in front
 @add_str_eval_func("is_are_list")
 def _str_eval_fn_is_are_list(context, *obs) :
+    """concatenates list of objects, getting indefinite names, and
+    puts proper is/are in front"""
     return [obj_is_are_list(context, list_append(o[0] for o in obs))]
+
+@add_str_eval_func("dir")
+def _str_eval_fn_dir(context, *obs) :
+    """Takes a direction and possibly a new name, and provides a link
+    to go in that direction."""
+    if len(obs) == 1 :
+        dir = obs[0]
+        text = obs[0]
+    else :
+        dir = obs[0]
+        text = obs[1]
+    return [make_action_link(text, "go "+dir)]
+
+@add_str_eval_func("ob")
+def _str_eval_fn_ob(context, *obs) :
+    """Takes an object and possible text, and provides a link to
+    examine that object."""
+    if len(obs) == 1 :
+        ob = obs[0]
+        text = obs[0]
+    else :
+        ob = obs[0]
+        text = obs[1]
+    return [make_action_link(text, "examine "+ob)]
 
 ###
 ### Reworder.  Makes is/are work out depending on context

@@ -1,6 +1,6 @@
 import tornado.ioloop
 import tornado.web
-from tornado.escape import json_encode, url_unescape
+from tornado.escape import json_encode, url_unescape, url_escape
 import os.path
 import sys
 import time
@@ -27,7 +27,7 @@ class GameHandler(tornado.web.RequestHandler):
 
         session = base64.b64encode(uuid.uuid4().bytes + uuid.uuid4().bytes)
         
-        t = GameThread(games[game], session=session)
+        t = GameThread(game, games[game], session=session)
         t.daemon = True
         t.start()
         sessions_lock.acquire()
@@ -58,6 +58,9 @@ class InputHandler(tornado.web.RequestHandler) :
 class OutputHandler(tornado.web.RequestHandler) :
     @tornado.web.asynchronous
     def get(self) :
+        self.set_header("Cache-Control", "no-store, no-cache, must-revalidate")
+        self.set_header("Pragma", "no-cache")
+        self.set_header("Expires", "Thu, 01 Jan 1970 00:00:00 GMT")
         self.output_lock = threading.Semaphore(1)
         session = url_unescape(self.get_argument("session", None))
         self.ignore_output = False
@@ -74,7 +77,9 @@ class OutputHandler(tornado.web.RequestHandler) :
             sessions_lock.release()
             self.game_thread = t
             print "waiting for output"
-            t.game_context.io.register_wants_output(self.__finish_output)
+            def _output_handler(out, prompt) :
+                tornado.ioloop.IOLoop.instance().add_callback(lambda : self.__finish_output(out, prompt))
+            t.game_context.io.register_wants_output(_output_handler)
     def __finish_output(self, out, prompt) :
         self.output_lock.acquire()
         if self.ignore_output :
@@ -128,7 +133,7 @@ application = tornado.web.Application(
 import threading
 
 class TornadoGameIO(object) :
-    def __init__(self) :
+    def __init__(self, outfile) :
         self.prompt = ">"
         self.main_lock = threading.BoundedSemaphore(1)
         self.input_lock = threading.Semaphore(0)
@@ -137,6 +142,7 @@ class TornadoGameIO(object) :
         self.to_output = ""
         self.wants_output = None
         self.die = False
+        self.outfile = outfile
     def register_wants_output(self, callback) :
         self.main_lock.acquire()
         if self.to_output :
@@ -171,6 +177,11 @@ class TornadoGameIO(object) :
         if self.die :
             raise SystemExit("Thread death due to self.die.")
         command = self.commands.pop()
+        self.main_lock.acquire()
+        if self.outfile :
+            self.outfile.write("\n\n<p><b>"+self.prompt + " "+command+"</b></p>")
+            self.outfile.flush()
+        self.main_lock.release()
         return command
     def kill_io(self) :
         self.main_lock.acquire()
@@ -178,6 +189,9 @@ class TornadoGameIO(object) :
         if self.wants_output :
             self.wants_output("<i>Error: timeout</i>", "")
             self.wants_output = None
+        if self.outfile :
+            self.outfile.flush()
+            self.outfile.close()
         self.main_lock.release()
         self.input_lock.release()
     def receive_input(self, input) :
@@ -197,6 +211,9 @@ class TornadoGameIO(object) :
         out = out.replace("[indent]", "&nbsp;&nbsp;")
         self.to_output += "<p>"+out+"</p>"
         self.to_flush = []
+        if self.outfile :
+            self.outfile.write("\n\n<p>"+out+"</p>")
+            self.outfile.flush()
         if self.wants_output :
             self.wants_output(self.to_output, self.prompt)
             self.to_output = ""
@@ -204,9 +221,10 @@ class TornadoGameIO(object) :
         self.main_lock.release()
 
 class GameThread(threading.Thread) :
-    def __init__(self, game, session) :
+    def __init__(self, gamename, game, session) :
         self.game = game
-        self.game_context = self.game.make_actorcontext_with_io(TornadoGameIO())
+        logfile = open(os.path.join(os.path.dirname(__file__), "logs", gamename+"_"+url_escape(session)+".html"), "w")
+        self.game_context = self.game.make_actorcontext_with_io(TornadoGameIO(logfile))
         self.session = session
         threading.Thread.__init__(self)
     def run(self) :

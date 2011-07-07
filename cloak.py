@@ -20,8 +20,8 @@ quickdef(world, "cloak", "thing", {
         Name : "black velvet cloak",
         Words : ["handsome", "dark", "black", "satin", "velvet", "@cloak"],
         Description : """A handsome cloak, of velvet trimmed with
-satin, and slightly splattered with raindrops.  Its blackness is so
-deep that it almost seems to suck light from the room.""",
+        satin, and slightly splattered with raindrops.  Its blackness
+        is so deep that it almost seems to suck light from the room.""",
         IsWearable : True,
         })
 world.activity.make_wear("player", "cloak")
@@ -36,9 +36,9 @@ def can_drop_cloak_only_in_cloakroom(actor, ctxt, x=None) :
 quickdef(world, "Foyer", "room", {
         Name : "Foyer of the Opera House",
         Description : """You are standing in a spacious hall,
-splendidly decorated in red and gold, with glittering chandeliers
-overhead. The entrance from the street is to the north, and there are
-doorways south and west.""",
+        splendidly decorated in red and gold, with glittering
+        chandeliers overhead. The entrance from the street is to the
+        [dir north], and there are doorways [dir south] and [dir west].""",
         })
 
 world.activity.connect_rooms("Foyer", "south", "Bar")
@@ -51,9 +51,9 @@ and besides, the weather outside seems to be getting worse."""
 quickdef(world, "Bar", "room", {
         Name : "Foyer bar",
         Description : """The bar, much rougher than you'd have guessed
-after the opulence of the foyer to the north, is completely
-empty. There seems to be some sort of message scrawled in the sawdust
-on the floor.""",
+        after the opulence of the foyer to the [dir north], is
+        completely empty. There seems to be some sort of [ob message]
+        scrawled in the sawdust on the floor.""",
         })
 
 @world.handler(ContainsLight("Bar"))
@@ -106,16 +106,16 @@ def before_anything_in_bar(x, ctxt) :
 
 quickdef(world, "Cloakroom", "room", {
         Description : """The walls of this small room were clearly
-once lined with hooks, though now only one remains. The exit is a door
-to the east.""",
+        once lined with [ob hooks], though now only one remains. The
+        exit is a door to the [dir east].""",
         })
 
 quickdef(world, "hook", "supporter", {
-        Words : ["small", "brass", "@hook", "@peg"],
+        Words : ["small", "brass", "@hook", "@peg", "@hooks"],
         Scenery : True,
         Description : """It's just a small brass hook, [if [when hook
-Supports cloak]]with a cloak hanging on it.[else]screwed to the
-wall.[endif]""",
+        Supports cloak]]with a [ob cloak] hanging on it.[else]screwed
+        to the wall.[endif]""",
         })
 world.activity.put_in("hook", "Cloakroom")
 

@@ -224,6 +224,8 @@ class GameThread(threading.Thread) :
     def __init__(self, gamename, game, session) :
         self.game = game
         logfile = open(os.path.join(os.path.dirname(__file__), "logs", gamename+"_"+url_escape(session)+".html"), "w")
+        if not os.path.exists(os.path.dirname(logfile)) :
+            os.path.mkdir(os.path.dirname(logfile))
         self.game_context = self.game.make_actorcontext_with_io(TornadoGameIO(logfile))
         self.session = session
         threading.Thread.__init__(self)

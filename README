@@ -11,28 +11,56 @@ create a domain-specific language for Python which makes writing these
 games easy.  And, an added benefit is that we get to program in
 Python, so all of the standard libraries are included.
 
+Unlike many interactive fiction engines, this one is purely rule-based
+(much like Inform 7).
+
 
 ------------
 Requirements
 ------------
 
-I implemented the system with Python 2.7, and assumed no other
-libraries.  I don't know if it works in other versions of Python.
+This system requires the tornado library for Python, and I implemented
+the system with Python 2.7.  I don't know if it works in other
+versions of Python.
+
+
+-----------------
+Running the games
+-----------------
+
+Run, with respect to the root of the repository,
+
+$ python textadv/tornado/server.py
+
+Then, point your browser to the URL http://localhost:8888/
+
+
+------------------------
+Generating documentation
+------------------------
+
+Much of the engine is self-documenting.  Run ./make-documentation from
+the root of the repository.  To document a specific game, such as
+Cloak of Darkness, then run ./make-documentation cloak.py
+
+The output is in ./doc (you may need to create this directory first).
 
 
 ----------------
 Directory layout
 ----------------
 
-The root directory contains two test games, testgame.py (which is just
-silly), and isleadv.py (which is silly, but a very large test of the
-system).  I would recommend trying isleadv.py and seeing its source
-code to get an idea of what this DSL is like.
+The root directory contains three test games, testgame2.py (which has
+some enterable objects and a ball that's lit), isleadv.py (which is
+silly, but a very large test of the system), and cloak.py (which is
+the standard Cloak of Darkness).  I would recommend trying isleadv.py
+and cloak.py and seeing its source code to get an idea of what this
+DSL is like.
 
 Inside this folder is also the main textadv package (I'll label things
 as python packages now):
 
-* textadv.basiclibrary
+* textadv.basicsetup
 
 This imports everything you probably need.  See isleadv.py for an
 example.
@@ -40,26 +68,17 @@ example.
 * textadv.core
 
 This package contains everything the main game system uses, which
-includes a pattern-matching system (patterns), a database system
-(database) which uses patterns for lookups, an event system (events)
-which can be used to run event handlers based on a pattern, and a
-world model (world).
-
-The world model is an important datastructure of the system, and it
-consists of a relation database (for handling "x is in y", for
-instance) and an object database.  The objects are kind of weird, and
-I'm not completely sure they have to be this way (but there are some
-puzzles I want to try implementing where I think this structure will
-make it really easy).  For understanding how to use this world system,
-it might be easiest to find instances of context.world in isleadv.
+includes a pattern-matching system (patterns), a rule system
+(rulesystem).
 
 * textadv.gamesystem
 
-This package contains the parser and the idea of a "game context."
-This package uses textadv.core heavily.
+This package contains the parser, the world model, the idea of a "game
+context," the relation model, and the action system.  This package
+uses textadv.core heavily.
 
-The module eventsystem is the definition of how an event is checked
-and executed.  See run_action in that module for more details.
+The module actionsystem is the definition of how a player action is
+checked and executed.  See run_action in that module for more details.
 
 The idea with contexts is that modal changes may occur in the game,
 and the hope is that these will help with these switches (for
@@ -67,15 +86,23 @@ instance, it'll probably be possible to play a game inside the game
 without much difficulty.  I haven't tried it yet).
 
 The utilities module contains many useful utilities, including
-eval_str, which evaluates if statements within strings, among other
+eval_str, which evaluates 'if' statements within strings, among other
 things.
+
+The relations module contains models for one-to-many, many-to-many,
+etc. relations.
 
 * textadv.gameworld
 
 This package contains the definitions of basic game objects like
-rooms, doors, and actors, and it contains the definitions of all the
-basic actions a player may attempt on these objects.
+rooms, doors, and actors, and it contains the definitions of many of
+the basic actions a player may attempt on these objects.
 
+* textadv.tornado
+
+This contains the web interface for playing the games.  One runs
+'python textadv/tornado/server.py' in the main repository, and then
+points a web browser to the URL 'http://localhost:8888/' to play.
 
 -----------
 Future work
@@ -92,9 +119,21 @@ could create a new object of type Readable+Container, and then make
 sure the setup methods are sequenced.
 
 
+----------------
+Acknowledgements
+----------------
+
+Many ideas have been taken from reading about Inform 7 and TADS.  I
+thank Zarf for codifying on his website ideas similar to the ones I
+was thinking about.  Also, thanks to Will Doenlen and Colleen
+Josephson for testing the engine.
+
+
 -------
 History
 -------
+
+Jul 2011 - Removed object system and made it purely rule-based
 
 Jun 2011 - Implemented a new engine and got a small game working
 

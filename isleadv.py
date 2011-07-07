@@ -627,11 +627,11 @@ def _before_climb_tree(actor, ctxt) :
 
 quickdef(world, "animal trap", "thing", {
         Scenery : True,
-        Description : """[if [when bucket AttachedTo
-        animal_trap_catch]]It consists of a [ob bucket] haning from a
-        branch with a loop of rope running down to a [ob catch].  It
-        is rough but workable.[else]It's been set off, and you can't
-        see any way to reset it.[endif]"""
+        Description : """[if [when bucket AttachedTo <new rope>]]It
+        consists of a [ob bucket] hanging from a branch with a loop of
+        [ob rope] running down to a [ob catch].  It is rough but
+        workable.[else]It's been set off, and you can't see any way to
+        reset it.[endif]"""
         })
 world.activity.put_in("animal trap", "room_jungle")
 
@@ -772,7 +772,7 @@ def before_flying_default(actor, x, ctxt) :
     raise AbortAction("You can't fly that!")
 
 @before(Flying(actor, "bell helicopter"))
-def before_flying_default(actor, x, ctxt) :
+def before_flying_default(actor, ctxt) :
     raise AbortAction("You don't have a license!")
 
 

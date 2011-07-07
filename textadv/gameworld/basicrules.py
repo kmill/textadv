@@ -225,8 +225,17 @@ def rule_EffectiveContainer_if_thing(x, world) :
     """We assume that we only care about whether a regular thing is
     the effective container if it has constituent parts.  With this
     assumption, we then say that the effective container of a thing is
-    its location."""
+    that of its location."""
     return world[EffectiveContainer(world[Location(x)])]
+
+@world.handler(VisibleContainer(X) <= IsA(X, "thing"))
+def rule_VisibleContainer_if_thing(x, world) :
+    """We assume that we only care about whether a regular thing is
+    the visible container if it has constituent parts.  With this
+    assumption, we then say that the visible container of a thing is
+    that of its location."""
+    return world[VisibleContainer(world[Location(x)])]
+
 
 ##
 # Property: ContainingRoom
@@ -569,9 +578,22 @@ def rule_put_in_not_for_doors(x, y, world) :
 def rule_Location_of_door_is_error(x, world) :
     """There is no location of a door: we would have two choices for
     its location."""
-    raise Exception("Doors have no location.")
+    raise Exception("Doors have no location.", x)
 
 world[FixedInPlace(X) <= IsA(X, "door")] = True
+
+
+@world.handler(VisibleTo(X, actor) <= IsA(X, "door"))
+def rule_VisibleTo_for_door(x, actor, world) :
+    """A door is visible if it is a door to the visible container of
+    the location of the actor."""
+    return x in world.activity.get_room_doors(world[VisibleContainer(world[Location(actor)])])
+
+@world.handler(AccessibleTo(X, actor) <= IsA(X, "door"))
+def rule_AccessibleTo_for_door(x, actor, world) :
+    """A door is accessible if it is a door to the effective container
+    of the location of the actor."""
+    return x in world.activity.get_room_doors(world[EffectiveContainer(world[Location(actor)])])
 
 
 ##

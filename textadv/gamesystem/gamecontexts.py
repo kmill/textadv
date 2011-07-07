@@ -158,6 +158,7 @@ class ActorContext(GameContext) :
         except Exception :
             import traceback
             traceback.print_exc()
+            self.io.write("<pre>"+traceback.format_exc()+"</pre>")
             return (self, dict())
     def call_activity(self, name, *args, **kwargs) :
         kwargs["ctxt"] = self

@@ -1257,6 +1257,104 @@ def before_climbing_default(actor, x, ctxt) :
     """By default, you can't climb."""
     raise AbortAction(str_with_objs("{Bob|cap} can't climb [the $x].", x=x), actor=actor)
 
+##
+# Pushing
+##
+
+class Pushing(BasicAction) :
+    """Pushing(actor, X)"""
+    verb = "push"
+    gerund = "pushing"
+    numargs = 2
+parser.understand("push/press [something x]", Pushing(actor, X))
+
+require_xobj_accessible(actionsystem, Pushing(actor, X))
+
+@before(Pushing(actor, X))
+def before_pushing_default(actor, x, ctxt) :
+    """By default, you can't push things."""
+    raise AbortAction(str_with_objs("{Bob|cap} can't push [the $x].", x=x), actor=actor)
+
+##
+# GivingTo
+##
+
+class GivingTo(BasicAction) :
+    """GivingTo(actor, X, Y)"""
+    verb = ("give", "to")
+    gerund = ("giving", "to")
+    numargs = 3
+parser.understand("give [something x] to [something y]", GivingTo(actor, X, Y))
+
+require_xobj_held(actionsystem, GivingTo(actor, X, Y))
+require_xobj_accessible(actionsystem, GivingTo(actor, Z, X))
+
+@before(GivingTo(actor, X, Y) <= PNot(IsA(Y, "person")))
+def before_giving_to_inanimate(actor, x, y, ctxt) :
+    """You can't give things to inanimate things."""
+    raise AbortAction(str_with_objs("[The $y] can't take [the $x].",x=x, y=y), actor=actor)
+
+@before(GivingTo(actor, X, Y) <= IsA(Y, "person"))
+def before_giving_to_person_default(actor, x, y, ctxt) :
+    """People don't want things by default."""
+    raise AbortAction(str_with_objs("[The $y] doesn't seem interested in [the $x]", x=x, y=y), actor=actor)
+
+@before(GivingTo(actor, X, Y) <= PEquals(actor, Y))
+def before_giving_to_self(actor, x, y, ctxt) :
+    """You can't give things to yourself."""
+    raise AbortAction("{Bob|cap} already {has} that.", actor=actor)
+
+
+@when(GivingTo(actor, X, Y))
+def when_giving_to_default(actor, x, y, ctxt) :
+    """Changes the ownership of the object."""
+    ctxt.world.activity.give_to(x, y)
+
+
+@report(GivingTo(actor, X, Y))
+def report_giving_to_default(actor, x, y, ctxt) :
+    """Writes a message of the transaction."""
+    ctxt.write(str_with_objs("{Bob|cap} gives [the $x] to [the $y].", x=x, y=y), actor=actor)
+
+
+##
+# AskingAbout
+##
+
+class AskingAbout(BasicAction) :
+    verb = ("ask", "about")
+    gerund = ("asking", "about")
+    dereference_iobj = False
+    numargs = 3
+parser.understand("ask [something x] about [text y]", AskingAbout(actor, X, Y))
+
+require_xobj_accessible(actionsystem, AskingAbout(actor, X, Y))
+
+@report(AskingAbout(actor, X, Y))
+def report_asking_about_default(actor, x, y, ctxt) :
+    """Gracefully ignores asking."""
+    ctxt.write(str_with_objs("[The $x] has nothing to say about that.", x=x), actor=actor)
+
+
+##
+# AskingFor
+##
+
+class AskingFor(BasicAction) :
+    verb = ("ask", "for")
+    gerund = ("asking", "for")
+    numargs = 3
+parser.understand("ask [something x] for [something y]", AskingFor(actor, X, Y))
+
+require_xobj_accessible(actionsystem, AskingFor(actor, X, Y))
+require_xobj_visible(actionsystem, AskingFor(actor, Z, X))
+
+@before(AskingFor(actor, X, Y))
+def before_askingfor_turn_to_givingto(actor, x, y, ctxt) :
+    """Turns the AskingFor into a GivingTo."""
+    raise DoInstead(GivingTo(x, y, actor), suppress_message=True)
+
+
 #### to deal with later
 
 class AskTo(BasicAction) :
@@ -1273,26 +1371,25 @@ class AskTo(BasicAction) :
         return self.verb[0] + " " + dobj + " to " + comm
 parser.understand("ask [something x] to [action y]", AskTo(actor, X, Y))
 
-class GiveTo(BasicAction) :
-    verb = ("give", "to")
-    gerund = ("giving", "to")
-    numargs = 3
-parser.understand("give [something x] to [something y]", GiveTo(actor, X, Y))
 
-class Destroy(BasicAction) :
+###
+### Debugging actions
+###
+
+
+class MagicallyDestroying(BasicAction) :
     verb = "destroy"
     gerund = "destroying"
     numargs = 2
-parser.understand("destroy [something x]", Destroy(actor, X))
+parser.understand("magically destroy [something x]", MagicallyDestroying(actor, X))
 
-@when(Destroy(actor, X))
-def when_destroy(actor, x, ctxt) :
+@when(MagicallyDestroying(actor, X))
+def when_magicallydestroying(actor, x, ctxt) :
     ctxt.world.activity.remove_obj(x)
 
-@report(Destroy(actor, X))
-def report_destroy(actor, x, ctxt) :
+@report(MagicallyDestroying(actor, X))
+def report_magicallydestroying(actor, x, ctxt) :
     ctxt.write("*Poof*")
-
 
 
 class MagicallyTaking(BasicAction) :

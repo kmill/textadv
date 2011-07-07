@@ -90,6 +90,7 @@ def describe_current_location_default(ctxt) :
     loc = ctxt.world[Location(ctxt.actor)]
     vis_cont = ctxt.world[VisibleContainer(loc)]
     ctxt.world[Global("current_location")] = vis_cont
+    ctxt.world[Global("current_described_location")] = vis_cont
     ctxt.activity.describe_location(ctxt.actor, loc, vis_cont)
 
 __DESCRIBE_LOCATION_notables = []

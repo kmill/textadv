@@ -312,7 +312,7 @@ class RuleTable(object) :
         self.disabled = []
         self.current_disabled = None
         self.last_current_disabled = []
-    def add_handler(self, pattern, f, insert_first=None, insert_last=None, insert_before=None, insert_after=None, wants_event=False) :
+    def add_handler(self, pattern, f, insert_first=None, insert_last=None, insert_before=None, insert_after=None, wants_event=False, wants_table=False) :
         """Adds (pattern, f) to the table.  At most one of the following may be set:
         * insert_first: puts the handler in a position so it executes first
         * insert_last: puts the handler in a position so it executes last
@@ -321,28 +321,30 @@ class RuleTable(object) :
 
         If none are set, then insert_first is default if reverse is true, otherwise it's insert_last.
 
-        If wants_event is true, then the event is also supplied to the function as its first argument."""
+        If wants_event is true, then the event is also supplied to the function as its first argument.
+
+        If wants_table is true, then the table itself is supplied as the next argument."""
         if insert_first is None and insert_last is None and insert_before is None and insert_after is None :
             if self.reverse : insert_first=True
             else : insert_last=True
         if insert_first :
-            self.actions.insert(0, (pattern, f, wants_event))
+            self.actions.insert(0, (pattern, f, wants_event, wants_table))
         elif insert_last :
-            self.actions.append((pattern, f, wants_event))
+            self.actions.append((pattern, f, wants_event, wants_table))
         elif insert_before :
             for i in xrange(0, len(self.actions)) :
                 if self.actions[i][1] is insert_before : break
-            self.actions.insert(i, (pattern, f, wants_event))
+            self.actions.insert(i, (pattern, f, wants_event, wants_table))
         elif insert_after :
             for i in xrange(0, len(self.actions)) :
                 if self.actions[i][1] is insert_after : break
-            self.actions.insert(i+1, (pattern, f, wants_event))
+            self.actions.insert(i+1, (pattern, f, wants_event, wants_table))
     def notify(self, event, data, pattern_data=None, disable=None) :
         self.__push_current_disabled(disable or [])
         accum = []
         if not pattern_data :
             pattern_data = data
-        for (pattern, f, wants_event) in self.actions :
+        for (pattern, f, wants_event, wants_table) in self.actions :
             if f in self.current_disabled :
                 continue
             try :
@@ -350,9 +352,15 @@ class RuleTable(object) :
                 for k,v in data.iteritems() :
                     matches[k] = v
                 if wants_event :
-                    accum.append(f(event, **matches))
+                    if wants_table :
+                        accum.append(f(event, self, **matches))
+                    else :
+                        accum.append(f(event, **matches))
                 else :
-                    accum.append(f(**matches))
+                    if wants_table :
+                        accum.append(f(self, **matches))
+                    else :
+                        accum.append(f(**matches))
             except NoMatchException :
                 pass
             except NotHandled :
@@ -376,6 +384,38 @@ class RuleTable(object) :
         self.current_disabled = to_disable+self.disabled
     def __pop_current_disabled(self) :
         self.current_disabled = self.last_current_disabled.pop()
+    def disable(self, f=None) :
+        """This disables a function in the activity table
+        semi-permanently.  Should not be used once a game has
+        started."""
+        if self.current_disabled is not None :
+            raise Exception("Should be using temp_disable.")
+        if f :
+            if any(f==f0 for (p,f0,we,wt) in self.actions) :
+                self.disabled.append(f)
+            else :
+                raise Exception("The given f=%r is not in the table." % f)
+        else :
+            raise Exception("No f given to disable.")
+    def temp_disable(self, f=None) :
+        """This disables a function temporarily during the execution
+        of the table."""
+        if f :
+            if any(f==f0 for (p,f0,we,wt) in self.actions) :
+                self.current_disabled.append(f)
+            else :
+                raise Exception("The given f=%r is not in the table." % f)
+        else :
+            raise Exception("No f given to temporarily disable.")
+    def temp_enable(self, f=None) :
+        """This enables a function temporarily during the execution of
+        the table.  Does not require the function to have been
+        previously disabled."""
+        if f :
+            if f in self.current_disabled :
+                self.current_disabled.remove(f)
+        else :
+            raise Exception("No f given to temporarily disable.")
     def copy(self) :
         """Returns a copy which behaves like before, except the
         activity table has been suitably remade.  Values are stored in
@@ -398,14 +438,18 @@ class RuleTable(object) :
         print "<tt>"+escape(self.accumulator.__name__)+"</tt></p>"
         if self.actions :
             print "<ol>"
-            for key,handler,we in self.actions :
+            for key,handler,we,wt in self.actions :
                 print "<li><p>"
                 if handler in self.disabled :
                     print "<b><i>DISABLED</i></b>"
                 print escape(repr(key))#+"<br>"
                 print "<b>calls</b> <tt>"+escape(handler.__name__)+"</tt>"
+                withs = []
                 if we :
-                    print "<b>with event</b>"
+                    withs.append("event")
+                if wt :
+                    withs.append("table")
+                print "<b>with "+"and".join(withs)+"</b>"
                 try :
                     print "<small><i>(from <tt>"+inspect.getsourcefile(handler)+"</tt>)</i></small>"
                 except TypeError :

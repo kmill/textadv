@@ -22,7 +22,7 @@ but you feel that Adventure is afoot."""
 
 
 @before(Attacking(actor, X) <= PEquals(actor, X))
-def _before_suicide(actor, context) :
+def _before_suicide(actor, ctxt) :
     raise AbortAction("Suicide is not the answer.", actor=actor)
 
 ##
@@ -228,9 +228,6 @@ quickdef(world, "old_rope", "thing", {
         })
 world.activity.put_in("old_rope", "room_the_dock")
 
-#  Instead of taking the old rope when the old rope is
-#joined to the driftwood, say "It seems to be knotted up with no
-# beginning nor end.  It's a mobius rope."""
 
 quickdef(world, "driftwood", "thing", {
         Name : "long piece of driftwood",
@@ -296,31 +293,49 @@ quickdef(world, "skeleton", "person", {
         })
 world.activity.put_in("skeleton", "room_more_beach")
 
-#     def ask_about(self, text, context) :
-#         res = parse_something(context, text)
-#         if context.world["knife"] in res :
-#             if context.world["skeleton_hand"].x_R_s(In, "knife") :
-#                 context.write_line("""'Do you like it?  It's my
-#                 favorite knife.  Though, the sun is a bit hot.  I
-#                 might give it to you if you help me out a bit...'""")
-#             else :
-#                 context.write_line("""'Isn't it a great knife?'""")
-#         else :
-#             context.write_line("""The skeleton seems unmoved by your question.""")
+@before(AskingAbout(actor, "skeleton", Y))
+def before_askingabout_knife(actor, y, ctxt) :
+    res = ctxt.parser.run_parser("something",
+                                 ctxt.parser.transform_text_to_words(y),
+                                 ctxt)
+    if "knife" in [r[0].value for r in res] :
+        raise DoInstead(AskingFor(actor, "skeleton", "knife"), suppress_message=True)
 
-# @before(GiveTo(actor, "good_fronds", "skeleton"))
-# def _before_give_fronds(actor, context) :
-#     raise ActionHandled()
-# @when(GiveTo(actor, "good_fronds", "skeleton"))
-# def _when_give_fronds(actor, context) :
-#     context.world["good_fronds"].give_to("skeleton")
-#     context.world["knife"].give_to(actor)
-#     raise ActionHandled()
-# @after(GiveTo(actor, "good_fronds", "skeleton"))
-# def _after_give_fronds(actor, context) :
-#     context.write_line("""The skeleton covers himself in the fronds
-#     and says: 'Thank you.  These will work -- they seem to block the
-#     sun very well.  I'll give you my knife in return.'\n\nTaken.""")
+@before(AskingFor(actor, "skeleton", Y))
+def before_askingfor_knife(actor, y, ctxt) :
+    if y == "knife" :
+        if ctxt.world[Location("knife")] == "skeleton_hand" :
+            ctxt.write("""'Do you like it? It's my favorite
+            knife. Though, the sun is a bit hot.  I might give it to
+            you if you help me out a bit...'""")
+            raise ActionHandled()
+        else :
+            ctxt.write("""Isn't it a great knife?  You didn't lose it, did you?""")
+            raise ActionHandled()
+    else :
+        ctxt.write_line("""The skeleton seems unmoved by your question.""")
+        raise ActionHandled()
+
+@before(PlacingOn(actor, "good_fronds", "skeleton"))
+def before_placingon_fronds(actor, ctxt) :
+    raise DoInstead(GivingTo(actor, "good_fronds", "skeleton"), suppress_message=True)
+
+@before(GivingTo(actor, "good_fronds", "skeleton"), wants_table=True)
+def before_giving_fronds(table, actor, ctxt) :
+    table.temp_disable(f=before_giving_to_person_default)
+
+@when(GivingTo(actor, "good_fronds", "skeleton"))
+def when_giving_fronds(actor, ctxt) :
+    ctxt.world.activity.give_to("good_fronds", "skeleton")
+    ctxt.world.activity.give_to("knife", actor)
+    raise ActionHandled()
+
+@report(GivingTo(actor, "good_fronds", "skeleton"))
+def report_giving_fronds(actor, ctxt) :
+    ctxt.write("""The skeleton covers himself in the fronds and says:
+    'Thank you.  These will work -- they seem to block the sun very
+    well.  I'll give you my knife in return.'[newline]Taken.""")
+    raise ActionHandled()
 
 quickdef(world, "skeleton_hand", "container", {
         Name : "hand",
@@ -483,7 +498,7 @@ quickdef(world, "bucket", "container", {
         Description : """It is a tin bucket and looks like it is
         mostly water tight, except for [if [not [get Plugged
         bucket]]]a hole[else]an insignificant plugged hole[endif] near
-        the bottom.[if [when animal_trap Contains bucket]] It is
+        the bottom.[if [when <animal trap> Contains bucket]] It is
         hanging from a branch as part of the animal trap.[else][if
         [when bucket AttachedTo animal_trap_catch]] It is still
         connected to the catch by a rope.[else] It has a length of
@@ -601,7 +616,7 @@ quickdef(world, "jungle_tree", "thing", {
 world.activity.put_in("jungle_tree", "room_jungle")
 
 @before(Climbing(actor, "jungle_tree"))
-def _before_climb_tree(actor, context) :
+def _before_climb_tree(actor, ctxt) :
     raise AbortAction("That would be far too simple.")
 
 quickdef(world, "animal trap", "thing", {
@@ -998,7 +1013,7 @@ world.activity.make_part_of("knife_switch", "transformer")
 def _before_inserting_fuse(actor, x, ctxt) :
     raise AbortAction("To prevent electrical shock, you ought to turn off the knife switch.")
 
-@before(InsertingInto(actor, X, "fuse_receptacle") <= Contents("fuse_receptacle"))
+@before(InsertingInto(actor, X, "fuse_receptacle") <= Contents("fuse_receptacle")) # that is, if contents not empty
 def _before_insert_fuse(actor, x, ctxt) :
     raise AbortAction("There's already something in the fuse receptacle.")
 
@@ -1011,129 +1026,137 @@ def _report_switchingon_knifeswitch(actor, ctxt) :
         ctxt.write("Nothing happens.")
     raise ActionHandled()
 
-# ###
-# ### The Volcano
-# ###
+###
+### The Volcano
+###
 
-# ##
-# ## West side of volcano
-# ##
+##
+## West side of volcano
+##
 
-# room_west_volcano = world.new_obj("west_volcano", Room, "The Western Side of the Volcano",
-# """This is one side of a volcano.  Acrid smoke is billowing from the
-# top of the cinder cone and rolling down the sides.  A secret door is
-# hidden on the side of the volcano.""")
-# room_west_volcano["no_go_msg"] = "Sulfur-laden rocks bar the way."
-# room_west_volcano.connect(room_jungle, "west")
+quickdef(world, "room_west_volcano", "room", {
+        Name : "The Western Side of the Volcano",
+        Description : """This is one side of a volcano.  Acrid smoke
+        is billowing from the top of the cinder cone and rolling down
+        the sides.  A secret door is hidden on the side of the
+        volcano."""
+        })
+world[NoGoMessage("room_west_volcano", X)] = "Sulfur-laden rocks bar the way."
 
-# smoke = world.new_obj("smoke", Scenery, "acrid smoke",
-# """The smoke smells strangly of rocket fuel.""")
-# smoke.move_to(room_west_volcano)
+world.activity.connect_rooms("room_west_volcano", "west", "room_jungle")
 
-# elevator_door = world.new_obj("elevator_door", Door, "secret elevator door",
-# """It's secret and express, as the sign above the door does not say.""")
-# elevator_door.add_exit_for(room_west_volcano, "east")
-# elevator_door["lockable"] = True
-# elevator_door["locked"] = True
-# elevator_door.unlockable_with(key_card)
+quickdef(world, "smoke", "thing", {
+        Name : "acrid smoke",
+        Scenery : True,
+        Description : """The smoke smells strangly of rocket fuel."""
+        })
+world.activity.put_in("smoke", "room_west_volcano")
 
-# secret_sign = world.new_obj("secret_sign", Readable, "secret sign",
-# """In bold, clear writing in carbon dioxide laser writing on titanium,
-# the sign says: 'This is not a secret and express elevator door.'""")
-# secret_sign["takeable"] = False
-# secret_sign["reported"] = False
-# secret_sign.move_to(room_west_volcano)
+quickdef(world, "elevator_door", "door", {
+        Name : "secret elevator door",
+        Lockable : True,
+        IsLocked : True,
+        KeyOfLock : "key card",
+        Description : """It's secret and express, as the sign above
+        the door does not say."""
+        })
+world.activity.connect_rooms("room_west_volcano", "east", "elevator_door")
 
-# ##
-# ## Secret Express Elevator
-# ##
+quickdef(world, "secret sign", "thing", {
+        Scenery : True,
+        Description : """In bold, clear writing in carbon dioxide
+        laser writing on titanium, the sign says: 'This is not a
+        secret and express elevator door.'"""
+        })
+world.activity.put_in("secret sign", "room_west_volcano")
 
-# room_secret_elevator = world.new_obj("room_secret_elevator", Room, "The Secret Express Elevator",
-# """Next to the [get elevator_door is_open_msg] elevator door is a
-# small control panel with a single button and a small indicator light
-# which is currently [if [get underground_defs transformer_on]]on[else]off[endif].""")
-# elevator_door.add_exit_for(room_secret_elevator, "west")
+##
+## Secret Express Elevator
+##
 
-# control_panel = world.new_obj("control_panel", Scenery, "control panel",
-# """A brushed aluminum panel.  It is very sparse with only two
-# features: a small blue button, and an indicator light which [if [get
-# underground_defs transformer_on]]is[else]isn't[endif] currently
-# lit.""")
-# control_panel.move_to(room_secret_elevator)
+quickdef(world, "room_secret_elevator", "room", {
+        Name : "The Secret Express Elevator",
+        Description : """Next to the [get IsOpenMsg elevator_door]
+        elevator door is a small control panel with a single button
+        and a small indicator light which is currently [if [get
+        Global transformer_on]]on[else]off[endif]."""
+        })
+world.activity.connect_rooms("elevator_door", "east", "room_secret_elevator")
 
-# indicator_light = world.new_obj("indicator_light", Scenery, "small indicator light",
-# """It is a pilot light, red in color.  [if [get underground_defs
-# transformer_on]]It is shining brightly.[else]No light is being
-# emitted.[endif]""")
-# indicator_light.move_to(control_panel)
+quickdef(world, "control panel", "thing", {
+        Scenery : True,
+        Description : """A brushed aluminum panel.  It is very sparse
+        with only two features: a small blue button, and an indicator
+        light which [if [get Global
+        transformer_on]]is[else]isn't[endif] currently lit."""
+        })
+world.activity.put_in("control panel", "room_secret_elevator")
 
-# blue_button = world.new_obj("blue_button", BObject, "small blue button",
-# """It's a small blue button on the control panel.  It's glowing
-# slightly, eager for you to push it.""")
-# blue_button["takeable"] = False
-# blue_button.move_to(control_panel)
+quickdef(world, "indicator_light", "thing", {
+        Name : "small indicator light",
+        Description : """It is a pilot light, red in color.  [if [get
+        Global transformer_on]]It is shining brightly.[else]No light
+        is being emitted.[endif]"""
+        })
+world.activity.make_part_of("indicator_light", "control panel")
 
-# @before(Push(actor, blue_button))
-# def _before_push_blue_button(actor, context) :
-#     if context.world["underground_defs"]["transformer_on"] :
-#         if world["elevator_door"]["open"] :
-#             raise AbortAction("""A voice booms from the control panel:
-#                                  'Please close the elevator door.'""")
-#         else :
-#             raise ActionHandled()
-#     else :
-#         raise AbortAction("Nothing happens.")
+quickdef(world, "blue_button", "thing", {
+        Name : "small blue button",
+        Description : """It's a small blue button on the control
+        panel.  It's glowing slightly, eager for you to push it."""
+        })
+world.activity.make_part_of("blue_button", "control panel")
 
-# @when(Push(actor, blue_button))
-# def _when_push_blue_button(actor, context) :
-#     actor.move_to("room_lab")
+@before(Pushing(actor, "blue_button"))
+def _before_pushing_blue_button(actor, ctxt) :
+    if ctxt.world[Global("transformer_on")] :
+        if ctxt.world[IsOpen("elevator_door")] :
+            raise AbortAction("""A voice booms from the control panel:
+                                 'Please close the elevator door.'""")
+        else :
+            raise ActionHandled()
+    else :
+        raise AbortAction("Nothing happens.")
 
-# @after(Push(actor, blue_button))
-# def _after_push_blue_button(actor, context) :
-#     context.write_line("""The red light begins to blink, and, without
-#     warning, a trap door opens up underneath you and deposits you
-#     in...""")
-#     run_action(Look(actor), context=context)
-#     context.write_line("""You get up and recover from the fall.""")
+@when(Pushing(actor, "blue_button"))
+def _when_pushing_blue_button(actor, ctxt) :
+    ctxt.world.activity.put_in(actor, "room_lab")
 
-# ##
-# ## The lab
-# ##
+@report(Pushing(actor, "blue_button"))
+def _report_pushing_blue_button(actor, ctxt) :
+    ctxt.write("""The red light begins to blink, and, without warning,
+    a trap door opens up underneath you and deposits you in...[newline]""")
+    ctxt.activity.describe_current_location()
+    ctxt.write("""[newline]You get up and recover from the fall.""")
 
-# room_lab = world.new_obj("room_lab", Room, "The Lab",
-# """Lots of equipment, all evil.  The horror...""")
+##
+## The lab
+##
 
-# red_button = world.new_obj("red_button", BObject, "large red button",
-# """It looks like nothing good will come out of pushing this button
-# that has inscribed lettering of 'Do not push.'""")
-# red_button["takeable"] = False
-# red_button.move_to(room_lab)
+quickdef(world, "room_lab", "room", {
+        Name : "The Lab",
+        Description : """Lots of equipment, all evil.  The
+        horror..."""
+        })
 
-# @before(Push(actor, red_button))
-# def _before_push_red_button(actor, context) :
-#     raise ActionHandled()
+quickdef(world, "red_button", "thing", {
+        Name : "large red button",
+        FixedInPlace : True,
+        Description : """It looks like nothing good will come out of
+        pushing this button that has inscribed lettering of 'Do not
+        push.'"""
+        })
+world.activity.put_in("red_button", "room_lab")
 
-# @when(Push(actor, red_button))
-# def _when_push_red_button(actor, context) :
-#     finish_game(EndGameWin())
+@before(Pushing(actor, "red_button"))
+def _before_pushing_red_button(actor, ctxt) :
+    raise ActionHandled()
 
+@when(Pushing(actor, "red_button"))
+def _when_push_red_button(actor, ctxt) :
+    ctxt.write("""Just kidding, the button actually said 'Do push for
+    a party.'  There was a surprise party for you.  The whole thing
+    was set up because you like adventures.  You ate a lot of cake.""")
+    ctxt.activity.end_game_saying("You have won")
+    raise ActionHandled()
 
-# ###
-# ### Game endings
-# ###
-
-# @when(EndGameWin())
-# def _end_game_win(context) :
-#     context.write_line("""Just kidding, the button actually said 'Do
-#     push for a party.'  There was a surprise party for you.  The whole
-#     thing was set up because you like adventures.  You ate a lot of
-#     cake.
-
-#     You won!""")
-
-# ###
-# ### Begin the game
-# ###
-
-# if __name__=="__main__" :
-#     basic_begin_game(see_world_size=False)

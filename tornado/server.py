@@ -80,6 +80,7 @@ class OutputHandler(tornado.web.RequestHandler) :
         if self.ignore_output :
             print "ignoring output, client has quit"
         else :
+            self.ignore_output = True
             self.write(json_encode({"text" : out,
                                     "prompt" : prompt}))
             print "wrote output."

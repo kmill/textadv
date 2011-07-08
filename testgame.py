@@ -2,137 +2,205 @@
 #
 # a test of the game engine
 
-from textadv.basiclibrary import *
+execfile("textadv/basicsetup.py")
 
 ##
 ## Rat region
 ##
 
-rat_region = world.new_obj("rat_region", Region, "Rat region")
-rat = world.new_obj("rat", Scenery, "big fat rat", """The rat looks like it's been eating quite a lot.  You are somewhat confused, though, since rats don't live on the fourth floor.""")
-rat.move_to(rat_region)
-rat["no_take_msg"] = "It moves too fast for you to catch it."
-understand("catch rat", Take(actor, "rat"))
-sky = world.new_obj("sky", Scenery, "sky", """You look out the window and see a bit of the Boston skyline.""")
-sky.move_to(rat_region)
-sky["words"] = ["boston", "@skyline", "@sky"]
+quickdef(world, "rat region", "region")
+
+quickdef(world, "rat", "backdrop", {
+        Name : "big fat rat",
+        NoTakeMessage : "It moves too fast for you to catch it.",
+        Description : """The rat looks like it's been eating quite a
+        lot.  You are somewhat confused, though, since rats don't live
+        on the fourth floor.""",
+        BackdropLocations : ["rat region"]
+        })
+
+parser.understand("catch [object rat]", Taking(actor, "rat"))
+
+quickdef(world, "sky", "backdrop", {
+        Words : ["boston", "@skyline", "@sky"],
+        Description : """You look out the window and see a bit of the
+        Boston skyline.""",
+        BackdropLocations : ["rat region"]
+        })
 
 ##
 ## The Verifier
 ##
 
-verifier = world.new_obj("verifier", Actor, "The Verifier", """
-The Verifier always thinks what you do is a good idea.""")
-@before(TagPattern(x, player, z))
-def _verifier_whenever(x, z, context) :
-    if context.world["player"].get_location() != context.world["verifier"].get_location() :
-        return
-    if x==Take :
-        context.write_line(str_with_objs("\"My, I would have never thought of taking [the $z],\" notes The Verifier.", z=z))
-    else :
-        context.write_line("\"What a wonderful idea!\" cries The Verifier.")
+quickdef(world, "verifier", "person", {
+        Name : "The Verifier",
+        ProperNamed : True,
+        Description : """The Verifier always thinks what you do is a
+        good idea."""
+        })
 
-#@when(EndTurn())
-def _verifier_startturn(context) :
-    player = context.world["player"]
-    verifier = context.world["verifier"]
-    if player.get_location() != verifier.get_location() :
-        context.write_line("The Verifier follows.")
-        verifier.move_to(player.get_location())
+@report(X <= PEquals(Location("verifier"), Location("player")))
+def _verifier_whenever(x, ctxt) :
+    if type(x) is Taking :
+        ctxt.write(str_with_objs("[newline]\"My, I would have never thought of taking [the $z],\" notes The Verifier.", z=x.get_do()))
+    else :
+        ctxt.write("[newline]\"What a wonderful idea to "+x.infinitive_form(ctxt)+"!\" cries The Verifier.")
+
+@actoractivities.to("step_turn")
+def _verifier_step_turn(ctxt) :
+    if ctxt.world[Location("player")] != ctxt.world[Location("verifier")] :
+        ctxt.write("The Verifier follows.")
+        ctxt.world.activity.put_in("verifier", ctxt.world[Location("player")])
 
 ##
 ## Your pocket
 ##
 
-pocket = world.new_obj("pocket", BObject, "pocket", "It's your pocket.")
-pocket.give_to(player) # doesn't give to player, just attaches it so it's in context
-pocket["reported"] = False
-pocket["reference_objects"] = False
+quickdef(world, "pocket", "container", {
+        Description : """It's your pocket."""
+        })
+world.activity.make_part_of("pocket", "player")
 
-the_key = world.new_obj("the_key", BObject, "useful key", """
-It looks like it can open anything.""")
-the_key["indefinite_name"] = "a useful key"
-the_key.move_to(pocket)
+quickdef(world, "key", "thing", {
+        Name : "useful key",
+        Description : """It looks like it can open anything."""
+        })
+world.activity.put_in("key", "pocket")
 
-@before(Examine(actor, BObject(PVar("pocket", pocket))))
-def _before_examine_pocket(actor, pocket, context) :
-    if actor.id != context.actorid :
-        return
-    if context.world["the_key"].s_R_x(In, pocket) :
-        context.write_line("The key was in your pocket all along.")
-        context.world["the_key"].move_to(context.actor.get_location())
-        raise DoInstead(Take(actor, "the_key"))
+@before(Examining("player", "pocket") <= Contains("pocket", "key"))
+def _before_examine_pocket_with_key(ctxt) :
+    ctxt.write("The key was in your pocket all along.")
+    raise DoInstead(Taking("player", "key"))
+
+##
+## The continuation
+##
+
+world.add_relation(KindOf("continuation", "container"))
+
+quickdef(world, "purple continuation", "continuation", {
+        Description : """It's a purple continuation.  Can this be?"""
+        })
+quickdef(world, "brown continuation", "continuation", {
+        Description : """It's a purple continuation.  Can this be?"""
+        })
+world.activity.put_in("purple continuation", "room_41")
+world.activity.put_in("brown continuation", "room_41")
+
+@world.define_property
+class ContinuationData(Property) :
+    numargs = 1
+
+world[ContinuationData(X)] = None
+
+@before(InsertingInto(actor, X, Y) <= IsA(Y, "continuation") & PNot(PEquals(Owner(Y), actor)))
+def _before_inserting_into_continuation_if_not_owner(actor, x, y, ctxt) :
+    raise AbortAction("You have to be holding the continuation.")
+
+@when(InsertingInto(actor, X, Y) <= IsA(Y, "continuation"))
+def _when_inserting_into_continuation(actor, x, y, ctxt) :
+    old_world = ctxt.world
+    ctxt.world = old_world[ContinuationData(y)]
+    ctxt.world.activity.give_to(x, actor)
+    if old_world[ContinuationData(x)] : # for if the passed object is a continuation
+        ctxt.world[ContinuationData(x)] = old_world[ContinuationData(x)]
+    raise ActionHandled()
+
+@report(InsertingInto(actor, X, Y) <= IsA(Y, "continuation"))
+def _report_inserting_into_continuation(actor, x, y, ctxt) :
+    ctxt.write(str_with_objs("Bewildered, you find the world as it was, but you are now holding [the $x].", x=x), actor=actor)
+    raise ActionHandled()
+
+@when(Taking(actor, X) <= IsA(X, "continuation") & PNot(ContinuationData(X)))
+def _when_taking_continuation(actor, x, ctxt) :
+    ctxt.world[ContinuationData(x)] = ctxt.world.copy()
+
+@actoractivities.to("describe_object", insert_before=describe_object_default)
+def describe_object_continuation(actor, o, ctxt) :
+    if ctxt.world[IsA(o, "continuation")] and ctxt.world[ContinuationData(o)] :
+        ctxt.write("The continuation is ready something to be inserted into it.")
 
 ##
 ## Room 41
 ##
 
-room_41 = world.new_obj("room_41", Room, "41","""
-This is a room on the fourth floor of tep.  It is currently home to Kyle.  There is a bed and a loft.  There is an exit to the north.""")
-room_41.move_to(rat_region)
+quickdef(world, "room_41", "room", {
+        Name : "41",
+        Description : """This is a room on the fourth floor of tep.
+        It is currently home to Kyle.  There is a bed and a loft.
+        There is an exit to the [dir north]."""
+        })
+world.activity.put_in("room_41", "rat_region")
 
-player.move_to("room_41")
-verifier.move_to("room2")
+world.activity.put_in("player", "room_41")
+world.activity.put_in("verifier", "room_41")
 
-ball = world.new_obj("ball", BObject, "red ball","""
-It's simply a red ball.  Round like a sphere.""")
-ball.move_to(room_41)
+quickdef(world, "red ball", "thing", {
+        Description : """It's simply a red ball.  Round like a
+        sphere."""
+        })
+world.activity.put_in("red ball", "room_41")
 
-ball2 = world.new_obj("ball2", BObject, "blue ball","""
-It's a blue ball.  Like something blue.""")
-ball2.move_to(room_41)
+quickdef(world, "blue ball", "thing", {
+        Description : """It's a blue ball.  Like something blue."""
+        })
+world.activity.put_in("blue ball", "room_41")
 
-ball3 = world.new_obj("ball3", BObject, "green ball","""
-It's a green ball.  Like grass, but not quite.""")
-ball3.move_to(room_41)
-ball3["indefinite_name"] = "an amazing green ball"
-ball3["words"] = ["amazing", "green", "@ball"]
-@before(Take(actor, ball3))
-def _instead_take_ball3(actor, context) :
-    context.write_line("{Bob} actually {wants} the blue ball.")
-    raise DoInstead(Take(actor, "ball2"))
+quickdef(world, "green ball", "thing", {
+        Words : ["amazing", "green", "@ball"],
+        IndefiniteName : "an amazing green ball",
+        Description : """It's a green ball.  Like grass, but not
+        quite.""",
+        })
+world.activity.put_in("green ball", "room_41")
 
-light = world.new_obj("light", BObject, "light", """It's a light.""")
-light_bulb = world.new_obj("light_bulb", BObject, "light bulb", "It's a light bulb.")
-light.move_to("room_41")
-light_bulb.move_to("room_41")
+@before(Taking(actor, "green ball"))
+def _instead_taking_green_ball(actor, ctxt) :
+    ctxt.write("{Bob} actually {wants} the blue ball.", actor=actor)
+    raise DoInstead(Taking(actor, "blue ball"))
 
-zombocom = world.new_obj("zombocom", Room, "zombocom", """
-[if [when in zombocom]]Welcome to zombocom.[else]This is zombocom.  It looks like you can enter it.[endif]""")
-zombocom.move_to("room_41")
-zombocom["reference_self"] = True
 
-@before(Enter(actor, zombocom))
-def _before_enter_zombocom(actor, context) :
-    context.write_line("Anything is possible...")
+quickdef(world, "light", "thing", {
+        Description : "It's a light."
+        })
+world.activity.put_in("light", "room_41")
+
+quickdef(world, "light bulb", "thing", {
+        Description : "It's a light bulb."
+        })
+world.activity.put_in("light bulb", "room_41")
+
+quickdef(world, "zombocom", "container", {
+        IsEnterable : True,
+        Description : """[if [when zombocom Contains]]Welcome to
+        zombocom.[else]This is zombocom.  It looks like you can enter
+        it.[endif]"""
+        })
+world.activity.put_in("zombocom", "room_41")
+
+world[NotableDescription("player") <= PEquals(Location("player"), "zombocom")] = "You are standing here, cognizant of the possibilities."
+
+@report(Entering(actor, "zombocom"))
+def _report_enter_zombocom(actor, ctxt) :
+    ctxt.write("Anything is possible...")
 
 ##
 ## Room2
 ##
 
-room2 = world.new_obj("room2", Room, "Another Room", """
-It's another room.  I don't know what to say.  You can go south.""")
-#room_41.connect(room2, "north")
+quickdef(world, "room2", "room", {
+        Name : "Another Room",
+        Description : """It's another room.  I don't know what to say.
+        You can go [dir south]."""
+        })
 
-door = world.new_obj("door", Door, "old door","""
-It's a door.  It's made of wood, and has been here longer than you have.  It is [get door is_open_msg].""")
-door.add_exit_for(room_41, "north")
-door.add_exit_for(room2, "south")
-door["lockable"] = True
-door["locked"] = True
-door.unlockable_with(the_key)
-
-##
-## Run game
-##
-
-print "World serialization is",len(world.serialize()),"bytes"
-import zlib
-print "World serialization is",len(zlib.compress(world.serialize())),"bytes compressed"
-#import pickle
-#pickle.dump(game_context, file("the_world.obj", "w"))
-
-
-if __name__=="__main__" :
-    #context2 = ActorContext(None, gameio, world.copy(), "player")
-    basic_begin_game()
+quickdef(world, "old door", "door", {
+        Lockable : True,
+        IsLocked : True,
+        KeyOfLock : "key",
+        Description : """It's a door.  It's made of wood, and has been
+        here longer than you have.  It is [get IsOpenMsg <old
+        door>]."""
+        })
+world.activity.connect_rooms("old door", "south", "room_41")
+world.activity.connect_rooms("old door", "north", "room2")

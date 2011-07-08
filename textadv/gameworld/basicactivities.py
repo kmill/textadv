@@ -113,7 +113,7 @@ def describe_location_Heading(actor, loc, vis_cont, ctxt) :
         ctxt.activity.describe_location_heading(actor, loc, vis_cont)
     else :
         ctxt.world[Global("currently_lit")] = False
-        ctxt.write("<b>Darkness</b>")
+        ctxt.write("<span class=\"location_heading\">Darkness</span>")
 
 @actoractivities.to("describe_location")
 def describe_location_Description(actor, loc, vis_cont, ctxt) :

@@ -21,7 +21,7 @@ but you feel that Adventure is afoot."""
 
 
 @before(Attacking(actor, X) <= PEquals(actor, X))
-def _before_suicide(actor, ctxt) :
+def _before_suicide(actor, x, ctxt) :
     raise AbortAction("Suicide is not the answer.", actor=actor)
 
 ##
@@ -750,14 +750,14 @@ quickdef(world, "tarmac", "supporter", {
         })
 world.activity.put_in("tarmac", "room_helicopter_pad")
 
-quickdef(world, "bell helicopter", "container", {
+quickdef(world, "Bell helicopter", "container", {
         Words : ["bell", "@helicopter", "@copter"],
         Scenery : True,
         NoTakeMessage : "That's too big to take.",
         IsEnterable : True,
         Description : "A large helicopter."
         })
-world.activity.put_on("bell helicopter", "tarmac")
+world.activity.put_on("Bell helicopter", "tarmac")
 
 class Flying(BasicAction) :
     verb = "fly"
@@ -1074,8 +1074,7 @@ quickdef(world, "room_west_volcano", "room", {
         Name : "The Western Side of the Volcano",
         Description : """This is one side of a [ob volcano].  [ob
         <Acrid smoke>] is billowing from the top of the cinder cone
-        and rolling down the sides.  A [ob secret door] is hidden on
-        the side of the volcano.  You can go [dir west]"""
+        and rolling down the sides. You can go [dir west]."""
         })
 world[NoGoMessage("room_west_volcano", X)] = "Sulfur-laden rocks bar the way."
 
@@ -1091,15 +1090,18 @@ world.activity.put_in("smoke", "room_west_volcano")
 quickdef(world, "volcano", "thing", {
         Words : ["cinder", "cone", "@volcano"],
         Scenery : True,
-        Description : """The smoke smells strangly of rocket fuel."""
+        Description : """It's a big cinder cone with a [ob door] on
+        the side."""
         })
-world.activity.put_in("smoke", "room_west_volcano")
+world.activity.put_in("volcano", "room_west_volcano")
 
 quickdef(world, "elevator_door", "door", {
         Name : "secret elevator door",
         Lockable : True,
         IsLocked : True,
         KeyOfLock : "key card",
+        NotableDescription : """A [ob secret door] is hidden on the
+        side of the volcano.""",
         Description : """It's secret and express, as the [ob sign]
         above the door does not say."""
         })

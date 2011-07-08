@@ -36,13 +36,12 @@ def is_are_list(nouns) :
     else :
         return "are "+serial_comma(nouns)
 
-def obj_is_are_list(context, objs, propname=None) :
+def obj_is_are_list(ctxt, objs, prop=None) :
     if prop is None :
         prop = "a"
     propstring = "[%s $o]" % prop
-    #objs = [context.world.get_property(prop, o) for o in objs]
     objs = [str_with_objs(propstring, o=o) for o in objs]
-    return is_are_list(objs)
+    return eval_str(is_are_list(objs), ctxt)
 
 DIRECTION_INVERSES = {"north" : "south",
                       "south" : "north",
@@ -325,10 +324,10 @@ def _cap(string) :
 
 @add_str_eval_func("when")
 def _str_eval_fn_when(context, *obs) :
-    """if no first object, then first defaults to actor (so one can
-    write [when In box] box] instead of [when actor In box])"""
+    """if no second object, then defaults to actor (so one can write
+    [when box Contains] instead of [when box Contains actor])"""
     if len(obs) == 2 :
-        ob1, relation, ob2 = context.actor, obs[0], obs[1]
+        ob1, relation, ob2 = obs[0], obs[1], context.actor
     else :
         ob1, relation, ob2 = obs
     return [context.world.query_relation(context.world.get_relation(relation)(ob1, ob2))]

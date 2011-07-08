@@ -8,6 +8,7 @@ import time
 sys.path.append(os.path.join(os.path.dirname(__file__), "../.."))
 
 games = {"cloak" : __import__("cloak"),
+         "testgame" : __import__("testgame"),
          "testgame2" : __import__("testgame2"),
          "isleadv" : __import__("isleadv")}
 

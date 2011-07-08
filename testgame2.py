@@ -31,7 +31,7 @@ world[Words("red ball")] = ["run-of-the-mill", "red", "@ball"]
 world.activity.put_in("red ball", "room1")
 
 world.activity.def_obj("blue ball", "thing")
-#world[Name("blue ball")] = "blue ball of light"
+world[Name("blue ball")] = "blue ball of light"
 world[MakesLight("blue ball")] = True
 world.activity.put_in("blue ball", "big box")
 #world.activity.give_to("blue ball", "player")
@@ -42,7 +42,7 @@ world.activity.def_obj("big box", "container")
 world[Name("big box")] = "big glass box"
 world[Description("big box")] = "You wonder why anyone would make such a thing, but it's a gigantic glass box."
 world[IsEnterable("big box")] = True
-#world[IsOpaque("big box")] = False
+world[IsOpaque("big box")] = False
 world[Openable("big box")] = True
 world[IsOpen("big box")] = True
 world.activity.put_in("big box", "room1")

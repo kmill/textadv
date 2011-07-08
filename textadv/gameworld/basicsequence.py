@@ -82,7 +82,9 @@ def act_player_has_moved_describe_location(ctxt) :
     """Describes the current location after the player has moved, if
     the last described location isn't the current location."""
     current_location = ctxt.world[VisibleContainer(ctxt.world[Location(ctxt.actor)])]
-    if ctxt.world[Global("current_described_location")] != current_location :
+    last_light = ctxt.world[Global("last_light")]
+    currently_lit = ctxt.world[ContainsLight(current_location)]
+    if ctxt.world[Global("current_described_location")] != current_location or last_light != currently_lit :
         ctxt.write("[newline]")
         ctxt.activity.describe_current_location()
 

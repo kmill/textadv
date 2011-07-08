@@ -1403,6 +1403,10 @@ class MagicallyTaking(BasicAction) :
     numargs = 2
 parser.understand("magically take [something x]", MagicallyTaking(actor, X))
 
+@verify(MagicallyTaking(actor, X) <= PEquals(actor, X))
+def verify_magically_taking_no_actor(actor, x, ctxt) :
+    raise AbortAction("That would crash the program.")
+
 @when(MagicallyTaking(actor, X))
 def when_magically_taking(actor, x, ctxt) :
     ctxt.world.activity.give_to(x, actor)

@@ -29,7 +29,7 @@ class AbstractPattern(object) :
         """Try to match against the input, and return a dictionary
         with the variables bound.  Assume that the "matches" argument
         will be modified."""
-        raise NotImplementedError("AbstractPattern is abstract (no match)")
+        raise NotImplementedError("AbstractPattern is abstract (no match)", self)
     def expand_pattern(self, replacements) :
         """Try to use the replacements dictionary to modify the
         pattern.  By default returns self."""
@@ -40,7 +40,7 @@ class AbstractPattern(object) :
         return PatternRequires(self, b)
     def __and__(self, b) :
         if not isinstance(b, AbstractPattern) :
-            raise Exception("Not anding with a pattern")
+            raise Exception("Not anding with a pattern", self, b)
         return PatternConjunction(self, b)
     def __hash__(self) :
         return hash(repr(self))

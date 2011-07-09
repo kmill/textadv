@@ -70,9 +70,9 @@ def separate_object_words(words) :
     nouns = []
     for w in words :
         if w[0] == "@" :
-            nouns.append(w[1:])
+            nouns.append(w[1:].lower())
         else :
-            adjs.append(w)
+            adjs.append(w.lower())
     return (adjs,nouns)
 
 def parser_valid_description(myadjs, mynouns, objadjs, objnouns) :

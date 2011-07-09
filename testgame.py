@@ -4,6 +4,9 @@
 
 execfile("textadv/basicsetup.py")
 
+world[Global("game_title")] = "Test game"
+world[Global("game_author")] = "Kyle Miller"
+
 ##
 ## Rat region
 ##

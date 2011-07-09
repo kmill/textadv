@@ -95,14 +95,54 @@ def hint_xobj_notheld(actionsystem, action) :
 
 class GettingHelp(BasicAction) :
     """GettingHelp(actor)"""
-    verb = "help"
-    gerund = "helping"
+    verb = "get help"
+    gerund = "getting help"
     numargs = 1
 parser.understand("help", GettingHelp(actor))
 
 @when(GettingHelp(actor))
 def when_getting_help(actor, ctxt) :
-    ctxt.write("For help, please take a look at <a href=\"http://eblong.com/zarf/if.html\" target=\"_blank\">http://eblong.com/zarf/if.html</a> for a reference card of perhaps-possible things to try.")
+    ctxt.write("""So you want help?
+
+    [newline]You are controlling a character in a virtual world.  To
+    play the game, you must give the character commands to interact
+    with its surroundings.
+
+    [newline]Some examples of commands one may try are the following:
+
+    [newline]
+    look ('l' for short)[break]
+    inventory ('i' for short)[break]
+    examine <i>something</i> ('x <i>something</i>' for short)[break]
+    take <i>something</i>[break]
+    drop <i>something</i>[break]
+    put <i>something</i> in <i>something</i>[break]
+    put <i>something</i> on <i>something</i>[break]
+    go <i>direction</i> (or the first letter of the direction for short)[break]
+    enter <i>something</i>[break]
+    leave[break]
+    open <i>something</i>[break]
+    close <i>something</i>[break]
+    unlock <i>something</i> with <i>something</i>[break]
+    turn on <i>something</i>[break]
+    ask <i>someone</i> about <i>something</i>[break]
+    ask <i>someone</i> for <i>something</i>[break]
+    give <i>something</i> to <i>someone</i>[break]
+
+    [newline]This list is not exhaustive.  Part of the fun is figuring
+    out what you can do.
+
+    [newline]You may also click the underlined words to go in a
+    direction or examine a particular object.
+
+    [newline]If you get stuck, don't forget to examine things, as
+    often times vital cluse are left in descriptions (this being a
+    text-based game).
+
+    [newline]For more help, take a look at <a
+    href=\"http://eblong.com/zarf/if.html\"
+    target=\"_blank\">http://eblong.com/zarf/if.html</a> for a
+    reference card of perhaps-possible things to try.""")
 
 ##
 # Look
@@ -113,7 +153,7 @@ class Looking(BasicAction) :
     verb = "look"
     gerund = "looking"
     numargs = 1
-parser.understand("look/l", Looking(actor))
+parser.understand("look/l/ls", Looking(actor))
 parser.understand("look around", Looking(actor))
 
 @when(Looking(actor))
@@ -1290,6 +1330,7 @@ class GivingTo(BasicAction) :
     gerund = ("giving", "to")
     numargs = 3
 parser.understand("give [something x] to [something y]", GivingTo(actor, X, Y))
+parser.understand("give [something y] [something x]", GivingTo(actor, X, Y))
 
 require_xobj_held(actionsystem, GivingTo(actor, X, Y))
 require_xobj_accessible(actionsystem, GivingTo(actor, Z, X))

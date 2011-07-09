@@ -27,8 +27,13 @@ class GameHandler(tornado.web.RequestHandler):
             return
 
         session = base64.b64encode(uuid.uuid4().bytes + uuid.uuid4().bytes)
+
+        if self.get_argument("reload", False) :
+            the_game = reload(games[game])
+        else :
+            the_game = games[game]
         
-        t = GameThread(game, games[game], session=session)
+        t = GameThread(game, the_game, session=session)
         t.daemon = True
         t.start()
         sessions_lock.acquire()
@@ -116,7 +121,6 @@ class PingHandler(tornado.web.RequestHandler) :
             sessions_lock.release()
             return
         else :
-            print "getting ping"
             t = sessions[session]
             sessions_timer[session] = time.time()
             sessions_lock.release()
@@ -147,24 +151,16 @@ class TornadoGameIO(object) :
     def register_wants_output(self, callback) :
         self.main_lock.acquire()
         if self.to_output :
-            print "1"
             if self.wants_output :
-                print "2"
                 self.wants_output(self.to_output, self.prompt)
-                print "2.1"
                 self.wants_output = callback
                 self.to_output = ""
             else :
-                print "3"
                 callback(self.to_output, self.prompt)
-                print "3.1"
                 self.to_output = ""
         else :
-            print "4"
             if self.wants_output :
-                print "4.1"
                 self.wants_output("", self.prompt)
-            print "4.2"
             self.wants_output = callback
         self.main_lock.release()
     def get_input(self, prompt=">") :

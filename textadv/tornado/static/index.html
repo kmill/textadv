@@ -31,20 +31,23 @@ span.game_title {
 </div>
 
 <table border="0px">
-  <tr><td><span class="user_response" id="input_text">&gt;</span>
+  <tr><td><span class="user_response" id="input_text">&gt;</span></td>
+  <td>
     <form style="margin:0;padding:0;display:inline;" action="javascript:send_command()" method="" autocomplete="off">
     <input type="text" id="command" name="command" size="100" style="border:0;"/>
     <input type="hidden" id="session" name="session" value="{{url_escape(session)}}"/>
     </form>
-  </td>
+  </td></tr>
+  <tr><td>&nbsp;</td>
   <td rowspan=1>
     <font size="-2">
-    <a href="" onclick="return run_action('look');">look</a><br>
-    <a href="" onclick="return run_action('inventory');">inventory</a><br>
+    Example actions:
+    <a href="" onclick="return run_action('look');">look</a>
+    <a href="" onclick="return run_action('inventory');">inventory</a>
+    <a href="" onclick="return run_action('help');">help</a>
     </font>
   </td>
 </tr>
-<tr><td>&nbsp;</td><td></td></tr>
 <tr><td>&nbsp;</td><td></td></tr>
 </table>
 </body>

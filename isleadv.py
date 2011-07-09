@@ -357,11 +357,11 @@ quickdef(world, "skeleton_hand", "container", {
 world.activity.make_part_of("skeleton_hand", "skeleton")
 
 quickdef(world, "knife", "thing", {
-        Name : "somewhat existant knife",
-        Words : ["strangely", "translucent", "metal", "somewhat", "existant", "@knife", "shiny", "thing"],
+        Name : "somewhat existent knife",
+        Words : ["strangely", "translucent", "metal", "somewhat", "existent", "@knife", "shiny", "thing"],
         Description : """It is semi-transparent.  Maybe the guy tried
         to take it with him.  It seems to be a very high-quality
-        knife, except for the lack of total existance."""
+        knife, except for the lack of total existence."""
         })
 world.activity.put_in("knife", "skeleton_hand")
 
@@ -834,6 +834,8 @@ for leverage."""
 world[WrongKeyMessages("manhole", X)] = """That doesn't give you
 enough leverage."""
 world.activity.connect_rooms("room_clearing", "down", "manhole")
+
+parser.understand("go down/up [object manhole]", Entering(actor, "manhole"))
 
 @when(Going(actor, "down") <= Contains("room_clearing", actor))
 def _when_going_down_manhole(actor, ctxt) :

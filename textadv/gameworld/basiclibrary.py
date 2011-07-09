@@ -88,9 +88,9 @@ execfile("textadv/gameworld/basicactions.py")
 ##
 
 world.activity.def_obj("player", "person")
-world[PrintedName("player")] = "[if [current_actor_is player]]yourself[else]the player[endif]"
+world[PrintedName("player")] = "[if [current_actor_is player]]you[else]the player[endif]"
 world[ProperNamed("player")] = True
-world[Words("player")] = ["yourself", "self", "AFGNCAAP"]
+world[Words("player")] = ["yourself", "self", "AFGNCAAP", "me"]
 world[Description("player")] = """{Bob|cap} {is} an ageless, faceless,
 gender-neutral, culturally-ambiguous adventure-person.  {Bob|cap}
 {does} stuff sometimes."""

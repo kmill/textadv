@@ -862,7 +862,7 @@ def rule_EffectiveContainer_if_person(x, world) :
 @world.define_property
 class Gender(Property) :
     """Represents the gender of a person.  Examples of options are
-    "male", "female", and "unknown"."""
+    "male", "female", "none", and "unknown"."""
     numargs = 1
 
 world[Gender(X) <= IsA(X, "person")] = "unknown" # other options are male and female
@@ -879,6 +879,8 @@ def person_SubjectPronoun(x, world) :
         return "he"
     elif gender == "female" :
         return "she"
+    elif gender == "none" :
+        return "it"
     else :
         return "they"
 @world.handler(ObjectPronoun(X) <= IsA(X, "person"))
@@ -889,6 +891,8 @@ def person_ObjectPronoun(x, world) :
         return "him"
     elif gender == "female" :
         return "her"
+    elif gender == "none" :
+        return "it"
     else :
         return "them"
 @world.handler(PossessivePronoun(X) <= IsA(X, "person"))
@@ -899,6 +903,8 @@ def person_PossessivePronoun(x, world) :
         return "him"
     elif gender == "female" :
         return "her"
+    elif gender == "none" :
+        return "its"
     else :
         return "their"
 
@@ -936,6 +942,30 @@ def rule_ContributesLight_possessions_can_light_person(x, world) : # maybe shoul
     if any(world[ContributesLight(o)] for o in world[Contents(x)]) :
         return True
     else : raise NotHandled()
+
+#
+# Willingness of NPCs to do stuff
+#
+
+actoractivities.define_activity("npc_is_willing", reverse=True, doc="""An
+activity which checks whether an NPC is willing to do something.  This
+runs in reverse order so it is more like rules in that later-defined
+things are executed first.  The handler should raise AbortAction if
+the NPC is not willing to do the action.  This activity is defined in
+basicrules.py because it makes sense to place it near the definition
+of the person kind, and it is an actoractivity because it needs the
+current actor context.  The activity takes (requester, action), where
+the actor of the action is presumed to be action.get_actor().""")
+
+@actoractivities.to("npc_is_willing")
+def npc_is_willing_default(requester, action, ctxt) :
+    if requester == action.get_actor() :
+        """It's fine, if a bit weird, if the requester is the actor of
+        the action."""
+        raise ActionHandled()
+    else :
+        raise AbortAction(str_with_objs("[The $a] doesn't feel compelled to "+action.infinitive_form(ctxt)+".",
+                                        a=action.get_actor()), actor=requester)
 
 ###
 ### Defining: region

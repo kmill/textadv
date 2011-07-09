@@ -304,6 +304,17 @@ def before_askingabout_knife(actor, y, ctxt) :
     if "knife" in [r[0].value for r in res] :
         raise DoInstead(AskingFor(actor, "skeleton", "knife"), suppress_message=True)
 
+@report(AskingAbout(actor, "skeleton", Y))
+def report_askingabout_stuff(actor, y, ctxt) :
+    words = y.lower().split()
+    if "sun" in words :
+        ctxt.write("'The sun's been up there all day.  I wish I had something to cover myself.'")
+        raise ActionHandled()
+    elif "help" in words or "helping" in words :
+        ctxt.write("'You want to help me?  Please find something I could use to block the sun.'")
+        raise ActionHandled()
+        
+
 @before(AskingFor(actor, "skeleton", Y))
 def before_askingfor_knife(actor, y, ctxt) :
     if y == "knife" :
@@ -1207,4 +1218,3 @@ def _when_push_red_button(actor, ctxt) :
     was set up because you like adventures.  You ate a lot of cake.""")
     ctxt.activity.end_game_saying("You have won")
     raise ActionHandled()
-

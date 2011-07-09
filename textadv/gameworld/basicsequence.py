@@ -38,7 +38,7 @@ def act_start_game_describe_location(ctxt) :
     """Describes the current location, and, using the actor of the
     context, also sets variables for knowing when to give a new room
     description."""
-    ctxt.activity.describe_current_location()
+    ctxt.activity.describe_current_location(ctxt.actor)
     ctxt.world[Global("last_location")] = ctxt.world[Global("current_location")]
     ctxt.world[Global("last_light")] = ctxt.world[Global("currently_lit")]
     ctxt.world[Global("last_described_location")] = ctxt.world[Global("current_described_location")]
@@ -86,7 +86,7 @@ def act_player_has_moved_describe_location(ctxt) :
     currently_lit = ctxt.world[ContainsLight(current_location)]
     if ctxt.world[Global("current_described_location")] != current_location or last_light != currently_lit :
         ctxt.write("[newline]")
-        ctxt.activity.describe_current_location()
+        ctxt.activity.describe_current_location(ctxt.actor)
 
 
 actoractivities.define_activity("end_game_saying",

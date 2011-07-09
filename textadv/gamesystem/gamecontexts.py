@@ -186,6 +186,7 @@ class DisambiguationContext(GameContext) :
                                 for o in opts], conj="or")
             self.parent.write("Did you mean "+res+"?")
             input = self.parent.io.get_input(">>>")
+            self.parent.parser.init_current_objects(self.parent, opts)
             res = self.parent.parser.run_parser("something",
                                                 self.parent.parser.transform_text_to_words(input),
                                                 self.parent)

@@ -24,6 +24,11 @@ class BasicAction(BasicPattern) :
             self.args = args
         else :
             raise Exception("Pattern requires exactly "+str(self.numargs)+" arguments.")
+    def update_actor(self, newactor) :
+        """Sometimes the actor is not set properly (for instance, with
+        AskingTo).  We need to be able to reset it."""
+        self.args = list(self.args)
+        self.args[0] = newactor
     def get_actor(self) :
         """An accessor method for the actor of the action. Assumed to
         be first element."""

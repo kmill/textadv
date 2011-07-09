@@ -94,7 +94,11 @@ def str_with_objs(input, **kwarg) :
     return string.Template(input).safe_substitute(newkwarg)
 
 def as_actor(input, actor) :
-    return "[as %s]%s[endas]" % (actor, input)
+    if " " in actor :
+        repla = "<%s>"%actor
+    else :
+        repla = actor
+    return "[as %s]%s[endas]" % (repla, input)
 
 
 ###

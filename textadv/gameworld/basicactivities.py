@@ -84,14 +84,14 @@ def default_get_room_exit_directions(room, world) :
 ##
 
 @actoractivities.to("describe_current_location")
-def describe_current_location_default(ctxt) :
+def describe_current_location_default(actor, ctxt) :
     """Calls describe_location using the Location and the
     VisibleContainer of the current actor."""
-    loc = ctxt.world[Location(ctxt.actor)]
+    loc = ctxt.world[Location(actor)]
     vis_cont = ctxt.world[VisibleContainer(loc)]
     ctxt.world[Global("current_location")] = vis_cont
     ctxt.world[Global("current_described_location")] = vis_cont
-    ctxt.activity.describe_location(ctxt.actor, loc, vis_cont)
+    ctxt.activity.describe_location(actor, loc, vis_cont)
 
 __DESCRIBE_LOCATION_notables = []
 __DESCRIBE_LOCATION_mentioned = []
@@ -168,24 +168,24 @@ def describe_location_Objects(actor, loc, vis_cont, ctxt) :
                         current_location = o_loc
                         if o_loc == vis_cont :
                             if is_first_sentence :
-                                current_start = "You see "
+                                current_start = "{Bob|cap} {sees} "
                                 is_first_sentence = False
                             else :
-                                current_start = "You also see "
+                                current_start = "{Bob|cap} also {sees} "
                         elif ctxt.world[IsA(o_loc, "container")] :
                             mentioned.append(o_loc)
                             if is_first_sentence :
-                                current_start = str_with_objs("In [the $x] you see ", x=o_loc)
+                                current_start = str_with_objs("In [the $x] {Bob} {sees} ", x=o_loc)
                                 is_first_sentence = False
                             else :
-                                current_start = str_with_objs("In [the $x] you also see ", x=o_loc)
+                                current_start = str_with_objs("In [the $x] {Bob} also {sees} ", x=o_loc)
                         elif ctxt.world[IsA(o_loc, "supporter")] :
                             mentioned.append(o_loc)
                             if is_first_sentence :
-                                current_start = str_with_objs("On [the $x] you see ", x=o_loc)
+                                current_start = str_with_objs("On [the $x] {Bob} {sees} ", x=o_loc)
                                 is_first_sentence = False
                             else :
-                                current_start = str_with_objs("On [the $x] you also see ", x=o_loc)
+                                current_start = str_with_objs("On [the $x] {Bob} also {sees} ", x=o_loc)
                         else :
                             raise Exception("Unknown kind of location for "+o_loc)
                         current_descs = []

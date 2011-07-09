@@ -44,10 +44,11 @@ quickdef(world, "verifier", "person", {
 
 @report(X <= PEquals(Location("verifier"), Location("player")))
 def _verifier_whenever(x, ctxt) :
-    if type(x) is Taking :
-        ctxt.write(str_with_objs("[newline]\"My, I would have never thought of taking [the $z],\" notes The Verifier.", z=x.get_do()))
-    else :
-        ctxt.write("[newline]\"What a wonderful idea to "+x.infinitive_form(ctxt)+"!\" cries The Verifier.")
+    if x.get_actor() == ctxt.actor :
+        if type(x) is Taking :
+            ctxt.write(str_with_objs("[newline]\"My, I would have never thought of taking [the $z],\" notes The Verifier.", z=x.get_do()))
+        else :
+            ctxt.write("[newline]\"What a wonderful idea to "+x.infinitive_form(ctxt)+"!\" cries The Verifier.")
 
 @actoractivities.to("step_turn")
 def _verifier_step_turn(ctxt) :
@@ -111,7 +112,7 @@ def _when_inserting_into_continuation(actor, x, y, ctxt) :
 
 @report(InsertingInto(actor, X, Y) <= IsA(Y, "continuation"))
 def _report_inserting_into_continuation(actor, x, y, ctxt) :
-    ctxt.write(str_with_objs("Bewildered, you find the world as it was, but you are now holding [the $x].", x=x), actor=actor)
+    ctxt.write(str_with_objs("Bewildered, you find the world as it was, but {Bob} {is} now holding [the $x].", x=x), actor=actor)
     raise ActionHandled()
 
 @when(Taking(actor, X) <= IsA(X, "continuation") & PNot(ContinuationData(X)))
@@ -186,6 +187,19 @@ world[NotableDescription("player") <= PEquals(Location("player"), "zombocom")] =
 @report(Entering(actor, "zombocom"))
 def _report_enter_zombocom(actor, ctxt) :
     ctxt.write("Anything is possible...")
+
+
+quickdef(world, "compliant robot", "person", {
+        Gender : "none",
+        Description : "It's a robot that will do anything you ask of it."
+        })
+world.activity.put_in("compliant robot", "room_41")
+
+@actoractivities.to("npc_is_willing")
+def robot_is_willing_default(requester, action, ctxt) :
+    if action.get_actor() == "compliant robot" :
+        # of course the robot is willing!
+        raise ActionHandled()
 
 ##
 ## Room2

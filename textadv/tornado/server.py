@@ -29,6 +29,8 @@ class GameHandler(tornado.web.RequestHandler):
         session = base64.b64encode(uuid.uuid4().bytes + uuid.uuid4().bytes)
 
         if self.get_argument("reload", False) :
+            import textadv.gameworld.basiclibrary
+            reload(textadv.gameworld.basiclibrary)
             the_game = reload(games[game])
         else :
             the_game = games[game]

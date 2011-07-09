@@ -39,7 +39,9 @@ def require_xobj_visible(actionsystem, action) :
 def require_xobj_held(actionsystem, action, only_hint=False, transitive=True) :
     """Adds rules which check if the object x is held by the actor in
     the action, and if only_hint is not true, then if the thing is not
-    already held, an attempt is made to take it."""
+    already held, an attempt is made to take it.  The transitive flag
+    refers to allowing the actor be the owner of the object, and not
+    necessarily holding onto it directly."""
     def __is_held(actor, x, ctxt) :
         if transitive :
             return actor == ctxt.world[Owner(x)] and ctxt.world[AccessibleTo(x, actor)]
@@ -50,8 +52,15 @@ def require_xobj_held(actionsystem, action, only_hint=False, transitive=True) :
     def _verify_xobj_held(actor, x, ctxt, **kwargs) :
         if ctxt.world.query_relation(Has(actor, x)) :
             return VeryLogicalOperation()
-        elif not ctxt.world[AccessibleTo(x, actor)] :
+        elif not ctxt.world[VisibleTo(x, actor)] :
             return IllogicalOperation(as_actor("{Bob|cap} {can} see no such thing.", actor=actor))
+        elif not ctxt.world[AccessibleTo(x, actor)] :
+            effcont = ctxt.world[EffectiveContainer(ctxt.world[Location(x)])]
+            if ctxt.world[Openable(effcont)] and not ctxt.world[IsOpen(effcont)] :
+                return IllogicalOperation(as_actor(str_with_objs("That's inside [the $y], which is closed.", y=effcont),
+                                                   actor=actor))
+            else :
+                return IllogicalOperation(as_actor("{Bob|cap} {can't} get to that.", actor=actor))
     if only_hint :
         @actionsystem.before(action)
         @docstring("A check that the actor is holding the x in "+repr(action)+".  The holding may be transitive.")
@@ -158,7 +167,7 @@ parser.understand("look around", Looking(actor))
 
 @when(Looking(actor))
 def when_looking_default(actor, ctxt) :
-    ctxt.activity.describe_current_location()
+    ctxt.activity.describe_current_location(actor)
 
 ##
 # Inventory
@@ -175,11 +184,11 @@ parser.understand("inventory/i", TakingInventory(actor))
 def when_takinginventory(actor, ctxt) :
     possessions = ctxt.world[Contents(actor)]
     if possessions :
-        ctxt.write("{Bob|cap} {is} carrying:")
+        ctxt.write("{Bob|cap} {is} carrying:", actor=actor)
         for p in possessions :
             ctxt.activity.describe_possession(actor, p, 1)
     else :
-        ctxt.write("{Bob|cap} {is} carrying nothing.")
+        ctxt.write("{Bob|cap} {is} carrying nothing.", actor=actor)
 
 ##
 # Examine
@@ -512,8 +521,11 @@ def when_entering_container(actor, x, ctxt) :
 
 @report(Entering(actor, X))
 def report_entering_describe_contents(actor, x, ctxt) :
-    """Describes the contents of the new location."""
-    ctxt.activity.describe_location(actor, x, x, disable=[describe_location_Heading, describe_location_Description])
+    """Describes the contents of the new location if the actor is the
+    actor of the context, disabling the location heading and the
+    location description."""
+    if ctxt.actor == actor :
+        ctxt.activity.describe_location(actor, x, x, disable=[describe_location_Heading, describe_location_Description])
 
 @report(Entering(actor, X) <= IsA(X, "container"))
 def report_entering_container(actor, x, ctxt) :
@@ -641,9 +653,10 @@ def when_GettingOff_default(event, actor, ctxt) :
 
 @report(GettingOff(actor), wants_event=True)
 def report_GettingOff_default(event, actor, ctxt) :
-    """Describes what happened, and describes the new location."""
+    """Describes what happened, and describes the new location (if the actor is the actor of the context)."""
     ctxt.write(str_with_objs("{Bob|cap} {gets} off of [the $z].", z=event.get_off_from), actor=actor)
-    ctxt.activity.describe_current_location()
+    if actor == ctxt.actor :
+        ctxt.activity.describe_current_location(actor)
 
 
 ##
@@ -1342,8 +1355,10 @@ def before_giving_to_inanimate(actor, x, y, ctxt) :
 
 @before(GivingTo(actor, X, Y) <= IsA(Y, "person"))
 def before_giving_to_person_default(actor, x, y, ctxt) :
-    """People don't want things by default."""
-    raise AbortAction(str_with_objs("[The $y] doesn't seem interested in [the $x]", x=x, y=y), actor=actor)
+    """People don't want things by default, unless y is the actor of
+    the context."""
+    if y != ctxt.actor :
+        raise AbortAction(str_with_objs("[The $y] doesn't seem interested in [the $x]", x=x, y=y), actor=actor)
 
 @before(GivingTo(actor, X, Y) <= PEquals(actor, Y))
 def before_giving_to_self(actor, x, y, ctxt) :
@@ -1397,13 +1412,15 @@ require_xobj_visible(actionsystem, AskingFor(actor, Z, X))
 
 @before(AskingFor(actor, X, Y))
 def before_askingfor_turn_to_givingto(actor, x, y, ctxt) :
-    """Turns the AskingFor into a GivingTo."""
-    raise DoInstead(GivingTo(x, y, actor), suppress_message=True)
+    """Turns the AskingFor into a AskingTo(...,GivingTo(...))."""
+    raise DoInstead(AskingTo(actor, x, GivingTo(x, y, actor)), suppress_message=True)
 
 
-#### to deal with later
+##
+# AskingTo
+##
 
-class AskTo(BasicAction) :
+class AskingTo(BasicAction) :
     verb = ("ask", "to")
     gerund = ("asking", "to")
     numargs = 3
@@ -1415,8 +1432,28 @@ class AskTo(BasicAction) :
         dobj = str_with_objs("[the $x]", x=self.args[1])
         comm = self.args[2].infinitive_form(ctxt)
         return self.verb[0] + " " + dobj + " to " + comm
-parser.understand("ask [something x] to [action y]", AskTo(actor, X, Y))
+parser.understand("ask [something x] to [action y]", AskingTo(actor, X, Y))
 
+require_xobj_accessible(actionsystem, AskingTo(actor, X, Y))
+
+@verify(AskingTo(actor, X, Y))
+def verify_askingto_by_verify_y(actor, x, y, ctxt) :
+    """Updates the actor for y to x and then verifies that action."""
+    y.update_actor(x)
+    return ctxt.actionsystem.verify_action(y, ctxt)
+
+@before(AskingTo(actor, X, Y))
+def before_askingto_check_willing(actor, x, y, ctxt) :
+    """Checks if the askee is willing to do the action by calling the
+    actor activity 'npc_is_willing'."""
+    y.update_actor(x)
+    ctxt.activity.npc_is_willing(actor, y)
+
+@when(AskingTo(actor, X, Y))
+def when_askingto_make_it_happen(actor, x, y, ctxt) :
+    """Makes the actor x do the action."""
+    y.update_actor(x)
+    ctxt.actionsystem.run_action(y, ctxt)
 
 ###
 ### Debugging actions

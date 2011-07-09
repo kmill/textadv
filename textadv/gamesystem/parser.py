@@ -141,10 +141,13 @@ class Parser(object) :
         from what is expected--we try to find the thing we're looking
         for rather than try to find any thing.  Should return
         [Matched(..), ...] or something.""")
-    def init_current_objects(self, ctxt) :
+    def init_current_objects(self, ctxt, with_objs=None) :
         """For parsing efficiency of things (needed in the something
         parser).  Gets the referenceable objects and their words."""
-        self.CURRENT_OBJECTS = ctxt.world.activity.referenceable_things()
+        if with_objs :
+            self.CURRENT_OBJECTS = list(with_objs)
+        else :
+            self.CURRENT_OBJECTS = ctxt.world.activity.referenceable_things()
         self.CURRENT_WORDS = [separate_object_words(ctxt.world.get_property("Words", o))
                               for o in self.CURRENT_OBJECTS]
     def add_known_words(self,*words) :

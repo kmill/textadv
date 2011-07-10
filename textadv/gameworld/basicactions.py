@@ -1327,12 +1327,22 @@ class Eating(BasicAction) :
     numargs = 2
 parser.understand("eat [something x]", Eating(actor, X))
 
-require_xobj_accessible(actionsystem, Eating(actor, X))
+require_xobj_held(actionsystem, Eating(actor, X))
 
-@before(Eating(actor, X))
-def before_eating_default(actor, x, ctxt) :
-    """By default, you can't eat."""
+@before(Eating(actor, X) <= PNot(IsEdible(X)))
+def before_eating_inedible(actor, x, ctxt) :
+    """You can't eat what's not edible."""
     raise AbortAction("{Bob|cap} {doesn't} feel like eating that.", actor=actor)
+
+@when(Eating(actor, X))
+def when_eating_default(actor, x, ctxt) :
+    """Eating just removes the item from play."""
+    ctxt.world.activity.remove_obj(x)
+
+@report(Eating(actor, X))
+def report_eating_default(actor, x, ctxt) :
+    """Gives the default message for eating."""
+    ctxt.write(str_with_objs("{Bob} {eats} [the $x].", x=x), actor=actor)
 
 ##
 # Swimming and SwimmingIn

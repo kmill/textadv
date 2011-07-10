@@ -548,7 +548,7 @@ class LocaleDescription(Property) :
     numargs = 1
 
 # By default it's none for enterables
-world[LocaleDescription(X) <= IsA(X, "enterable")] = None
+world[LocaleDescription(X) <= IsEnterable(X)] = None
 
 
 ##
@@ -562,6 +562,18 @@ class IsWearable(Property) :
     numargs = 1
 
 world[IsWearable(X) <= IsA(X, "thing")] = False
+
+
+##
+# Property: IsEdible
+##
+
+@world.define_property
+class IsEdible(Property) :
+    """Represents whether the thing can be eaten."""
+    numargs = 1
+
+world[IsEdible(X) <= IsA(X, "thing")] = False
 
 
 ###

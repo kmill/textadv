@@ -37,24 +37,28 @@ quickdef(world, "sky", "backdrop", {
 
 quickdef(world, "verifier", "person", {
         Name : "The Verifier",
+        Gender : "male",
         ProperNamed : True,
         Description : """The Verifier always thinks what you do is a
         good idea."""
         })
+world[Global("verifier_dead")] = False
 
 @report(X <= PEquals(Location("verifier"), Location("player")))
 def _verifier_whenever(x, ctxt) :
-    if x.get_actor() == ctxt.actor :
-        if type(x) is Taking :
-            ctxt.write(str_with_objs("[newline]\"My, I would have never thought of taking [the $z],\" notes The Verifier.", z=x.get_do()))
-        else :
-            ctxt.write("[newline]\"What a wonderful idea to "+x.infinitive_form(ctxt)+"!\" cries The Verifier.")
+    if not ctxt.world[Global("verifier_dead")] :
+        if x.get_actor() == ctxt.actor :
+            if type(x) is Taking :
+                ctxt.write(str_with_objs("[newline]\"My, I would have never thought of taking [the $z],\" notes The Verifier.", z=x.get_do()))
+            else :
+                ctxt.write("[newline]\"What a wonderful idea to "+x.infinitive_form(ctxt)+"!\" cries [ob <The Verifier>].")
 
 @actoractivities.to("step_turn")
 def _verifier_step_turn(ctxt) :
-    if ctxt.world[Location("player")] != ctxt.world[Location("verifier")] :
-        ctxt.write("The Verifier follows.")
-        ctxt.world.activity.put_in("verifier", ctxt.world[Location("player")])
+    if not ctxt.world[Global("verifier_dead")] :
+        if ctxt.world[Location("player")] != ctxt.world[Location("verifier")] :
+            ctxt.write("The Verifier follows.")
+            ctxt.world.activity.put_in("verifier", ctxt.world[Location("player")])
 
 ##
 ## Your pocket
@@ -178,9 +182,11 @@ world.activity.put_in("light bulb", "room_41")
 quickdef(world, "zombocom", "container", {
         IsEnterable : True,
         ProperNamed : True,
+        LocaleDescription : """From within zombocom, it seems the
+        infinite is possible.""",
         Description : """[if [when zombocom Contains]]Welcome to
         zombocom.[else]This is zombocom.  It looks like you can enter
-        it.[endif]"""
+        it.[endif]""",
         })
 world.activity.put_in("zombocom", "room_41")
 
@@ -209,6 +215,30 @@ def robot_is_wanting_default(giver, object, receiver, ctxt) :
     if receiver=="compliant robot" :
         raise ActionHandled()
 
+@report(Eating("compliant robot", "peanuts"))
+def robot_eating_peanuts(ctxt) :
+    ctxt.write("The [ob <compliant robot>] eats the peanuts, but doesn't enjoy it one bit.")
+    raise ActionHandled()
+
+
+@before(Attacking("compliant robot", "verifier"))
+def let_robot_attack_verifier(ctxt) :
+    raise ActionHandled()
+
+@when(Attacking("compliant robot", "verifier"))
+def robot_attacks_verifier(ctxt) :
+    ctxt.world.activity.remove_obj("verifier")
+    ctxt.world[Global("verifier_dead")] = True
+
+@report(Attacking("compliant robot", "verifier"))
+def report_robot_attacks_verifier(ctxt) :
+    ctxt.write("The [ob <compliant robot>] follows the command and gruesomely dismantles The Verifier particle by particle.  The Verifier is no more.")
+
+@before(Attacking("player", "verifier"))
+def before_attacking_verifier(ctxt) :
+    raise AbortAction("You can't bring yourself to do that to such an upbeat guy.")
+
+
 quickdef(world, "table", "supporter", {
         Scenery : True,
         Description : "It's a wood table."
@@ -217,6 +247,7 @@ world.activity.put_in("table", "room_41")
 
 quickdef(world, "peanuts", "thing", {
         IndefiniteName : "some peanuts",
+        IsEdible : True,
         Description : "It's just a pile of peanuts."
         })
 world.activity.put_on("peanuts", "table")

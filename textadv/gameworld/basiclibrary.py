@@ -94,4 +94,3 @@ world[Words("player")] = ["player", "yourself", "self", "AFGNCAAP", "me"]
 world[Description("player")] = """{Bob|cap} {is} an ageless, faceless,
 gender-neutral, culturally-ambiguous adventure-person.  {Bob|cap}
 {does} stuff sometimes."""
-world[Reported("player")] = False

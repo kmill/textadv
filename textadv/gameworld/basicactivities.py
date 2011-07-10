@@ -119,11 +119,20 @@ def describe_location_Heading(actor, loc, vis_cont, ctxt) :
 def describe_location_Description(actor, loc, vis_cont, ctxt) :
     """Prints the description property of the visible container if it
     is a room, unless the room is in darkness.  Darkness stops further
-    description of the location."""
+    description of the location.  If the current location has a
+    non-None LocaleDescription, then this is printed instead of the
+    Description of the visible container."""
     if ctxt.world[ContainsLight(vis_cont)] :
-        if ctxt.world[IsA(vis_cont, "room")] :
-            d = ctxt.world[Description(vis_cont)]
-            if d : ctxt.write("[newline]"+d)
+        # It's possible it makes more sense to walk up the chain of
+        # locations until we hit a LocaleDescription.  I have no
+        # examples yet.
+        localedesc = ctxt.world[IsA(loc, "thing")] and ctxt.world[IsEnterable(loc)] and ctxt.world[LocaleDescription(loc)]
+        if localedesc :
+            ctxt.write("[newline]"+localedesc)
+        else :
+            if ctxt.world[IsA(vis_cont, "room")] :
+                d = ctxt.world[Description(vis_cont)]
+                if d : ctxt.write("[newline]"+d)
     else :
         ctxt.write("[newline]You can't see a thing; it's incredibly dark.")
         raise ActionHandled()

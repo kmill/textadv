@@ -366,6 +366,18 @@ def _str_eval_fn_ob(context, *obs) :
         text = obs[1]
     return [make_action_link(text, "examine "+ob)]
 
+@add_str_eval_func("action")
+def _str_eval_fn_action(context, *obs) :
+    """Takes an action (as a string) and possible text, and provides a
+    link to do that action.  Calls make_action_link."""
+    if len(obs) == 1 :
+        action = obs[0]
+        text = obs[0]
+    else :
+        action = obs[0]
+        text = obs[1]
+    return [make_action_link(text, action)]
+
 ###
 ### Reworder.  Makes is/are work out depending on context
 ###
@@ -403,7 +415,6 @@ _reword_replacements = {"is" : "are",
                         "can't" : "can't",
                         "switches" : "switch",
                         "isn't" : "aren't",
-                        "himself" : "yourself"
                         }
 
 def _reword(word, flags, world, actor, is_me) :
@@ -412,6 +423,8 @@ def _reword(word, flags, world, actor, is_me) :
             return world.get_property("SubjectPronounIfMe", actor)
         elif word == "him" :
             return world.get_property("ObjectPronounIfMe", actor)
+        elif word == "himself" :
+            return world.get_property("ReflexivePronounIfMe", actor)
         elif word == "bob" :
             if "obj" in flags :
                 return world.get_property("ObjectPronounIfMe", actor)
@@ -428,6 +441,8 @@ def _reword(word, flags, world, actor, is_me) :
             return world.get_property("SubjectPronoun", actor)
         elif word == "him" :
             return world.get_property("ObjectPronoun", actor)
+        elif word == "himself" :
+            return world.get_property("ReflexivePronoun", actor)
         elif word == "bob" :
             return world.get_property("DefiniteName", actor)
         elif word == "bob's" :

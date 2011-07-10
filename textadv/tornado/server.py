@@ -7,10 +7,10 @@ import time
 
 sys.path.append(os.path.join(os.path.dirname(__file__), "../.."))
 
-games = {"cloak" : __import__("cloak"),
-         "testgame" : __import__("testgame"),
-         "testgame2" : __import__("testgame2"),
-         "isleadv" : __import__("isleadv")}
+games = {"cloak" : __import__("games.cloak", fromlist=["cloak"]),
+         "testgame" : __import__("games.testgame", fromlist=["testgame"]),
+         "testgame2" : __import__("games.testgame2", fromlist=["testgame2"]),
+         "isleadv" : __import__("games.isleadv", fromlist=["isleadv"])}
 
 class MainHandler(tornado.web.RequestHandler):
     def get(self) :
@@ -59,7 +59,7 @@ class InputHandler(tornado.web.RequestHandler) :
             t = sessions[session]
             sessions_timer[session] = time.time()
             sessions_lock.release()
-            command = self.get_argument("command", default=None)
+            command = self.get_argument("command", default="")
             t.game_context.io.receive_input(str(command))
             self.write("received")
 

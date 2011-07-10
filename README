@@ -50,7 +50,7 @@ The output is in ./doc (you may need to create this directory first).
 Directory layout
 ----------------
 
-The root directory contains three test games, testgame2.py (which has
+The games directory contains three test games, testgame2.py (which has
 some enterable objects and a ball that's lit), isleadv.py (which is
 silly, but a very large test of the system), and cloak.py (which is
 the standard Cloak of Darkness).  I would recommend trying isleadv.py

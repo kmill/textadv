@@ -334,9 +334,10 @@ def before_askingfor_knife(actor, y, ctxt) :
 def before_placingon_fronds(actor, ctxt) :
     raise DoInstead(GivingTo(actor, "good_fronds", "skeleton"), suppress_message=True)
 
-@before(GivingTo(actor, "good_fronds", "skeleton"), wants_table=True)
-def before_giving_fronds(table, actor, ctxt) :
-    table.temp_disable(f=before_giving_to_person_default)
+@actoractivities.to("npc_is_wanting")
+def npc_is_wanting_skeleton_fronds(giver, object, receiver, ctxt) :
+    if object == "good_fronds" and "receiver" == "skeleton" :
+        raise ActionHandled()
 
 @when(GivingTo(actor, "good_fronds", "skeleton"))
 def when_giving_fronds(actor, ctxt) :

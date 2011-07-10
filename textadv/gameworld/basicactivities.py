@@ -175,17 +175,17 @@ def describe_location_Objects(actor, loc, vis_cont, ctxt) :
                         elif ctxt.world[IsA(o_loc, "container")] :
                             mentioned.append(o_loc)
                             if is_first_sentence :
-                                current_start = str_with_objs("In [the $x] {Bob} {sees} ", x=o_loc)
+                                current_start = str_with_objs("In [the $x] {bob} {sees} ", x=o_loc)
                                 is_first_sentence = False
                             else :
-                                current_start = str_with_objs("In [the $x] {Bob} also {sees} ", x=o_loc)
+                                current_start = str_with_objs("In [the $x] {bob} also {sees} ", x=o_loc)
                         elif ctxt.world[IsA(o_loc, "supporter")] :
                             mentioned.append(o_loc)
                             if is_first_sentence :
-                                current_start = str_with_objs("On [the $x] {Bob} {sees} ", x=o_loc)
+                                current_start = str_with_objs("On [the $x] {bob} {sees} ", x=o_loc)
                                 is_first_sentence = False
                             else :
-                                current_start = str_with_objs("On [the $x] {Bob} also {sees} ", x=o_loc)
+                                current_start = str_with_objs("On [the $x] {bob} also {sees} ", x=o_loc)
                         else :
                             raise Exception("Unknown kind of location for "+o_loc)
                         current_descs = []
@@ -333,13 +333,22 @@ def get_notable_objects_container(actor, x, ctxt) :
     else : raise NotHandled()
 @actoractivities.to("get_notable_objects")
 def get_notable_objects_supporter(actor, x, ctxt) :
+    """Gets objects from on the supporter."""
     if ctxt.world[IsA(x, "supporter")] :
         obs = ctxt.world[Contents(x)]
         return list_append(ctxt.activity.get_notable_objects(actor, o) for o in obs)
     else : raise NotHandled()
 @actoractivities.to("get_notable_objects")
 def get_notable_objects_not_reported(actor, x, ctxt) :
+    """Prevents objects whose Reported is false from mentioning
+    themselves or their contents."""
     if not ctxt.world[Reported(x)] :
+        return [(x, 0)]
+    else : raise NotHandled()
+@actoractivities.to("get_notable_objects")
+def get_notable_objects_not_self(actor, x, ctxt) :
+    """If the object is the actor, then it's not reported."""
+    if actor==x :
         return [(x, 0)]
     else : raise NotHandled()
 
@@ -374,7 +383,7 @@ def describe_object_container(actor, o, ctxt) :
         if ctxt.world[SuppressContentDescription(o)] :
             raise NotHandled()
         if not ctxt.world[IsOpaque(o)] :
-            contents = [str_with_objs("[a $c]", c=c) for c in ctxt.world[Contents(o)] if ctxt.world[Reported(c)]]
+            contents = [str_with_objs("[a $c]", c=c) for c in ctxt.world[Contents(o)] if c!=actor and ctxt.world[Reported(c)]]
             if contents :
                 if __DESCRIBE_OBJECT_described : # print a newline if needed.
                     ctxt.write("[newline]")
@@ -391,7 +400,7 @@ def describe_object_supporter(actor, o, ctxt) :
     if ctxt.world[IsA(o, "supporter")] :
         if ctxt.world[SuppressContentDescription(o)] :
             raise NotHandled()
-        contents = [str_with_objs("[a $c]", c=c) for c in ctxt.world[Contents(o)] if ctxt.world[Reported(c)]]
+        contents = [str_with_objs("[a $c]", c=c) for c in ctxt.world[Contents(o)] if c!=actor and ctxt.world[Reported(c)]]
         if contents :
             global __DESCRIBE_OBJECT_described # print a newline if needed.
             if __DESCRIBE_OBJECT_described :

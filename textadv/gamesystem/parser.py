@@ -28,7 +28,7 @@ from textadv.core.patterns import VarPattern, AbstractPattern
 from textadv.core.rulesystem import ActivityTable, ActionHandled
 from textadv.gamesystem.utilities import list_append, docstring
 from textadv.gamesystem.basicpatterns import *
-from textadv.gamesystem.actionsystem import BasicAction
+from textadv.gamesystem.actionsystem import BasicAction, IllogicalNotVisible
 
 ###
 ### Parser exceptions
@@ -92,7 +92,7 @@ def parser_valid_description(myadjs, mynouns, objadjs, objnouns) :
 ### Basically constant constants
 ###
 
-PARSER_ARTICLES = ["a", "an", "the"]
+PARSER_ARTICLES = ["a", "an", "the", "some"]
 
 ###
 ### Matched objects
@@ -211,7 +211,7 @@ class Parser(object) :
         for match in re.finditer(r"\[([A-Za-z]+)\s+([^\]]+)\]", text) :
             textparts = text[lastindex:match.start()].split()
             for tp in textparts :
-                parts.append(tp.split("/"))
+                parts.append(tp.lower().split("/"))
             lastindex = match.end()
             if self.subparsers.has_key(match.group(1).lower()) :
                 csp = CallSubParser(match.group(1), " ".join(match.group(2).split()))
@@ -220,7 +220,7 @@ class Parser(object) :
                 raise Exception("No such subparser %r" % match.group(1))
         textparts = text[lastindex:].split()
         for tp in textparts :
-            parts.append(tp.split("/"))
+            parts.append(tp.lower().split("/"))
         self.__subparser_add_sequence(dest, parts, result, text)
     def __subparser_add_sequence(self, dest, parts, result, text) :
         """Takes a sequence (parts) and adds a parser to the dest
@@ -246,7 +246,7 @@ class Parser(object) :
                     # or, we have a subparser to execute
                     csp = parts[part_i]
                     return parser.run_subparser(csp.name, csp.var, input, i2, ctxt, actor, _next2)
-                elif i2 < len(input) and type(parts[part_i]) is list and input[i2] in parts[part_i] :
+                elif i2 < len(input) and type(parts[part_i]) is list and input[i2].lower() in parts[part_i] :
                     # as in "if we haven't reached the end of input,
                     # and we have a list of options in parts, check to
                     # see if the input is currently one of these
@@ -282,13 +282,13 @@ class Parser(object) :
             return out
 
     def transform_command_to_words(self, text) :
-        text = text.lower()
+        #text = text.lower()
         if "," in text :
             actor, action = text.split(",",1)
             text = "ask "+actor+" to "+action
         return text.split()
     def transform_text_to_words(self, text) :
-        text = text.lower()
+        #text = text.lower()
         return text.split()
 
     def handle_all(self, input, ctxt, action_verifier) :
@@ -315,7 +315,19 @@ class Parser(object) :
             return results[0].value, False
         else : # it's ambiguous!
             # first, see if verification helps at all
-            scores = [(r, action_verifier(r.value, ctxt)) for r in results]
+            scores_pre = [(r, action_verifier(r.value, ctxt)) for r in results]
+            # we separate out the ones which are illogical because
+            # something wasn't visible because we don't want to even
+            # mention the objects involved (because they weren't
+            # visible).
+            scores = [(r, v) for r,v in scores_pre if type(v) is not IllogicalNotVisible]
+            if len(scores) == 0 :
+                # In this case, we are stuck with an invalid action
+                # because some item is not visible
+                scores_not_visible = [r for r,v in scores_pre if type(v) is IllogicalNotVisible]
+                # we say is_disambiguating=False so there is no
+                # disambiguation message
+                return scores_not_visible[0].value, False
             scores.sort(key=lambda z : z[1].score)
             is_disambiguating = 1 < len([True for r,v in scores if v.is_acceptible()])
             if scores[-1][1].is_acceptible() :
@@ -410,13 +422,13 @@ def default_parse_thing(parser, var, name, words, input, i, ctxt, next, multipli
         poss = []
         if i2 < len(input) :
             # try adding another adjective
-            if input[i2] in adjs :
-                new_adjs = curr_adjs + [input[i2]]
+            if input[i2].lower() in adjs :
+                new_adjs = curr_adjs + [input[i2].lower()]
                 if parser_valid_description(new_adjs, [], adjs, nouns) :
                     poss.extend(match_adjs_nouns(new_adjs, i2+1))
             # or try concluding with a noun
-            if input[i2] in nouns :
-                # already a match
+            if input[i2].lower() in nouns :
+                # already a match because input[i2] is one of the nouns.
                 poss.extend(product([[Matched(input[i:i2+1], name, 2*multiplier, var)]],
                                     next(i2+1)))
         # or just try concluding
@@ -430,7 +442,7 @@ def default_parse_thing(parser, var, name, words, input, i, ctxt, next, multipli
     if i < len(input) :
         i2 = i
         # skip over articles
-        if input[i] in PARSER_ARTICLES :
+        if input[i].lower() in PARSER_ARTICLES :
             i2 += 1
         poss.extend(match_adjs_nouns([], i2))
     return poss

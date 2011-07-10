@@ -201,6 +201,15 @@ class BasicVerify(object) :
     def __repr__(self) :
         return "<BasicVerify %r %r>" % (self.score, self.reason)
 
+class IllogicalNotVisible(BasicVerify) :
+    """For when the thing is illogical because it can't be seen.
+    Meant to prevent unseemly disambiguations because of objects not
+    presently viewable.  These kinds of verify objects are special
+    cased in the parser."""
+    def __init__(self, reason) :
+        self.score = 0
+        self.reason = reason
+
 def VeryLogicalOperation() :
     """For operations which are particularly apt."""
     return BasicVerify(150, "Very good.")
@@ -216,7 +225,7 @@ def IllogicalInaccessible(reason) :
     inaccessible."""
     return BasicVerify(20, reason)
 def IllogicalOperation(reason) :
-    return BasicVerify(0, reason)
+    return BasicVerify(10, reason)
 def NonObviousOperation() :
     """To prevent automatically doing an operation."""
     return BasicVerify(99, "Non-obvious.")

@@ -197,7 +197,9 @@ world[ContributesLight(X) <= IsA(X, "thing")] = False
 
 @world.handler(ContributesLight(X) <= IsA(X, "thing"))
 def rule_ContributesLight_thing_default_is_MakesLight(x, world) :
-    """By default, a thing contributes light if it makes light."""
+    """By default, a thing contributes light if it makes light.
+    Containing light doesn't matter for things which are not
+    containers or supporters."""
     if world[MakesLight(x)] :
         return True
     else : raise NotHandled()
@@ -212,13 +214,6 @@ def rule_ContributesLight_if_parts_contribute(x, world) :
     if any(world[ContributesLight(o)] for o in parts) :
         return True
     else : raise NotHandled()
-
-# @world.handler(ContributesLight(X) <= IsA(X, "thing"))
-# def rule_ContributesLight_if_contains_light(x, world) :
-#     """A thing contributes light if it contains light."""
-#     if world[ContainsLight(x)] :
-#         return True
-#     else : raise NotHandled()
 
 @world.handler(EffectiveContainer(X) <= IsA(X, "thing"))
 def rule_EffectiveContainer_if_thing(x, world) :
@@ -348,7 +343,7 @@ def default_IndefiniteName(x, world) :
         return "a "+printed_name
 
 ##
-# Properties: SubjectPronoun, ObjectPronoun, PossessivePronoun
+# Properties: SubjectPronoun, ObjectPronoun, PossessivePronoun, ReflexivePronoun
 ##
 
 @world.define_property
@@ -368,9 +363,15 @@ class PossessivePronoun(Property) :
     """Represents the possesive pronoun of the object."""
     numargs = 1
 
+@world.define_property
+class ReflexivePronoun(Property) :
+    """Represents the reflexive pronoun of the object."""
+    numargs = 1
+
 world[SubjectPronoun(X) <= IsA(X, "thing")] = "it"
 world[ObjectPronoun(X) <= IsA(X, "thing")] = "it"
 world[PossessivePronoun(X) <= IsA(X, "thing")] = "its"
+world[ReflexivePronoun(X) <= IsA(X, "thing")] = "itself"
 
 
 ##
@@ -908,6 +909,19 @@ def person_PossessivePronoun(x, world) :
     else :
         return "their"
 
+@world.handler(ReflexivePronoun(X) <= IsA(X, "person"))
+def person_ReflexivePronoun(x, world) :
+    """Gives a default reflexive pronoun based on Gender."""
+    gender = world[Gender(x)]
+    if gender == "male" :
+        return "himself"
+    elif gender == "female" :
+        return "herself"
+    elif gender == "none" :
+        return "itself"
+    else :
+        return "themself"
+
 ##
 # Properties: SubjectPronounIfMe, ObjectPronounIfMe, PossessivePronounIfMe
 ##
@@ -927,10 +941,16 @@ class PossessivePronounIfMe(Property) :
     """Represents the possessive pronoun, but when referring to the
     current actor."""
     numargs = 1
+@world.define_property
+class ReflexivePronounIfMe(Property) :
+    """Represents the reflexive pronoun, but when referring to the
+    current actor."""
+    numargs = 1
 
 world[SubjectPronounIfMe(X) <= IsA(X, "person")] = "you"
 world[ObjectPronounIfMe(X) <= IsA(X, "person")] = "you"
 world[PossessivePronounIfMe(X) <= IsA(X, "person")] = "your"
+world[ReflexivePronounIfMe(X) <= IsA(X, "person")] = "yourself"
 
 #
 # Light for a person
@@ -959,13 +979,33 @@ the actor of the action is presumed to be action.get_actor().""")
 
 @actoractivities.to("npc_is_willing")
 def npc_is_willing_default(requester, action, ctxt) :
+    """Fails unless the requester is the actor of the action."""
     if requester == action.get_actor() :
-        """It's fine, if a bit weird, if the requester is the actor of
-        the action."""
+        # It's fine, if a bit weird, if the requester is the actor of
+        # the action.
         raise ActionHandled()
     else :
         raise AbortAction(str_with_objs("[The $a] doesn't feel compelled to "+action.infinitive_form(ctxt)+".",
                                         a=action.get_actor()), actor=requester)
+
+actoractivities.define_activity("npc_is_wanting", reverse=True, doc="""An
+activity which checks whether an NPC wants an object which is being
+given to them.  If the NPC wants it, it should raise ActionHandled,
+and if there is a particular reason the NPC doesn't want it, it should
+raise AbortAction.  The activity takes (giver, object, receiver).""")
+
+@actoractivities.to("npc_is_wanting")
+def npc_is_wanting_default(giver, object, receiver, ctxt) :
+    """Fails unless the giver is the receiver or the receiver is the
+    current context's actor."""
+    if giver==receiver :
+        # It's fine, if a bit weird, if the giver is the receiver.
+        raise ActionHandled()
+    elif receiver==ctxt.actor :
+        # The actor of the context always is willing to accept things
+        raise ActionHandled()
+    else :
+        raise AbortAction(str_with_objs("[The $y] doesn't seem interested in [the $x]", x=object, y=receiver), actor=giver)
 
 ###
 ### Defining: region

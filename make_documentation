@@ -6,7 +6,7 @@ docfor=""
 
 if len(sys.argv)>=2 :
     print "Making documentation for "+sys.argv[1]
-    docfor = "_for_"+sys.argv[1].split(".")[0]
+    docfor = "_for_"+sys.argv[1].split(".")[0].replace("/","_")
     execfile(sys.argv[1])
 else :
     from textadv.basicsetup import *

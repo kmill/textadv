@@ -67,6 +67,7 @@ world.activity.make_part_of("pocket", "player")
 
 quickdef(world, "key", "thing", {
         Name : "useful key",
+        IndefiniteName : "a useful key",
         Description : """It looks like it can open anything."""
         })
 world.activity.put_in("key", "pocket")
@@ -112,7 +113,7 @@ def _when_inserting_into_continuation(actor, x, y, ctxt) :
 
 @report(InsertingInto(actor, X, Y) <= IsA(Y, "continuation"))
 def _report_inserting_into_continuation(actor, x, y, ctxt) :
-    ctxt.write(str_with_objs("Bewildered, you find the world as it was, but {Bob} {is} now holding [the $x].", x=x), actor=actor)
+    ctxt.write(str_with_objs("Bewildered, you find the world as it was, but {bob} {is} now holding [the $x].", x=x), actor=actor)
     raise ActionHandled()
 
 @when(Taking(actor, X) <= IsA(X, "continuation") & PNot(ContinuationData(X)))
@@ -176,6 +177,7 @@ world.activity.put_in("light bulb", "room_41")
 
 quickdef(world, "zombocom", "container", {
         IsEnterable : True,
+        ProperNamed : True,
         Description : """[if [when zombocom Contains]]Welcome to
         zombocom.[else]This is zombocom.  It looks like you can enter
         it.[endif]"""
@@ -197,9 +199,27 @@ world.activity.put_in("compliant robot", "room_41")
 
 @actoractivities.to("npc_is_willing")
 def robot_is_willing_default(requester, action, ctxt) :
+    """The robot is willing to do anything!"""
     if action.get_actor() == "compliant robot" :
-        # of course the robot is willing!
         raise ActionHandled()
+
+@actoractivities.to("npc_is_wanting")
+def robot_is_wanting_default(giver, object, receiver, ctxt) :
+    """The robot wants everything!"""
+    if receiver=="compliant robot" :
+        raise ActionHandled()
+
+quickdef(world, "table", "supporter", {
+        Scenery : True,
+        Description : "It's a wood table."
+        })
+world.activity.put_in("table", "room_41")
+
+quickdef(world, "peanuts", "thing", {
+        IndefiniteName : "some peanuts",
+        Description : "It's just a pile of peanuts."
+        })
+world.activity.put_on("peanuts", "table")
 
 ##
 ## Room2

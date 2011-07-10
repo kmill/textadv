@@ -18,7 +18,7 @@ def require_xobj_accessible(actionsystem, action) :
     def _verify_xobj_accessible(actor, x, ctxt, **kwargs) :
         if not ctxt.world[AccessibleTo(x, actor)] :
             if not ctxt.world[VisibleTo(x, actor)] :
-                return IllogicalOperation(as_actor("{Bob|cap} {can} see no such thing.", actor=actor))
+                return IllogicalNotVisible(as_actor("{Bob|cap} {can} see no such thing.", actor=actor))
             else :
                 effcont = ctxt.world[EffectiveContainer(ctxt.world[Location(x)])]
                 if ctxt.world[Openable(effcont)] and not ctxt.world[IsOpen(effcont)] :
@@ -34,7 +34,7 @@ def require_xobj_visible(actionsystem, action) :
     @docstring("Ensures the object x in "+repr(action)+" is visible to the actor.  Added by require_xobj_visible.")
     def _verify_xobj_visible(actor, x, ctxt, **kwargs) :
         if not ctxt.world[VisibleTo(x, actor)] :
-            return IllogicalOperation(as_actor("{Bob|cap} {can} see no such thing.", actor=actor))
+            return IllogicalNotVisible(as_actor("{Bob|cap} {can} see no such thing.", actor=actor))
 
 def require_xobj_held(actionsystem, action, only_hint=False, transitive=True) :
     """Adds rules which check if the object x is held by the actor in
@@ -53,7 +53,7 @@ def require_xobj_held(actionsystem, action, only_hint=False, transitive=True) :
         if ctxt.world.query_relation(Has(actor, x)) :
             return VeryLogicalOperation()
         elif not ctxt.world[VisibleTo(x, actor)] :
-            return IllogicalOperation(as_actor("{Bob|cap} {can} see no such thing.", actor=actor))
+            return IllogicalNotVisible(as_actor("{Bob|cap} {can} see no such thing.", actor=actor))
         elif not ctxt.world[AccessibleTo(x, actor)] :
             effcont = ctxt.world[EffectiveContainer(ctxt.world[Location(x)])]
             if ctxt.world[Openable(effcont)] and not ctxt.world[IsOpen(effcont)] :
@@ -120,23 +120,24 @@ def when_getting_help(actor, ctxt) :
     [newline]Some examples of commands one may try are the following:
 
     [newline]
-    look ('l' for short)[break]
-    inventory ('i' for short)[break]
-    examine <i>something</i> ('x <i>something</i>' for short)[break]
-    take <i>something</i>[break]
-    drop <i>something</i>[break]
-    put <i>something</i> in <i>something</i>[break]
-    put <i>something</i> on <i>something</i>[break]
-    go <i>direction</i> (or the first letter of the direction for short)[break]
-    enter <i>something</i>[break]
-    leave[break]
-    open <i>something</i>[break]
-    close <i>something</i>[break]
-    unlock <i>something</i> with <i>something</i>[break]
-    turn on <i>something</i>[break]
-    ask <i>someone</i> about <i>something</i>[break]
-    ask <i>someone</i> for <i>something</i>[break]
-    give <i>something</i> to <i>someone</i>[break]
+    - look ('l' for short)[break]
+    - inventory ('i' for short)[break]
+    - examine <i>something</i> ('x <i>something</i>' for short)[break]
+    - take <i>something</i>[break]
+    - drop <i>something</i>[break]
+    - put <i>something</i> in <i>something</i>[break]
+    - put <i>something</i> on <i>something</i>[break]
+    - go <i>direction</i> (or the first letter of the direction for short)[break]
+    - enter <i>something</i>[break]
+    - leave[break]
+    - open <i>something</i>[break]
+    - close <i>something</i>[break]
+    - unlock <i>something</i> with <i>something</i>[break]
+    - turn on <i>something</i>[break]
+    - ask <i>someone</i> about <i>something</i>[break]
+    - ask <i>someone</i> for <i>something</i>[break]
+    - ask <i>someone</i> to <i>some action</i>[break]
+    - give <i>something</i> to <i>someone</i>[break]
 
     [newline]This list is not exhaustive.  Part of the fun is figuring
     out what you can do.
@@ -145,7 +146,7 @@ def when_getting_help(actor, ctxt) :
     direction or examine a particular object.
 
     [newline]If you get stuck, don't forget to examine things, as
-    often times vital cluse are left in descriptions (this being a
+    often times vital clues are left in descriptions (this being a
     text-based game).
 
     [newline]For more help, take a look at <a
@@ -1191,6 +1192,110 @@ def before_switching_switchable(actor, x, ctxt) :
     else :
         raise DoInstead(SwitchingOn(actor, x), suppress_message=True)
 
+
+##
+# AskingFor
+##
+
+class AskingFor(BasicAction) :
+    verb = ("ask", "for")
+    gerund = ("asking", "for")
+    numargs = 3
+parser.understand("ask [something x] for [something y]", AskingFor(actor, X, Y))
+
+require_xobj_accessible(actionsystem, AskingFor(actor, X, Y))
+require_xobj_visible(actionsystem, AskingFor(actor, Z, X))
+
+@before(AskingFor(actor, X, Y))
+def before_askingfor_turn_to_givingto(actor, x, y, ctxt) :
+    """Turns the AskingFor into a AskingTo(...,GivingTo(...))."""
+    raise DoInstead(AskingTo(actor, x, GivingTo(x, y, actor)), suppress_message=True)
+
+
+##
+# AskingTo
+##
+
+class AskingTo(BasicAction) :
+    verb = ("ask", "to")
+    gerund = ("asking", "to")
+    numargs = 3
+    def gerund_form(self, ctxt) :
+        dobj = str_with_objs("[the $x]", x=self.args[1])
+        comm = self.args[2].infinitive_form(ctxt)
+        return self.gerund[0] + " " + dobj + " to " + comm
+    def infinitive_form(self, ctxt) :
+        dobj = str_with_objs("[the $x]", x=self.args[1])
+        comm = self.args[2].infinitive_form(ctxt)
+        return self.verb[0] + " " + dobj + " to " + comm
+parser.understand("ask [something x] to [action y]", AskingTo(actor, X, Y))
+
+require_xobj_accessible(actionsystem, AskingTo(actor, X, Y))
+
+@verify(AskingTo(actor, X, Y))
+def verify_askingto_by_verify_y(actor, x, y, ctxt) :
+    """Updates the actor for y to x and then verifies that action."""
+    y.update_actor(x)
+    return ctxt.actionsystem.verify_action(y, ctxt)
+
+@before(AskingTo(actor, X, Y))
+def before_askingto_check_willing(actor, x, y, ctxt) :
+    """Checks if the askee is willing to do the action by calling the
+    actor activity 'npc_is_willing'."""
+    y.update_actor(x)
+    ctxt.activity.npc_is_willing(actor, y)
+
+@when(AskingTo(actor, X, Y))
+def when_askingto_make_it_happen(actor, x, y, ctxt) :
+    """Makes the actor x do the action."""
+    y.update_actor(x)
+    ctxt.actionsystem.run_action(y, ctxt)
+
+
+##
+# GivingTo
+##
+
+class GivingTo(BasicAction) :
+    """GivingTo(actor, X, Y)"""
+    verb = ("give", "to")
+    gerund = ("giving", "to")
+    numargs = 3
+parser.understand("give [something x] to [something y]", GivingTo(actor, X, Y))
+parser.understand("give [something y] [something x]", GivingTo(actor, X, Y))
+
+require_xobj_held(actionsystem, GivingTo(actor, X, Y))
+require_xobj_accessible(actionsystem, GivingTo(actor, Z, X))
+
+@before(GivingTo(actor, X, Y) <= PNot(IsA(Y, "person")))
+def before_giving_to_inanimate(actor, x, y, ctxt) :
+    """You can't give things to inanimate things."""
+    raise AbortAction(str_with_objs("[The $y] can't take [the $x].",x=x, y=y), actor=actor)
+
+@before(GivingTo(actor, X, Y) <= IsA(Y, "person"))
+def before_giving_to_person_npc_is_wanting(actor, x, y, ctxt) :
+    """Checks whether the NPC is wanting the object from the actor
+    using the npc_is_wanting activity."""
+    ctxt.activity.npc_is_wanting(actor, x, y)
+
+@before(GivingTo(actor, X, Y) <= PEquals(actor, Y))
+def before_giving_to_self(actor, x, y, ctxt) :
+    """You can't give things to yourself."""
+    raise AbortAction("{Bob|cap} already {has} that.", actor=actor)
+
+
+@when(GivingTo(actor, X, Y))
+def when_giving_to_default(actor, x, y, ctxt) :
+    """Changes the ownership of the object."""
+    ctxt.world.activity.give_to(x, y)
+
+
+@report(GivingTo(actor, X, Y))
+def report_giving_to_default(actor, x, y, ctxt) :
+    """Writes a message of the transaction."""
+    ctxt.write(str_with_objs("{Bob|cap} {gives} [the $x] to [the $y].", x=x, y=y), actor=actor)
+
+
 ###
 ### Actions that don't do anything
 ###
@@ -1333,56 +1438,13 @@ def before_pushing_default(actor, x, ctxt) :
     """By default, you can't push things."""
     raise AbortAction(str_with_objs("{Bob|cap} can't push [the $x].", x=x), actor=actor)
 
-##
-# GivingTo
-##
-
-class GivingTo(BasicAction) :
-    """GivingTo(actor, X, Y)"""
-    verb = ("give", "to")
-    gerund = ("giving", "to")
-    numargs = 3
-parser.understand("give [something x] to [something y]", GivingTo(actor, X, Y))
-parser.understand("give [something y] [something x]", GivingTo(actor, X, Y))
-
-require_xobj_held(actionsystem, GivingTo(actor, X, Y))
-require_xobj_accessible(actionsystem, GivingTo(actor, Z, X))
-
-@before(GivingTo(actor, X, Y) <= PNot(IsA(Y, "person")))
-def before_giving_to_inanimate(actor, x, y, ctxt) :
-    """You can't give things to inanimate things."""
-    raise AbortAction(str_with_objs("[The $y] can't take [the $x].",x=x, y=y), actor=actor)
-
-@before(GivingTo(actor, X, Y) <= IsA(Y, "person"))
-def before_giving_to_person_default(actor, x, y, ctxt) :
-    """People don't want things by default, unless y is the actor of
-    the context."""
-    if y != ctxt.actor :
-        raise AbortAction(str_with_objs("[The $y] doesn't seem interested in [the $x]", x=x, y=y), actor=actor)
-
-@before(GivingTo(actor, X, Y) <= PEquals(actor, Y))
-def before_giving_to_self(actor, x, y, ctxt) :
-    """You can't give things to yourself."""
-    raise AbortAction("{Bob|cap} already {has} that.", actor=actor)
-
-
-@when(GivingTo(actor, X, Y))
-def when_giving_to_default(actor, x, y, ctxt) :
-    """Changes the ownership of the object."""
-    ctxt.world.activity.give_to(x, y)
-
-
-@report(GivingTo(actor, X, Y))
-def report_giving_to_default(actor, x, y, ctxt) :
-    """Writes a message of the transaction."""
-    ctxt.write(str_with_objs("{Bob|cap} gives [the $x] to [the $y].", x=x, y=y), actor=actor)
-
 
 ##
 # AskingAbout
 ##
 
 class AskingAbout(BasicAction) :
+    """AskingAbout(actor, X, 'text')"""
     verb = ("ask", "about")
     gerund = ("asking", "about")
     dereference_iobj = False
@@ -1398,62 +1460,70 @@ def report_asking_about_default(actor, x, y, ctxt) :
 
 
 ##
-# AskingFor
+# Laughing
 ##
 
-class AskingFor(BasicAction) :
-    verb = ("ask", "for")
-    gerund = ("asking", "for")
-    numargs = 3
-parser.understand("ask [something x] for [something y]", AskingFor(actor, X, Y))
+class Laughing(BasicAction) :
+    """Laughing(actor)"""
+    verb = "laugh"
+    gerund = "laughing"
+    numargs = 1
+parser.understand("laugh/lol", Laughing(actor))
 
-require_xobj_accessible(actionsystem, AskingFor(actor, X, Y))
-require_xobj_visible(actionsystem, AskingFor(actor, Z, X))
+@report(Laughing(actor))
+def report_laughing_default(actor, ctxt) :
+    """Reports a default message."""
+    ctxt.write("{Bob} {laughs} to {himself} quietly.", actor=actor)
 
-@before(AskingFor(actor, X, Y))
-def before_askingfor_turn_to_givingto(actor, x, y, ctxt) :
-    """Turns the AskingFor into a AskingTo(...,GivingTo(...))."""
-    raise DoInstead(AskingTo(actor, x, GivingTo(x, y, actor)), suppress_message=True)
+##
+# Singing
+##
+
+class Singing(BasicAction) :
+    """Singing(actor)"""
+    verb = "sing"
+    gerund = "singing"
+    numargs = 1
+parser.understand("sing", Singing(actor))
+
+@report(Singing(actor))
+def report_singing_default(actor, ctxt) :
+    """Reports a default message."""
+    ctxt.write("{Bob} {sings} to {himself} quietly.", actor=actor)
+
+##
+# Jumping
+##
+
+class Jumping(BasicAction) :
+    """Jumping(actor)"""
+    verb = "jump"
+    gerund = "jumping"
+    numargs = 1
+parser.understand("jump", Jumping(actor))
+
+@report(Jumping(actor))
+def report_jumping_default(actor, ctxt) :
+    """Reports a default message."""
+    ctxt.write("{Bob} {jumps} in place.", actor=actor)
 
 
 ##
-# AskingTo
+# Waiting
 ##
 
-class AskingTo(BasicAction) :
-    verb = ("ask", "to")
-    gerund = ("asking", "to")
-    numargs = 3
-    def gerund_form(self, ctxt) :
-        dobj = str_with_objs("[the $x]", x=self.args[1])
-        comm = self.args[2].infinitive_form(ctxt)
-        return self.gerund[0] + " " + dobj + " to " + comm
-    def infinitive_form(self, ctxt) :
-        dobj = str_with_objs("[the $x]", x=self.args[1])
-        comm = self.args[2].infinitive_form(ctxt)
-        return self.verb[0] + " " + dobj + " to " + comm
-parser.understand("ask [something x] to [action y]", AskingTo(actor, X, Y))
+class Waiting(BasicAction) :
+    """Waiting(actor)"""
+    verb = "wait"
+    gerund = "waiting"
+    numargs = 1
+parser.understand("wait/z", Waiting(actor))
 
-require_xobj_accessible(actionsystem, AskingTo(actor, X, Y))
+@report(Waiting(actor))
+def report_waiting_default(actor, ctxt) :
+    """Reports a default message."""
+    ctxt.write("Time passes.", actor=actor)
 
-@verify(AskingTo(actor, X, Y))
-def verify_askingto_by_verify_y(actor, x, y, ctxt) :
-    """Updates the actor for y to x and then verifies that action."""
-    y.update_actor(x)
-    return ctxt.actionsystem.verify_action(y, ctxt)
-
-@before(AskingTo(actor, X, Y))
-def before_askingto_check_willing(actor, x, y, ctxt) :
-    """Checks if the askee is willing to do the action by calling the
-    actor activity 'npc_is_willing'."""
-    y.update_actor(x)
-    ctxt.activity.npc_is_willing(actor, y)
-
-@when(AskingTo(actor, X, Y))
-def when_askingto_make_it_happen(actor, x, y, ctxt) :
-    """Makes the actor x do the action."""
-    y.update_actor(x)
-    ctxt.actionsystem.run_action(y, ctxt)
 
 ###
 ### Debugging actions

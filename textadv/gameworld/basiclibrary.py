@@ -12,7 +12,7 @@ from textadv.gamesystem.utilities import *
 #import textadv.gamesystem.parser as parser
 from textadv.gamesystem.parser import default_parser
 from textadv.gamesystem.actionsystem import BasicAction, DoInstead, verify_instead, ActionSystem
-from textadv.gamesystem.actionsystem import VeryLogicalOperation, LogicalOperation, IllogicalOperation, IllogicalInaccessible, NonObviousOperation
+from textadv.gamesystem.actionsystem import VeryLogicalOperation, LogicalOperation, IllogicalOperation, IllogicalInaccessible, NonObviousOperation, IllogicalNotVisible
 
 ###
 ### The main game world!
@@ -90,7 +90,7 @@ execfile("textadv/gameworld/basicactions.py")
 world.activity.def_obj("player", "person")
 world[PrintedName("player")] = "[if [current_actor_is player]]you[else]the player[endif]"
 world[ProperNamed("player")] = True
-world[Words("player")] = ["yourself", "self", "AFGNCAAP", "me"]
+world[Words("player")] = ["player", "yourself", "self", "AFGNCAAP", "me"]
 world[Description("player")] = """{Bob|cap} {is} an ageless, faceless,
 gender-neutral, culturally-ambiguous adventure-person.  {Bob|cap}
 {does} stuff sometimes."""

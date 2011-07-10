@@ -31,7 +31,7 @@ def act_start_game_describe_game(ctxt) :
     ctxt.write("<span class=\"game_title\">"+ctxt.world[Global("game_title")]+"</span>"+"[break]")
     ctxt.write(ctxt.world[Global("game_headline")], "by", ctxt.world[Global("game_author")])
     ctxt.write("[break]Release number", str(ctxt.world[Global("release_number")]), "[newline]")
-    ctxt.write("Type 'help' for help.[newline]")
+    ctxt.write("Type '[action help]' for help.[newline]")
 
 @actoractivities.to("start_game")
 def act_start_game_describe_location(ctxt) :

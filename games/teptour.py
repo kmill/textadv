@@ -121,6 +121,7 @@ world.activity.connect_rooms("253 Commonwealth Ave.", "north", "front door")
 world.activity.connect_rooms("front door", "northwest", "Center Room")
 
 quickdef(world, "doorbell", "thing", {
+        Words : ["@doorbell", "door", "@bell"],
         Scenery : True,
         Description : """It's a small, black button, and you almost
         didn't notice it.  It turns out the FedEx guy enjoys this
@@ -134,16 +135,18 @@ def before_pushing_doorbell(actor, ctxt) :
     raise ActionHandled()
 @when(Pushing(actor, "doorbell"))
 def when_pushing_doorbell(actor, ctxt) :
+    ctxt.world.activity.put_in(actor, "Center Room")
+@report(Pushing(actor, "doorbell"))
+def report_pushing_doorbell(actor, ctxt) :
     ctxt.write("""You hear a loud subwoofer buzzing at 32 Hz, and,
     after a few moments, footsteps down the stairs.  A young tEp opens
     the door for you and leads you in.  "Ah, I see you're getting the
     virtual house tour from [ob <Irving Q. Tep>]," he says.  "Those
     are really good."  Before running off, he brings you to the...""")
-    ctxt.world.activity.put_in(actor, "Center Room")
 
 @before(Going(actor, "north") <= PEquals("253 Commonwealth Ave.", Location(actor)))
 def ring_doorbell_instead(actor, ctxt) :
-    ctxt.write("The door is locked.  Looking around the door, you find a doorbell, and ring that instead.[newline]")
+    ctxt.write("The door is locked.  Looking around the door, you find a doorbell, and you ring that instead.[newline]")
     raise DoInstead(Pushing(actor, "doorbell"), suppress_message=True)
 
 ###

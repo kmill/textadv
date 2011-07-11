@@ -8,16 +8,16 @@
 execfile("textadv/basicsetup.py")
 #from textadv.basicsetup import *
 
-##
-## Fun and games
-##
-
 world[Global("game_title")] = "Island Adventure"
 world[Global("game_author")] = "Kyle Miller"
 world[Global("game_description")] = """
 You decided to stop what you were doing and wash up on an island.[newline]
 You're not quite sure how you got here, or what you're supposed to do,
 but you feel that Adventure is afoot."""
+
+##
+## Fun and games
+##
 
 
 @before(Attacking(actor, X) <= PEquals(actor, X))
@@ -79,15 +79,14 @@ def before_fishing_default(actor, ctxt) :
 
 require_xobj_held(actionsystem, FishingWith(actor, X))
 
-@before(FishingWith(actor, X))
+@before(FishingWith(actor, X) <= PNot(IsA(X, "fishing rod")))
 def before_fishingwith_default(actor, x, ctxt) :
-    if not ctxt.world[IsA(x, "fishing rod")] :
-        if ctxt.world[IsA(x, "person")] :
-            raise AbortAction(str_with_objs("""It doesn't look like [the $x] wants to help.""",
-                                            x=x))
-        else :
-            raise AbortAction(str_with_objs("""{Bob|cap} would have a
-                                            hard time catching fish with [the $x]""", x=x))
+    if ctxt.world[IsA(x, "person")] :
+        raise AbortAction(str_with_objs("""It doesn't look like [the $x] wants to help.""",
+                                        x=x))
+    else :
+        raise AbortAction(str_with_objs("""{Bob|cap} would have a
+                                        hard time catching fish with [the $x]""", x=x))
 
 @before(FishingWith(actor, X) <= IsA(X, "fishing rod"))
 def before_fishingwith_rod(actor, x, ctxt) :

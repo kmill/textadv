@@ -93,16 +93,12 @@ def describe_current_location_default(actor, ctxt) :
     ctxt.world[Global("current_described_location")] = vis_cont
     ctxt.activity.describe_location(actor, loc, vis_cont)
 
-__DESCRIBE_LOCATION_notables = []
-__DESCRIBE_LOCATION_mentioned = []
-
 @actoractivities.to("describe_location")
 def describe_location_init(actor, loc, vis_cont, ctxt) :
-    """Initializes the global variables __DESCRIBE_LOCATION_notables
-    and __DESCRIBE_LOCATION_mentioned."""
-    global __DESCRIBE_LOCATION_notables, __DESCRIBE_LOCATION_mentioned
-    __DESCRIBE_LOCATION_notables = []
-    __DESCRIBE_LOCATION_mentioned = []
+    """Initializes the global variables describe_location_notables and
+    describe_location_mentioned."""
+    ctxt.world[Global("describe_location_notables")] = []
+    ctxt.world[Global("describe_location_mentioned")] = []
 
 @actoractivities.to("describe_location")
 def describe_location_Heading(actor, loc, vis_cont, ctxt) :
@@ -137,13 +133,16 @@ def describe_location_Description(actor, loc, vis_cont, ctxt) :
         ctxt.write("[newline]You can't see a thing; it's incredibly dark.")
         raise ActionHandled()
 
+world[Global("describe_location_ascend_locations")] = True
+
 @actoractivities.to("describe_location")
 def describe_location_Objects(actor, loc, vis_cont, ctxt) :
     """Prints descriptions of the notable objects in the contents of
     the visible container."""
     continue_ascending = True
-    mentioned = __DESCRIBE_LOCATION_mentioned
-    notables = __DESCRIBE_LOCATION_notables
+    mentioned = ctxt.world[Global("describe_location_mentioned")]
+    notables = ctxt.world[Global("describe_location_notables")]
+    ascend = ctxt.world[Global("describe_location_ascend_locations")]
     curr_msgs = []
     while continue_ascending :
         obs = ctxt.world[Contents(loc)]
@@ -155,7 +154,7 @@ def describe_location_Objects(actor, loc, vis_cont, ctxt) :
 
         unnotable_messages = []
         current_location = None
-        is_first_sentence = loc==vis_cont # the top level ends up printing first
+        is_first_sentence = loc==vis_cont or not ascend # the top level ends up printing first, unless we don't ascend
         current_start = None
         current_descs = None
         for o in notables :
@@ -205,7 +204,7 @@ def describe_location_Objects(actor, loc, vis_cont, ctxt) :
         if unnotable_messages :
             curr_msgs.insert(0, "[newline]".join(start+serial_comma(msgs)+"." for start,msgs in unnotable_messages))
         
-        if loc == vis_cont :
+        if loc == vis_cont or not ascend :
             continue_ascending = False
         else :
             loc = ctxt.world[Location(loc)]
@@ -236,10 +235,10 @@ def describe_location_property_heading_location(actor, loc, vis_cont, ctxt) :
     while loc != vis_cont :
         if ctxt.world[IsA(loc, "container")] :
             ctxt.write(str_with_objs("(in [the $x])", x=loc), actor=actor)
-            __DESCRIBE_LOCATION_mentioned.append(loc)
+            ctxt.world[Global("describe_location_mentioned")].append(loc)
         elif ctxt.world[IsA(loc, "supporter")] :
             ctxt.write(str_with_objs("(on [the $x])", x=loc), actor=actor)
-            __DESCRIBE_LOCATION_mentioned.append(loc)
+            ctxt.world[Global("describe_location_mentioned")].append(loc)
         else :
             return
         loc = ctxt.world[ParentEnterable(loc)] # hopefully the vis_cont is always an enterable!
@@ -368,40 +367,35 @@ def get_notable_objects_not_self(actor, x, ctxt) :
 actoractivities.define_activity("describe_object",
                            doc="""Describes an object for the purpose of examining.""")
 
-__DESCRIBE_OBJECT_described = False
-
 @actoractivities.to("describe_object")
 def describe_object_init(actor, o, ctxt) :
-    """Initialize the global variable __DESCRIBE_OBJECT_described,
+    """Initialize the global variable describe_object_described,
     which represents whether any description was uttered."""
-    global __DESCRIBE_OBJECT_described
-    __DESCRIBE_OBJECT_described = False
+    ctxt.world[Global("describe_object_described")] = False
 @actoractivities.to("describe_object")
 def describe_object_description(actor, o, ctxt) :
     """Writes the Description if there is one defined."""
     d = ctxt.world[Description(o)]
     if d :
-        global __DESCRIBE_OBJECT_described
-        __DESCRIBE_OBJECT_described = True
+        ctxt.world[Global("describe_object_described")] = True
         ctxt.write(d, actor=actor)
 @actoractivities.to("describe_object")
 def describe_object_container(actor, o, ctxt) :
     """Writes a line about the contents of a container if the container is not opaque."""
-    global __DESCRIBE_OBJECT_described
     if ctxt.world[IsA(o, "container")] :
         if ctxt.world[SuppressContentDescription(o)] :
             raise NotHandled()
         if not ctxt.world[IsOpaque(o)] :
             contents = [str_with_objs("[a $c]", c=c) for c in ctxt.world[Contents(o)] if c!=actor and ctxt.world[Reported(c)]]
             if contents :
-                if __DESCRIBE_OBJECT_described : # print a newline if needed.
+                if ctxt.world[Global("describe_object_described")] : # print a newline if needed.
                     ctxt.write("[newline]")
-                __DESCRIBE_OBJECT_described = True
+                ctxt.world[Global("describe_object_described")] = True
                 ctxt.write(str_with_objs("In [the $o] ", o=o)+is_are_list(contents)+".", actor=actor)
         elif ctxt.world[Openable(o)] and not ctxt.world[IsOpen(o)] :
-            if __DESCRIBE_OBJECT_described :
+            if ctxt.world[Global("describe_object_described")] :
                 ctxt.write("[newline]")
-            __DESCRIBE_OBJECT_described = True
+            ctxt.world[Global("describe_object_described")] = True
             ctxt.write(str_with_objs("[The $o] is closed.", o=o), actor=actor)
 @actoractivities.to("describe_object")
 def describe_object_supporter(actor, o, ctxt) :
@@ -411,16 +405,22 @@ def describe_object_supporter(actor, o, ctxt) :
             raise NotHandled()
         contents = [str_with_objs("[a $c]", c=c) for c in ctxt.world[Contents(o)] if c!=actor and ctxt.world[Reported(c)]]
         if contents :
-            global __DESCRIBE_OBJECT_described # print a newline if needed.
-            if __DESCRIBE_OBJECT_described :
+            if ctxt.world[Global("describe_object_described")] : # print a newline if needed.
                 ctxt.write("[newline]")
-            __DESCRIBE_OBJECT_described = True
+            ctxt.world[Global("describe_object_described")] = True
             ctxt.write(str_with_objs("On [the $o] ", o=o)+is_are_list(contents)+".", actor=actor)
+@actoractivities.to("describe_object")
+def describe_object_switchable(actor, o, ctxt) :
+    """Writes a line about the state of a switchable thing."""
+    if ctxt.world[Switchable(o)] :
+        if ctxt.world[Global("describe_object_described")] : # print a newline if needed.
+            ctxt.write("[newline]")
+        ctxt.world[Global("describe_object_described")] = True
+        ctxt.write(str_with_objs("[He $o] is currently switched [get IsSwitchedOnMsg $o].", o=o), actor=actor)
 @actoractivities.to("describe_object")
 def describe_object_default(actor, o, ctxt) :
     """Runs if none of the previous were successful.  Prints a default message."""
-    global __DESCRIBE_OBJECT_described
-    if not __DESCRIBE_OBJECT_described :
+    if not ctxt.world[Global("describe_object_described")] :
         ctxt.write(str_with_objs("{Bob|cap} {sees} nothing special about [the $o].", o=o), actor=actor)
 
 ##

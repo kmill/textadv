@@ -379,8 +379,12 @@ def before_going_check_door(action, actor, direction, ctxt) :
 
 @before(Going(actor, direction), wants_event=True, insert_after=before_going_setup_variables)
 def before_going_leave_enterables(action, actor, direction, ctxt) :
-    """If currently in or on something which isn't action.going_from, try exiting first."""
+    """If currently in or on something which isn't action.going_from,
+    try exiting first.  If we do exit, then we restart Going so that
+    rules which fire based on the location of the actor work
+    properly."""
     loc = ctxt.world[Location(actor)]
+    first_loc = loc
     while action.going_from != loc :
         if ctxt.world[IsA(loc, "supporter")] :
             do_action = GettingOff(actor)
@@ -393,6 +397,9 @@ def before_going_leave_enterables(action, actor, direction, ctxt) :
         if newloc == loc :
             raise AbortAction(str_with_objs("{Bob|cap} can't leave [the $z]", z=loc), actor=actor)
         loc = newloc
+    if first_loc != loc :
+        # It's cleaner for some rules if we can assume that we are going from a room.
+        raise DoInstead(Going(actor, direction), suppress_message=True)
 
 
 @when(Going(actor, direction), wants_event=True)
@@ -526,7 +533,10 @@ def report_entering_describe_contents(actor, x, ctxt) :
     actor of the context, disabling the location heading and the
     location description."""
     if ctxt.actor == actor :
-        ctxt.activity.describe_location(actor, x, x, disable=[describe_location_Heading, describe_location_Description])
+        vis_cont = ctxt.world[VisibleContainer(x)]
+        ctxt.world[Global("describe_location_ascend_locations")] = False
+        ctxt.activity.describe_location(actor, x, vis_cont, disable=[describe_location_Heading, describe_location_Description])
+        ctxt.world[Global("describe_location_ascend_locations")] = True
 
 @report(Entering(actor, X) <= IsA(X, "container"))
 def report_entering_container(actor, x, ctxt) :
@@ -536,7 +546,7 @@ def report_entering_container(actor, x, ctxt) :
 @report(Entering(actor, X) <= IsA(X, "supporter"))
 def report_entering_supporter(actor, x, ctxt) :
     """Explains entering a supporter."""
-    ctxt.write(str_with_objs("{Bob|cap} {gets} on top of [the $x].", x=x), actor=actor)
+    ctxt.write(str_with_objs("{Bob|cap} {gets} on [the $x].", x=x), actor=actor)
 
 
 ##

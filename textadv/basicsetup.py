@@ -23,13 +23,19 @@ before = make_rule_decorator(actionsystem.action_before)
 when = make_rule_decorator(actionsystem.action_when)
 report = make_rule_decorator(actionsystem.action_report)
 
-def quickdef(world, obname, kind, props={}) :
+def quickdef(world, obname, kind, props={}, **kwargs) :
     """Defines an object with less typing.  The props argument is a
     dictionary of things like "Scenery: True", which is taken to mean
     "world[Scenery(obname)] = True"""
     world.activity.def_obj(obname, kind)
     for prop, val in props.iteritems() :
         world[prop(obname)] = val
+    if "put_in" in kwargs :
+        world.activity.put_in(obname, kwargs["put_in"])
+    if "put_on" in kwargs :
+        world.activity.put_on(obname, kwargs["put_on"])
+    if "make_part_of" in kwargs :
+        world.activity.make_part_of(obname, kwargs["make_part_of"])
 
 def make_actorcontext_with_io(io_obj) :
     """Copies the game, and creates an ActorContext with the given io."""

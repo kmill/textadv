@@ -913,7 +913,7 @@ def person_PossessivePronoun(x, world) :
     """Gives a default possessive pronoun based on Gender."""
     gender = world[Gender(x)]
     if gender == "male" :
-        return "him"
+        return "his"
     elif gender == "female" :
         return "her"
     elif gender == "none" :

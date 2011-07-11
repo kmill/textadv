@@ -56,7 +56,10 @@ class ActorActivities(object) :
         """Gets the activity table of the given name."""
         return self._activities[name]
     def call(self, name, *args, **kwargs) :
-        return self._activities[name].notify(args, {"ctxt" : kwargs["ctxt"]}, disable=kwargs.get("disable", []))
+        mykwargs = kwargs.copy()
+        if "disable" in mykwargs :
+            del mykwargs["disable"]
+        return self._activities[name].notify(args, mykwargs, disable=kwargs.get("disable", []))
     def copy(self) :
         naa = ActorActivities()
         for name, table in self._activities.iteritems() :

@@ -10,7 +10,9 @@ sys.path.append(os.path.join(os.path.dirname(__file__), "../.."))
 games = {"cloak" : __import__("games.cloak", fromlist=["cloak"]),
          "testgame" : __import__("games.testgame", fromlist=["testgame"]),
          "testgame2" : __import__("games.testgame2", fromlist=["testgame2"]),
-         "isleadv" : __import__("games.isleadv", fromlist=["isleadv"])}
+         "isleadv" : __import__("games.isleadv", fromlist=["isleadv"]),
+         "teptour" : __import__("games.teptour", fromlist=["teptour"]),
+         }
 
 class MainHandler(tornado.web.RequestHandler):
     def get(self) :

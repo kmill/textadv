@@ -66,8 +66,9 @@ def _verifier_step_turn(ctxt) :
 
 quickdef(world, "pocket", "container", {
         Description : """It's your pocket."""
-        })
-world.activity.make_part_of("pocket", "player")
+        },
+         make_part_of="player")
+#world.activity.make_part_of("pocket", "player")
 
 quickdef(world, "key", "thing", {
         Name : "useful key",

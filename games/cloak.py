@@ -94,12 +94,12 @@ def before_anything_in_bar(x, ctxt) :
     let the Going action keep going north."""
     if type(x) == Going :
         if x.get_direction() != "north" :
-            world[Global("message_disturbance")] += 2
+            ctxt.world[Global("message_disturbance")] += 2
             raise AbortAction("Blundering around in the dark isn't a good idea!")
     elif type(x) in [Looking, TakingInventory] :
         raise NotHandled()
     else :
-        world[Global("message_disturbance")] += 1
+        ctxt.world[Global("message_disturbance")] += 1
         raise AbortAction("In the dark? You could easily disturb something!")
 
 ### The Cloakroom

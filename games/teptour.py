@@ -37,7 +37,8 @@ parser.understand("upstairs", "up", dest="direction")
 parser.understand("downstairs", "down", dest="direction")
 
 quickdef(world, "Irving Q. Tep", "person", {
-        Gender: "male",
+        Gender : "male",
+        ProperNamed : True,
         Description : """It's Irving Q. Tep, spirit of the house.  He
         is giving you stories and such <i>telepathically</i> using
         images and text.  Quite amazing.
@@ -142,7 +143,7 @@ def report_pushing_doorbell(actor, ctxt) :
     after a few moments, footsteps down the stairs.  A young tEp opens
     the door for you and leads you in.  "Ah, I see you're getting the
     virtual house tour from [ob <Irving Q. Tep>]," he says.  "Those
-    are really good."  Before running off, he brings you to the...""")
+    are really good."  Before running off, he brings you to...[break]""")
 
 @before(Going(actor, "north") <= PEquals("253 Commonwealth Ave.", Location(actor)))
 def ring_doorbell_instead(actor, ctxt) :
@@ -154,6 +155,7 @@ def ring_doorbell_instead(actor, ctxt) :
 ###
 
 quickdef(world, "Center Room", "room", {
+        Visited : True,
         Description : """This is the center room, which is a common
         area at tEp.  Around you are composite photos from the past
         decade, and a [ob chandelier] that seems like it has seen
@@ -189,6 +191,7 @@ quickdef(world, "chandelier", "thing", {
 ###
 
 quickdef(world, "Front Room", "room", {
+        Visited : True,
         Description : """This is where the tEps play Super Smash
         Bros. after dinner every night.  You can go [dir north] to the
         center room."""
@@ -205,6 +208,7 @@ quickdef(world, "Dining Room", "room")
 ####################
 
 quickdef(world, "Second Floor", "room", {
+        Visited : True,
         Description : """This is the second floor.  You can go [dir
         southeast] to 21, [dir south] to 22, [dir north] to 23, [dir
         northeast] to 24, [dir upstairs], and [dir downstairs]."""
@@ -225,6 +229,7 @@ quickdef(world, "24", "room")
 ###################
 
 quickdef(world, "Third Floor", "room", {
+        Visited : True,
         Description : """This is the third floor.  You can go [dir
         southeast] to 31, [dir south] to 32, [dir north] to 33, [dir
         northeast] to 34, [dir upstairs], and [dir downstairs]."""
@@ -245,6 +250,7 @@ quickdef(world, "34", "room")
 ####################
 
 quickdef(world, "Fourth Floor", "room", {
+        Visited : True,
         Description : """This is the fourth floor.  You can go [dir
         southeast] to 41, [dir south] to 42, [dir north] to 43, [dir
         northeast] to 44, [dir upstairs], and [dir downstairs]."""
@@ -265,6 +271,7 @@ quickdef(world, "44", "room")
 ###################
 
 quickdef(world, "Fifth Floor", "room", {
+        Visited : True,
         Description : """This is the fifth floor.  You can go [dir
         southeast] to 51, [dir south] to the study room, [dir
         northwest] to 53, [dir north] to 54, [dir northeast] to 55,
@@ -282,6 +289,7 @@ quickdef(world, "54", "room")
 quickdef(world, "55", "room")
 
 quickdef(world, "Study Room", "room", {
+        Visited : True,
         Description : """This is the study room.  You can go [dir
         north] to the rest of the fifth floor, or [dir south] to the
         poop deck."""
@@ -289,6 +297,7 @@ quickdef(world, "Study Room", "room", {
 world.activity.connect_rooms("Study Room", "south", "Poop Deck")
 
 quickdef(world, "Poop Deck", "room", {
+        Visited : True,
         Description : """This is the roof deck immediately outside the
         study room.  From here you can see a nice view of the mall
         (which is the grassy area along Commonwealth Ave.).  You can
@@ -303,6 +312,7 @@ world.activity.connect_rooms("Poop Deck", "up", "Roof")
 ################
 
 quickdef(world, "Roof", "room", {
+        Visited : True,
         Description : """This is the roof of tEp.  To the north is a
         view of the MIT campus, and to the south is the Boston
         skyline.  You can go back [dir down] to the poopdeck."""
@@ -319,6 +329,11 @@ parser.understand("ask about [text y]", AskingAbout(actor, "Irving Q. Tep", Y))
 
 @report(AskingAbout(actor, "Irving Q. Tep", Y))
 def asking_irving(actor, y, ctxt) :
+    """Irving Q. Tep knows about various abstract ideas and can talk
+    about them.  But, if he doesn't know about a topic, it's assumed
+    that the player is asking about an object in the room, and we turn
+    it into an Examining action.  Otherwise, if there's no relevant
+    object, Irving 'has nothing to say about that.'"""
     text = y.strip().lower()
     if text in ["stupidball"] :
         ctxt.write("""Stupidball is a fine game in which contestants
@@ -367,5 +382,14 @@ def asking_irving(actor, y, ctxt) :
         to do their work assignments and to schedule [action <ask
         about work week> <work week>].""")
     else :
-        ctxt.write("""Irving Q. Tep has nothing to say about that.""")
+        # current words have already been init'd
+        res = ctxt.parser.run_parser("something",
+                                     ctxt.parser.transform_text_to_words(y),
+                                     ctxt)
+        if not res :
+            ctxt.write("""Irving Q. Tep has nothing to say about that.""")
+        elif len(res) == 1 :
+            ctxt.actionsystem.run_action(Examining(actor, res[0][0].value), ctxt)
+        else :
+            raise Ambiguous(Examining(actor, X), {X : [r[0].value for r in res]}, {X : "something"})
     raise ActionHandled()

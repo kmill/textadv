@@ -520,7 +520,7 @@ default_parser.define_subparser("object", "A parser which uses its variable as a
 def default_object(parser, var, input, i, ctxt, actor, next) :
     """Tries to parse the input so that the var is the name of the object."""
     words = separate_object_words(ctxt.world.get_property("Words", var))
-    return parser.parse_thing.notify([parser, None,var,words,input,i,ctxt,next,2],{})
+    return parser.parse_thing.notify([parser,"something",None,var,words,input,i,ctxt,next,2],{})
 
 
 default_parser.define_subparser("text", """Just matches against any sequence of words.""")

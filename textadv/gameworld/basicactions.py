@@ -341,19 +341,26 @@ class Going(BasicAction) :
         """An accessor method for the direction of the going
         action."""
         return self.args[1]
+    going_via = None
     going_to = None
     def gerund_form(self, ctxt) :
+        out = "going %s" % self.args[1]
         if self.going_to :
             dest = str_with_objs("[get DefiniteName $x]", x=self.going_to)
-            return "going %s to %s" % (self.args[1], dest)
-        else :
-            return "going %s" %s (self.args[1],)
+            out = "%s to %s" % (out, dest)
+        if self.going_via and self.going_via != self.going_to : # equal if not a door
+            via = str_with_objs("[the $x]", x=self.going_via)
+            return "%s via %s" % (out, via)
+        return out
     def infinitive_form(self, ctxt) :
+        out = "go %s" % self.args[1]
         if self.going_to :
             dest = str_with_objs("[get DefiniteName $x]", x=self.going_to)
-            return "go %s to %s" % (self.args[1], dest)
-        else :
-            return "go %s" %s (self.args[1],)
+            out = "%s to %s" % (out, dest)
+        if self.going_via and self.going_via != self.going_to :
+            via = str_with_objs("[the $x]", x=self.going_via)
+            return "%s via %s" % (out, via)
+        return out
 parser.understand("go [direction direction]", Going(actor, direction))
 parser.understand("[direction direction]", Going(actor, direction))
 
@@ -437,6 +444,7 @@ class GoingTo(BasicAction) :
     gerund = "going to"
     numargs = 2
 parser.understand("go to [somewhere x]", GoingTo(actor, X))
+parser.understand("goto [somewhere x]", GoingTo(actor, X))
 
 @verify(GoingTo(actor, X))
 def verify_going_default(actor, x, ctxt) :
@@ -456,15 +464,14 @@ def before_going_to_intermediate_walk(actor, x, ctxt) :
     only visiting already visited rooms."""
     def is_going_to_able(a) :
         """Something is going-to-able if it is a door, if it is
-        actually visited, or if it is adjacent to a place which has been visited"""
+        actually visited, or if it is the destination (we want to make
+        sure the planned path doesn't go through unvisited rooms!)"""
         if ctxt.world[IsA(a, "door")] or ctxt.world[Visited(a)] :
             return True
+        elif a == x :
+            return True
         else :
-            adjacent = ctxt.world.query_relation(Adjacent(a, Y), var=Y)
-            if any(not ctxt.world[IsA(b, "door")] and ctxt.world[Visited(b)] for b in adjacent) :
-                return True
-            else :
-                return False
+            return False
     if x == ctxt.world[ContainingRoom(actor)] :
         raise AbortAction("{Bob} {is} already there.", actor=actor)
     path = ctxt.world.r_path_to(Adjacent, ctxt.world[ContainingRoom(actor)], x,
@@ -473,13 +480,19 @@ def before_going_to_intermediate_walk(actor, x, ctxt) :
         raise AbortAction(str_with_objs("{Bob} {doesn't} know how to get to [get DefiniteName $x].", x=x),
                           actor=actor)
     currloc = path[0]
-    for nextloc in path[1:] :
+    i = 1
+    while i < len(path) :
+        nextloc = path[i]
         dir = ctxt.world.query_relation(Exit(currloc, Y, nextloc), var=Y)
         if not dir :
             raise AbortAction(str_with_objs("{Bob} {doesn't} know how to get to [get DefiniteName $y] from [get DefiniteName $z].", y=nextloc, z=currloc),
                               actor=actor)
         action = Going(actor, dir[0])
-        action.going_to = nextloc
+        if ctxt.world[IsA(nextloc, "door")] :
+            action.going_via = nextloc
+            action.going_to = path[i+1]
+        else :
+            action.going_to = nextloc
         if nextloc == path[-1] : # this is the last step of the path
             ctxt.actionsystem.run_action(action, ctxt, write_action=True)
         else : # otherwise we want "(first going ...)"
@@ -488,9 +501,14 @@ def before_going_to_intermediate_walk(actor, x, ctxt) :
         if currloc == nextlocp :
             raise AbortAction(str_with_objs("{Bob} {is} confused and {stops} trying to go to [get DefiniteName $x]", x=x),
                               actor=actor)
-        elif nextloc != nextlocp :
-            # we need to make a new path
-            raise DoInstead(GoingTo(actor, x), suppress_message=True)
+        elif nextloc != nextlocp : # uh-oh, we're off the charted path
+            print i, nextloc, nextlocp, path[i+1], path
+            if nextlocp != path[i+1] : # hmm, we didn't go through a door.
+                # we need to make a new path
+                raise DoInstead(GoingTo(actor, x), suppress_message=True)
+            else : # good, we went through a door
+                i += 1 # so skip the door in the path
+        i += 1
         currloc = nextlocp
 
 # no 'when' is needed.

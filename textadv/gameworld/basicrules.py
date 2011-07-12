@@ -82,7 +82,7 @@ def default_IndefiniteName(x, world) :
     printed_name = world[PrintedName(x)]
     if world[ProperNamed(x)] :
         return printed_name
-    elif printed_name[0] in "aeoiu" :
+    elif printed_name[0].lower() in "aeoiu" :
         return "an "+printed_name
     else :
         return "a "+printed_name

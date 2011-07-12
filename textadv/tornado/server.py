@@ -87,17 +87,16 @@ class OutputHandler(tornado.web.RequestHandler) :
             sessions_lock.release()
             self.game_thread = t
             print "waiting for output"
-            def _output_handler(out, prompt) :
-                tornado.ioloop.IOLoop.instance().add_callback(lambda : self.__finish_output(out, prompt))
+            def _output_handler(vars) :
+                tornado.ioloop.IOLoop.instance().add_callback(lambda : self.__finish_output(vars))
             t.game_context.io.register_wants_output(_output_handler)
-    def __finish_output(self, out, prompt) :
+    def __finish_output(self, vars) :
         self.output_lock.acquire()
         if self.ignore_output :
             print "ignoring output, client has quit"
         else :
             self.ignore_output = True
-            self.write(json_encode({"text" : out,
-                                    "prompt" : prompt}))
+            self.write(json_encode(vars))
             print "wrote output."
             try :
                 self.finish()
@@ -143,36 +142,40 @@ import threading
 
 class TornadoGameIO(object) :
     def __init__(self, outfile) :
-        self.prompt = ">"
         self.main_lock = threading.BoundedSemaphore(1)
         self.input_lock = threading.Semaphore(0)
         self.to_flush = []
         self.commands = []
         self.to_output = ""
         self.wants_output = None
+        self.status_vars = {"prompt" : ">"}
         self.die = False
         self.outfile = outfile
     def register_wants_output(self, callback) :
         self.main_lock.acquire()
         if self.to_output :
             if self.wants_output :
-                self.wants_output(self.to_output, self.prompt)
+                self.status_vars["text"] = self.to_output
+                self.wants_output(self.status_vars)
+                self.status_vars = {"prompt" : self.status_vars["prompt"]}
                 self.wants_output = callback
                 self.to_output = ""
             else :
-                callback(self.to_output, self.prompt)
+                self.status_vars["text"] = self.to_output
+                callback(self.status_vars)
+                self.status_vars = {"prompt" : self.status_vars["prompt"]}
                 self.to_output = ""
         else :
             if self.wants_output :
-                self.wants_output("", self.prompt)
+                self.status_vars["text"] = ""
+                self.wants_output(self.status_vars)
+                self.status_vars = {"prompt" : self.status_vars["prompt"]}
             self.wants_output = callback
         self.main_lock.release()
     def get_input(self, prompt=">") :
         if self.die :
             raise SystemExit("Thread death due to self.die.")
-        self.main_lock.acquire()
-        self.prompt = prompt
-        self.main_lock.release()
+        self.set_status_var("prompt", prompt)
         self.flush()
         self.input_lock.acquire()
         if self.die :
@@ -180,15 +183,21 @@ class TornadoGameIO(object) :
         command = self.commands.pop()
         self.main_lock.acquire()
         if self.outfile :
-            self.outfile.write("\n\n<p><b>"+self.prompt + " "+command+"</b></p>")
+            self.outfile.write("\n\n<p><b>"+self.status_vars["prompt"] + " "+command+"</b></p>")
             self.outfile.flush()
         self.main_lock.release()
         return command
+    def set_status_var(self, key, value) :
+        self.main_lock.acquire()
+        self.status_vars[key] = value
+        self.main_lock.release()
     def kill_io(self) :
         self.main_lock.acquire()
         self.die = True
         if self.wants_output :
-            self.wants_output("<i>Error: timeout</i>", "")
+            self.status_vars["text"] = "<i>Error: timeout</i>"
+            self.wants_output(self.status_vars)
+            self.status_vars = {"prompt" : self.status_vars["prompt"]}
             self.wants_output = None
         if self.outfile :
             self.outfile.flush()
@@ -216,7 +225,9 @@ class TornadoGameIO(object) :
             self.outfile.write("\n\n<p>"+out+"</p>")
             self.outfile.flush()
         if self.wants_output :
-            self.wants_output(self.to_output, self.prompt)
+            self.status_vars["text"] = self.to_output
+            self.wants_output(self.status_vars)
+            self.status_vars = {"prompt" : self.status_vars["prompt"]}
             self.to_output = ""
             self.wants_output = None
         self.main_lock.release()

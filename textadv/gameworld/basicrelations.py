@@ -194,6 +194,15 @@ def referenceable_things_Default(world) :
     things = [o for o in objects if world[IsA(o, "thing")]]
     return things
 
+world.define_activity("referenceable_rooms", accumulator=list_append)
+@world.to("referenceable_rooms")
+def referenceable_things_Default(world) :
+    """Gets all things in the world (that is, all objects which
+    inherit from "thing")."""
+    objects = world.query_relation(IsA(X, Y), var=X)
+    rooms = [o for o in objects if world[IsA(o, "room")]]
+    return rooms
+
 world.define_activity("objects_of_kind", accumulator=list_append)
 @world.to("objects_of_kind")
 def objects_of_type_Default(kind, world) :

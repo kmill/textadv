@@ -92,7 +92,7 @@ def describe_current_location_default(actor, ctxt) :
     ctxt.world[Global("current_location")] = vis_cont
     ctxt.world[Global("current_described_location")] = vis_cont
     ctxt.activity.describe_location(actor, loc, vis_cont)
-
+    
 @actoractivities.to("describe_location")
 def describe_location_init(actor, loc, vis_cont, ctxt) :
     """Initializes the global variables describe_location_notables and
@@ -226,7 +226,7 @@ def describe_location_heading_Name(actor, loc, vis_cont, ctxt) :
     if ctxt.world[IsA(vis_cont, "thing")] :
         ctxt.write(str_with_objs("<span class=\"location_heading\">[The $z]</span>", z=vis_cont), actor=actor)
     else :
-        ctxt.write(str_with_objs("<span class=\"location_heading\">[get Name $z]</span>", z=vis_cont), actor=actor)
+        ctxt.write(str_with_objs("<span class=\"location_heading\">[get DefiniteName $z]</span>", z=vis_cont), actor=actor)
 
 @actoractivities.to("describe_location_heading")
 def describe_location_property_heading_location(actor, loc, vis_cont, ctxt) :
@@ -242,6 +242,52 @@ def describe_location_property_heading_location(actor, loc, vis_cont, ctxt) :
         else :
             return
         loc = ctxt.world[ParentEnterable(loc)] # hopefully the vis_cont is always an enterable!
+
+
+actoractivities.define_activity("make_current_location_headline", accumulator=lambda x: x[0],
+                                doc="""A wrapper for
+                                make_location_headline to make it more
+                                convenient.""")
+
+@actoractivities.to("make_current_location_headline")
+def make_current_location_headline_Default(actor, ctxt) :
+    """Takes the current location stuff like in
+    describe_current_location, and then calls make_location_headline,
+    returning the result after calling eval_str."""
+    loc = ctxt.world[Location(actor)]
+    vis_cont = ctxt.world[VisibleContainer(loc)]
+    raise ActionHandled(eval_str(ctxt.activity.make_location_headline(actor, loc, vis_cont), ctxt))
+
+actoractivities.define_activity("make_location_headline", accumulator=join_with_spaces,
+                                doc="""Like describe_location_heading,
+                                but returns a string which can be used
+                                in the headline field of the user
+                                interface.""")
+
+@actoractivities.to("make_location_headline")
+def make_location_headline_Name(actor, loc, vis_cont, ctxt) :
+    """Returns the name of the visible container."""
+    if not ctxt.world[ContainsLight(vis_cont)] :
+        raise ActionHandled("Darkness")
+    elif ctxt.world[IsA(vis_cont, "thing")] :
+        return as_actor(str_with_objs("[The $z]", z=vis_cont), actor=actor)
+    else :
+        return as_actor(str_with_objs("[get DefiniteName $z]", z=vis_cont), actor=actor)
+
+@actoractivities.to("make_location_headline")
+def make_location_headline_ParentEnterable(actor, loc, vis_cont, ctxt) :
+    """Creates a description of where the location is with respect to
+    the visible container."""
+    out = []
+    while loc != vis_cont :
+        if ctxt.world[IsA(loc, "container")] :
+            out.append(as_actor(str_with_objs("(in [the $x])", x=loc), actor=actor))
+        elif ctxt.world[IsA(loc, "supporter")] :
+            out.append(as_actor(str_with_objs("(on [the $x])", x=loc), actor=actor))
+        else :
+            break
+        loc = ctxt.world[ParentEnterable(loc)] # hopefully the vis_cont is always an enterable!
+    raise MultipleResults(*out)
 
 ##
 ## Activity: terse_obj_description

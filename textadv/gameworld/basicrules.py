@@ -27,6 +27,67 @@ def default_Name(x, world) :
     return str(x)
 
 ##
+# Properties: ProperNamed, PrintedName, DefiniteName, IndefiniteName
+##
+
+@world.define_property
+class ProperNamed(Property) :
+    """Represents whether or not the name of something is a proper
+    name.  Basically inhibits the article for DefiniteName and
+    IndefiniteName."""
+    numargs = 1
+
+world[ProperNamed(X) <= IsA(X, "kind")] = False
+
+@world.define_property
+class PrintedName(Property) :
+    """Gives a textual representation of an object which can then be
+    prefaced by an article (that is, unless ProperNamed is true).
+    This is separate from Name because it might be dynamic in some
+    way.  (Note: it might be that this property isn't necessary)."""
+    numargs = 1
+
+@world.handler(PrintedName(X) <= IsA(X, "kind"))
+def default_PrintedName(x, world) :
+    """By default, PrintedName(X) is Name(X)."""
+    return world[Name(x)]
+
+@world.define_property
+class DefiniteName(Property) :
+    """Gives the definite name of an object.  For instance, "the ball"
+    or "Bob"."""
+    numargs = 1
+
+@world.handler(DefiniteName(X) <= IsA(X, "kind"))
+def default_DefiniteName(x, world) :
+    """By default, DefiniteName is just the PrintedName with "the"
+    stuck in front, unless ProperNamed is true."""
+    printed_name = world[PrintedName(x)]
+    if world[ProperNamed(x)] :
+        return printed_name
+    else :
+        return "the "+printed_name
+
+@world.define_property
+class IndefiniteName(Property) :
+    """Gives the indefinite name of an object.  For instance, "a ball"
+    or "Bob"."""
+    numargs = 1
+
+@world.handler(IndefiniteName(X) <= IsA(X, "kind"))
+def default_IndefiniteName(x, world) :
+    """By default, IndefiniteName is the PrintedName with "a" or "an"
+    (depending on whether the PrintedName starts with a vowel) stuck
+    to the front, unless ProperNamed is true."""
+    printed_name = world[PrintedName(x)]
+    if world[ProperNamed(x)] :
+        return printed_name
+    elif printed_name[0] in "aeoiu" :
+        return "an "+printed_name
+    else :
+        return "a "+printed_name
+
+##
 # Property: Description
 ##
 
@@ -63,6 +124,8 @@ def default_Words(x, world) :
 ###
 
 world[Description(X) <= IsA(X, "room")] = None
+
+world[ProperNamed(X) <= IsA(X, "room")] = True
 
 ##
 # Property: Visited
@@ -281,66 +344,6 @@ class Reported(Property) :
 
 world[Reported(X) <= IsA(X, "thing")] = True
 
-##
-# Properties: ProperNamed, PrintedName, DefiniteName, IndefiniteName
-##
-
-@world.define_property
-class ProperNamed(Property) :
-    """Represents whether or not the name of something is a proper
-    name.  Basically inhibits the article for DefiniteName and
-    IndefiniteName."""
-    numargs = 1
-
-world[ProperNamed(X) <= IsA(X, "thing")] = False
-
-@world.define_property
-class PrintedName(Property) :
-    """Gives a textual representation of an object which can then be
-    prefaced by an article (that is, unless ProperNamed is true).
-    This is separate from Name because it might be dynamic in some
-    way.  (Note: it might be that this property isn't necessary)."""
-    numargs = 1
-
-@world.handler(PrintedName(X) <= IsA(X, "thing"))
-def default_PrintedName(x, world) :
-    """By default, PrintedName(X) is Name(X)."""
-    return world[Name(x)]
-
-@world.define_property
-class DefiniteName(Property) :
-    """Gives the definite name of an object.  For instance, "the ball"
-    or "Bob"."""
-    numargs = 1
-
-@world.handler(DefiniteName(X) <= IsA(X, "thing"))
-def default_DefiniteName(x, world) :
-    """By default, DefiniteName is just the PrintedName with "the"
-    stuck in front, unless ProperNamed is true."""
-    printed_name = world[PrintedName(x)]
-    if world[ProperNamed(x)] :
-        return printed_name
-    else :
-        return "the "+printed_name
-
-@world.define_property
-class IndefiniteName(Property) :
-    """Gives the indefinite name of an object.  For instance, "a ball"
-    or "Bob"."""
-    numargs = 1
-
-@world.handler(IndefiniteName(X) <= IsA(X, "thing"))
-def default_IndefiniteName(x, world) :
-    """By default, IndefiniteName is the PrintedName with "a" or "an"
-    (depending on whether the PrintedName starts with a vowel) stuck
-    to the front, unless ProperNamed is true."""
-    printed_name = world[PrintedName(x)]
-    if world[ProperNamed(x)] :
-        return printed_name
-    elif printed_name[0] in "aeoiu" :
-        return "an "+printed_name
-    else :
-        return "a "+printed_name
 
 ##
 # Properties: SubjectPronoun, ObjectPronoun, PossessivePronoun, ReflexivePronoun

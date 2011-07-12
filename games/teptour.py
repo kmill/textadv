@@ -352,10 +352,10 @@ def asking_irving(actor, y, ctxt) :
         can basically cut through anything.  Their prohibition was
         made into one of the [action <ask about rules> <rules of tep>]
         after one brother repeatedly cut down the wall between 51 and
-        52 during the summer months to make a mega room, while the
-        [action <ask about house mangler> <house mangler>] had to mend
-        the wall and the end of each summer for [action <ask about
-        work week> <work week>].""")
+        52 during the summer months to make a mega room, where it was
+        the duty of the [action <ask about house mangler> <house
+        mangler>] to mend the wall at the end of each summer for
+        [action <ask about work week> <work week>].""")
     elif text in ["work week"] :
         ctxt.write("""Work week occurs once at the end of the summer
         and once during winter break, and it's a time where tEps try

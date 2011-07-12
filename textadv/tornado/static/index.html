@@ -22,12 +22,40 @@ span.game_title {
 .user_response {
   font-weight: bold;
 }
+#headline {
+  width: 610px;
+  color: #fff;
+  background-color: #000;
+  position: fixed;
+  left: 0; top: 0;
+  padding-left: 10px;
+  padding-right: 10px;
+  padding-top: 2px;
+  padding-bottom: 2px;
+  font-family: sans-serif;
+}
+#headline a.action {
+  color: #fff;
+  text-decoration: none;
+}
+#headline a.action:hover {
+  color: #ccc;
+}
+#content {
+  width: 600px;
+  margin-left: 5px;
+  margin-right: 5px;
+  margin-top: 2em;
+}
 </style>
 </head>
 
 <body onclick="$('input:#command').focus()">
 
-<div id="content" style="width:600px;">
+<div id="headline">
+</div>
+
+<div id="content">
 </div>
 
 <table border="0px">

@@ -71,7 +71,7 @@ parser.understand("catch fish with [something x]", FishingWith(actor, X))
 def before_fishing_default(actor, ctxt) :
     rods = [rod for rod in ctxt.world.query_relation(Has(actor, X), var=X) if ctxt.world[IsA(rod, "fishing rod")]]
     if len(rods) > 1 :
-        raise Ambiguous(FishingWith(actor, X), {X : rods})
+        raise Ambiguous(FishingWith(actor, X), {X : rods}, {X : "something"})
     elif len(rods) == 1 :
         raise DoInstead(FishingWith(actor, rods[0]))
     else :

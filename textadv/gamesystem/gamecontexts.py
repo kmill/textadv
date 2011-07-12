@@ -120,6 +120,7 @@ class ActorContext(GameContext) :
     def run(self, input=None, action=None) :
         if not self.world.get_property("Global", "game_started") :
             self.activity.start_game()
+            self.io.set_status_var("headline", self.activity.make_current_location_headline(self.actor))
         try :
             if input is None and action is None:
                 input = self.io.get_input()
@@ -138,9 +139,11 @@ class ActorContext(GameContext) :
                 if self.world.get_property("Global", "end_game_message") :
                     self.activity.end_game_actions()
                     if self.world.get_property("Global", "end_game_message") :
+                        self.io.set_status_var("headline", "*** Game over ***")
                         self.io.flush()
                         return (None, {})
                 self.activity.step_turn()
+                self.io.set_status_var("headline", self.activity.make_current_location_headline(self.actor))
             except parser.NoSuchWord as ex :
                 esc = escape_str(ex.word)
                 self.write("I don't know what you mean by '%s'." % esc)
@@ -190,7 +193,7 @@ class DisambiguationContext(GameContext) :
             self.parent.write("Did you mean "+res+"?")
             input = self.parent.io.get_input(">>>")
             self.parent.parser.init_current_objects(self.parent, opts)
-            res = self.parent.parser.run_parser("something",
+            res = self.parent.parser.run_parser(self.amb.subparsers[var],
                                                 self.parent.parser.transform_text_to_words(input),
                                                 self.parent)
             if len(res) == 0 :

@@ -19,6 +19,9 @@ print_result = function(r) {
   if(r["prompt"]) {
     $("#input_text").text(r["prompt"]);
   }
+  if(r["headline"]) {
+    $("#headline").html(r["headline"]);
+  }
   $("input#command").focus();
   container = $("html, body");
   scrollTo = $("input#command");

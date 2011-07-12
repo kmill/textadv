@@ -169,8 +169,9 @@ class ManyToManyRelation(Relation) :
     def is_commutative() :
         return True
     @classmethod
-    def path_to(r, data, a, b) :
-        """Breadth-first search."""
+    def path_to(r, data, a, b, predicate=lambda x : True) :
+        """Breadth-first search.  The predicate is a filter on the
+        vertex set."""
         paths = {a : [a]}
         seen = []
         to_visit = [a]
@@ -179,7 +180,7 @@ class ManyToManyRelation(Relation) :
             seen.append(visiting)
             neighbors = [res["x"] for res in r(visiting, X).query_relation(data)]
             for n in neighbors :
-                if n not in seen :
+                if (n not in seen) and predicate(n) :
                     to_visit.append(n)
                     if not paths.has_key(n) :
                         paths[n] = paths[visiting] + [n]

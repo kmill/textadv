@@ -46,11 +46,12 @@ class NoInput(Exception) :
 
 class Ambiguous(Exception) :
     """Options is a list of lists of object ids."""
-    def __init__(self, pattern, options) :
+    def __init__(self, pattern, options, subparsers) :
         self.pattern = pattern
         self.options = options
+        self.subparsers = subparsers
     def __repr__(self) :
-        return "Ambiguous(%r, %r)" % (self.pattern, self.options)
+        return "Ambiguous(%r, %r, %r)" % (self.pattern, self.options, self.subparsers)
 
 ###
 ### Useful functions
@@ -99,15 +100,16 @@ PARSER_ARTICLES = ["a", "an", "the", "some"]
 ###
 
 class Matched(object) :
-    def __init__(self, words, value, score, var=None, subobjects=None) :
+    def __init__(self, words, value, score, subparser, var=None, subobjects=None) :
         self.words = words
         self.value = value
         self.score = score
         self.var = var
+        self.subparser = subparser
         self.subobjects = subobjects
     def __repr__(self) :
-        return "Matched(%r,%r,%r,%r,%r)" % (self.words, self.value, self.score,
-                                            self.var, self.subobjects)
+        return "Matched(%r,%r,%r,%r,%r,%r)" % (self.words, self.value, self.score,
+                                               self.subparser, self.var, self.subobjects)
 
 
 ###
@@ -134,28 +136,39 @@ class Parser(object) :
         # subparser takes (parser, var, input, i, ctxt, actor, next)
         self.subparsers = dict()
         self.parse_thing = ActivityTable(accumulator=list_append, doc="""A
-        parse_thing parser takes the arguments (parser, var, name,
-        words, input, i, ctxt, next, multiplier=1), and then tries to
-        parse the input from the point of view of the name and the
-        words=(adjs,nouns) arguments.  Note: this may be backwards
-        from what is expected--we try to find the thing we're looking
-        for rather than try to find any thing.  Should return
+        parse_thing parser takes the arguments (parser, subparser,
+        var, name, words, input, i, ctxt, next, multiplier=1), and
+        then tries to parse the input from the point of view of the
+        name and the words=(adjs,nouns) arguments.  The subparser is
+        the name of the subparser which called parse_thing so that we
+        can disambiguate properly.  Note: this may be backwards from
+        what is expected--we try to find the thing we're looking for
+        rather than try to find any thing.  Should return
         [Matched(..), ...] or something.""")
-    def init_current_objects(self, ctxt, with_objs=None) :
+    def init_current_objects(self, ctxt, with_objs=None, with_rooms=None) :
         """For parsing efficiency of things (needed in the something
         parser).  Gets the referenceable objects and their words."""
         if with_objs :
             self.CURRENT_OBJECTS = list(with_objs)
         else :
             self.CURRENT_OBJECTS = ctxt.world.activity.referenceable_things()
+        if with_rooms :
+            self.CURRENT_ROOMS = list(with_rooms)
+        else :
+            self.CURRENT_ROOMS = ctxt.world.activity.referenceable_rooms()
         self.CURRENT_WORDS = [separate_object_words(ctxt.world.get_property("Words", o))
                               for o in self.CURRENT_OBJECTS]
+        self.CURRENT_ROOM_WORDS = [separate_object_words(ctxt.world.get_property("Words", o))
+                                   for o in self.CURRENT_ROOMS]
     def add_known_words(self,*words) :
         """Helps let the user know which word was not recognized when
         they make a typo."""
         self.KNOWN_WORDS.extend(words)
     def __is_word_for_thing(self, word) :
         for adjs,nouns in self.CURRENT_WORDS :
+            if word in adjs or word in nouns :
+                return True
+        for adjs,nouns in self.CURRENT_ROOM_WORDS :
             if word in adjs or word in nouns :
                 return True
         return False
@@ -262,22 +275,31 @@ class Parser(object) :
                 subobjects = r[:-1]
                 score = 0
                 matches = dict()
+                subparsers = dict()
                 for part in subobjects :
                     if type(part) is Matched :
                         score += part.score
                         if part.var :
                             matches[part.var] = part.value
+                            if part.subparser == "action" :
+                                subparsers[part.var] = part.supdata
+                            else :
+                                subparsers[part.var] = ("subparser", part.subparser)
                 matches["actor"] = actor
+                subparsers["actor"] = ("subparser", "something")
+                supdata = None
                 if result :
                     if type(result) == str :
                         value = result
                     elif isinstance(result, AbstractPattern) :
                         value = result.expand_pattern(matches)
+                        supdata = result.expand_pattern(subparsers)
                     else :
                         value = result(**matches)
                 else :
                     value = subobjects
-                m = Matched(input[i:i2], value, score, var, subobjects)
+                m = Matched(input[i:i2], value, score, dest, var=var, subobjects=subobjects)
+                m.supdata = supdata # hack!!! We need this to disambiguate properly
                 out.extend(product([[m]], rest))
             return out
 
@@ -358,37 +380,59 @@ class Parser(object) :
                     else :
                         # We need the user to disambiguate.  The
                         # following returns the Ambiguous exception.
-                        raise self.__construct_amb_exception([r.value for r in new_best_results])
+                        raise self.__construct_amb_exception([r.value for r in new_best_results],
+                                                             [r.supdata for r in new_best_results])
             else :
                 # well, none of them are acceptible.  Let's go for the
                 # worst one.
                 return scores[0][0].value, True
-    def __construct_amb_exception(self, results) :
+    def __construct_amb_exception(self, results, supdata) :
         # It's ambiguous. Construct the possibilities for each argument
-        def __construct_pattern(results, to_replace, next_var) :
+        def __construct_pattern(results, supdata, subparsers, to_replace, next_var) :
             poss_args = [[a] for a in results[0].args]
+            poss_subparsers = [(isinstance(r, BasicAction) and s) or
+                               (type(s) == tuple and len(s) == 2 and s[0] == "subparser" and s[1])
+                               for r,s in zip(results[0].args, supdata[0].args)]
             # the following represents that the result is a matched object
             # which needs to be followed for disambiguation
             more_disambig_flag = [isinstance(a, BasicAction) for a in results[0].args]
-            for r in results[1:] :
+            for r,sup in zip(results[1:], supdata[1:]) :
                 for a,curr_poss in zip(r.args, poss_args) :
                     if a not in curr_poss :
                         curr_poss.append(a)
+                for i in xrange(0, len(poss_subparsers)) : # part of a hack to get the 'subparser'
+                    s = sup.args
+                    if more_disambig_flag[i] :
+                        if not poss_subparsers[i] :
+                            poss_subparsers[i] = r[i]
+                        elif type(r.args[i]) != type(s[i]) :
+                            raise Exception("Conflicting subactions", r.args[i], s)
+                    elif type(s[i]) == tuple and len(s[i]) == 2 and s[i][0] == "subparser" :
+                        if not poss_subparsers[i] :
+                            poss_subparsers[i] = s[i][1]
+                        elif s[i][1] != poss_subparsers[i] :
+                            raise Exception("Conflicting subparsers", s[i][1], poss_subparsers[i])
             constructed_args = []
-            for poss, disamb_more in zip(poss_args, more_disambig_flag) :
+            for poss, disamb_more, sp, i in zip(poss_args, more_disambig_flag, poss_subparsers, xrange(0, len(poss_args))) :
                 var = next_var[0]
                 next_var[0] = chr(ord(var) + 1)
                 if len(poss) == 1 : # no need to disambiguate this slot
                     constructed_args.extend(poss)
+                elif i == 0 : # this is the actor of the action.  don't need to disambiguate
+                    constructed_args.append(poss[0])
                 else :
                     if disamb_more :
-                        constructed_args.append(__construct_pattern(poss, to_replace, next_var))
+                        constructed_args.append(__construct_pattern(poss, [sp]*len(poss), # len maybe hack?
+                                                                    subparsers, to_replace, next_var))
                     else :
                         to_replace[var] = poss
+                        subparsers[var] = sp
                         constructed_args.append(VarPattern(var))
             return type(results[0])(*constructed_args)
         to_replace = dict()
-        return Ambiguous(__construct_pattern(results, to_replace, ['a']), to_replace)
+        subparsers = dict()
+        return Ambiguous(__construct_pattern(results, supdata, subparsers, to_replace, ['a']),
+                         to_replace, subparsers)
 
     def copy(self) :
         newparser = Parser()
@@ -414,7 +458,7 @@ class Parser(object) :
 default_parser = Parser()
 
 @default_parser.parse_thing.add_handler
-def default_parse_thing(parser, var, name, words, input, i, ctxt, next, multiplier=1) :
+def default_parse_thing(parser, subparser, var, name, words, input, i, ctxt, next, multiplier=1) :
     """Given a set of words and a name, tries to find a subsequence by
     using the grammar [art]? [adjs]* [noun]?, where there is at least
     one adjective or noun."""
@@ -429,12 +473,12 @@ def default_parse_thing(parser, var, name, words, input, i, ctxt, next, multipli
             # or try concluding with a noun
             if input[i2].lower() in nouns :
                 # already a match because input[i2] is one of the nouns.
-                poss.extend(product([[Matched(input[i:i2+1], name, 2*multiplier, var)]],
+                poss.extend(product([[Matched(input[i:i2+1], name, 2*multiplier, subparser, var=var)]],
                                     next(i2+1)))
         # or just try concluding
         if len(curr_adjs) > 0 :
             # already a match
-            poss.extend(product([[Matched(input[i:i2], name, 1*multiplier, var)]],
+            poss.extend(product([[Matched(input[i:i2], name, 1*multiplier, subparser, var)]],
                                 next(i2)))
         return poss
     adjs,nouns = words
@@ -457,8 +501,17 @@ default_parser.define_subparser("something", "A parser to match against things i
 @default_parser.add_subparser("something")
 def default_something(parser, var, input, i, ctxt, actor, next) :
     """Tries to parse as if the following input were a thing."""
-    return list_append([parser.parse_thing.notify([parser, var, name, words,input,i,ctxt,next],{})
+    return list_append([parser.parse_thing.notify([parser, "something", var, name, words,input,i,ctxt,next],{})
                         for name,words in zip(parser.CURRENT_OBJECTS, parser.CURRENT_WORDS)])
+
+
+default_parser.define_subparser("somewhere", "A parser to match against rooms in the game.")
+
+@default_parser.add_subparser("somewhere")
+def default_somewhere(parser, var, input, i, ctxt, actor, next) :
+    """Tries to parse as if the following input were a room."""
+    return list_append([parser.parse_thing.notify([parser, "somewhere", var, name, words,input,i,ctxt,next],{})
+                        for name,words in zip(parser.CURRENT_ROOMS, parser.CURRENT_ROOM_WORDS)])
 
 
 default_parser.define_subparser("object", "A parser which uses its variable as an object id, instead.")
@@ -478,6 +531,6 @@ def default_parse_text(parser, var, input, i, ctxt, actor, next) :
     the input."""
     out = []
     for i2 in xrange(i+1,len(input)+1) :
-        out.extend(product([[Matched(input[i:i2], " ".join(input[i:i2]), 1, var)]],
+        out.extend(product([[Matched(input[i:i2], " ".join(input[i:i2]), 1, "text", var=var)]],
                            next(i2)))
     return out

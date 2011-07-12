@@ -336,12 +336,24 @@ class Going(BasicAction) :
     """Going(actor, direction)"""
     verb = "go"
     gerund = "going"
-    dereference_dobj = False
     numargs = 2
     def get_direction(self) :
         """An accessor method for the direction of the going
         action."""
         return self.args[1]
+    going_to = None
+    def gerund_form(self, ctxt) :
+        if self.going_to :
+            dest = str_with_objs("[get DefiniteName $x]", x=self.going_to)
+            return "going %s to %s" % (self.args[1], dest)
+        else :
+            return "going %s" %s (self.args[1],)
+    def infinitive_form(self, ctxt) :
+        if self.going_to :
+            dest = str_with_objs("[get DefiniteName $x]", x=self.going_to)
+            return "go %s to %s" % (self.args[1], dest)
+        else :
+            return "go %s" %s (self.args[1],)
 parser.understand("go [direction direction]", Going(actor, direction))
 parser.understand("[direction direction]", Going(actor, direction))
 
@@ -414,6 +426,75 @@ def report_going_default(action, actor, direction, ctxt) :
     make step_turn want to describe the location."""
     pass
 
+
+##
+# GoingTo
+##
+
+class GoingTo(BasicAction) :
+    """GoingTo(actor, X)"""
+    verb = "go to"
+    gerund = "going to"
+    numargs = 2
+parser.understand("go to [somewhere x]", GoingTo(actor, X))
+
+@verify(GoingTo(actor, X))
+def verify_going_default(actor, x, ctxt) :
+    """It's not logical to go somewhere one hasn't visited or doesn't know about."""
+    if ctxt.world[Visited(x)] :
+        return LogicalOperation()
+    else :
+        adjacent = ctxt.world.query_relation(Adjacent(x, Y), var=Y)
+        if any(not ctxt.world[IsA(b, "door")] and ctxt.world[Visited(b)] for b in adjacent) :
+            return LogicalOperation()
+        else :
+            return IllogicalNotVisible("{Bob} {knows} of no such place.")
+
+@before(GoingTo(actor, X))
+def before_going_to_intermediate_walk(actor, x, ctxt) :
+    """Find a path from the current location to the destination x,
+    only visiting already visited rooms."""
+    def is_going_to_able(a) :
+        """Something is going-to-able if it is a door, if it is
+        actually visited, or if it is adjacent to a place which has been visited"""
+        if ctxt.world[IsA(a, "door")] or ctxt.world[Visited(a)] :
+            return True
+        else :
+            adjacent = ctxt.world.query_relation(Adjacent(a, Y), var=Y)
+            if any(not ctxt.world[IsA(b, "door")] and ctxt.world[Visited(b)] for b in adjacent) :
+                return True
+            else :
+                return False
+    if x == ctxt.world[ContainingRoom(actor)] :
+        raise AbortAction("{Bob} {is} already there.", actor=actor)
+    path = ctxt.world.r_path_to(Adjacent, ctxt.world[ContainingRoom(actor)], x,
+                                predicate=is_going_to_able)
+    if not path :
+        raise AbortAction(str_with_objs("{Bob} {doesn't} know how to get to [get DefiniteName $x].", x=x),
+                          actor=actor)
+    currloc = path[0]
+    for nextloc in path[1:] :
+        dir = ctxt.world.query_relation(Exit(currloc, Y, nextloc), var=Y)
+        if not dir :
+            raise AbortAction(str_with_objs("{Bob} {doesn't} know how to get to [get DefiniteName $y] from [get DefiniteName $z].", y=nextloc, z=currloc),
+                              actor=actor)
+        action = Going(actor, dir[0])
+        action.going_to = nextloc
+        if nextloc == path[-1] : # this is the last step of the path
+            ctxt.actionsystem.run_action(action, ctxt, write_action=True)
+        else : # otherwise we want "(first going ...)"
+            ctxt.actionsystem.do_first(action, ctxt)
+        nextlocp = ctxt.world[ContainingRoom(actor)]
+        if currloc == nextlocp :
+            raise AbortAction(str_with_objs("{Bob} {is} confused and {stops} trying to go to [get DefiniteName $x]", x=x),
+                              actor=actor)
+        elif nextloc != nextlocp :
+            # we need to make a new path
+            raise DoInstead(GoingTo(actor, x), suppress_message=True)
+        currloc = nextlocp
+
+# no 'when' is needed.
+# no 'report' is needed.
 
 ##
 # Entering
@@ -634,7 +715,7 @@ class GettingOff(BasicAction) :
             dobj = str_with_objs("[the $x]", x=self.get_off_from)
             return "get off "+dobj
         else :
-            return "getting off"
+            return "get off"
 parser.understand("get off", GettingOff(actor))
 
 @before(GettingOff(actor), wants_event=True)

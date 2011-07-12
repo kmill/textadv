@@ -79,8 +79,8 @@ class World(object) :
             return res
         else :
             return [r[var.varName] for r in res]
-    def r_path_to(self, r, a, b) :
-        return r.path_to(self.relations[r], a, b)
+    def r_path_to(self, r, a, b, **kwargs) :
+        return r.path_to(self.relations[r], a, b, **kwargs)
     def get_relation(self, name) :
         return self.name_to_relation[name]
 

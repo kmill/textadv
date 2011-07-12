@@ -170,10 +170,12 @@ quickdef(world, "small coin", "thing", {
          put_on="workbench")
 
 quickdef(world, "wire snips", "thing", {
+        Name : "pair of wire snips",
         Description : """These are standard-issue wire snips.  Very
         handy (and ergonomic!)"""
         },
          put_on="workbench")
+parser.understand("snip [something x] with [something y]", CuttingWith(actor, X, Y))
 
 world.activity.connect_rooms("The Trophy Room", "north", "The Store")
 
@@ -210,6 +212,58 @@ def prevent_going_with_snips(actor, ctxt) :
     leave without paying first.  She looks scary, so you decide not to
     try leaving the store with the chair.""")
 
+world[Global("fixed_wire")] = False
+world[Global("took_snips")] = False
+world[Global("snips_were_in_storeroom")] = False
+
+@actoractivities.to("step_turn")
+def repair_when_not_in_room(ctxt) :
+    drats = 0
+    if "The Storeroom" != ctxt.world[ContainingRoom("player")] :
+        if ctxt.world[Location("thick wire")] == None and ctxt.world[Location("Argentinian mongoose chair")] == "The Storeroom":
+            ctxt.world.activity.put_in("thick wire", "The Storeroom")
+            ctxt.world.activity.attach_to("Argentinian mongoose chair", "thick wire")
+            ctxt.world[Global("fixed_wire")] = True
+    if ctxt.world[Global("fixed_wire")] and ctxt.world[Location("player")] == "The Store" :
+        ctxt.write("""The clerk leaves to go into the storeroom.  In a
+        moment, she returns and says to you, "I don't know how you
+        managed to cut that wire, but I've repaired it.  No more funny
+        business, OK?"[newline]Drat.""")
+        drats += 1
+        ctxt.world[Global("fixed_wire")] = False
+    if ctxt.world[Owner("wire snips")] != "player" and ctxt.world[ContainingRoom("player")] != ctxt.world[ContainingRoom("wire snips")] :
+        if ctxt.world[ContainingRoom("wire snips")] in ["The Store", "The Storeroom"] and ctxt.world[Owner("wire snips")] != "store clerk" :
+            ctxt.world[Global("snips_were_in_storeroom")] = (ctxt.world[Location("wire snips")] == "The Storeroom")
+            ctxt.world.activity.give_to("wire snips", "store clerk")
+            ctxt.world[Global("took_snips")] = True
+    if ctxt.world[Global("took_snips")] and ctxt.world[Location("player")] == "The Store" :
+        if drats :
+            ctxt.write("""[newline]"I also found some [ob <wire
+            snips>].  I don't want to see them in this store
+            again."[newline]Double drat.""")
+        elif ctxt.world[Global("snips_were_in_storeroom")] :
+            ctxt.write("""The clerk leaves to go into the storeroom.
+            In a moment, she returns and says to you, "I found some
+            [ob <wire snips>].  I don't want to see them in this store
+            again."[newline]Drat.""")
+        else :
+            ctxt.write(""" "I found some wire snips.  I don't want to
+            see them in this store again."[newline]Drat.""")
+        drats += 1
+        ctxt.world[Global("took_snips")] = False
+
+@actoractivities.to("npc_is_willing")
+def let_clerk_give_snips(asker, action, ctxt) :
+    if asker == "player" and type(action) == GivingTo and action.get_actor() == "store clerk" :
+        if action.get_do() == "wire snips" :
+            ctxt.write("\"I'll give them to you, but only because I don't want them in my store,\" she cautions.")
+            raise ActionHandled()
+        elif action.get_do() == "Argentinian mongoose chair" :
+            raise AbortAction("\"That'll be $10 for the chair,\" replies the store clerk.  The nerve of her.")
+        else :
+            raise NotHandled()
+    else : raise NotHandled()
+
 class Paying(BasicAction) :
     verb = "pay"
     gerund = "paying"
@@ -220,7 +274,7 @@ require_xobj_accessible(actionsystem, Paying(actor, X))
 
 @before(Paying(actor, X))
 def before_paying_cant(actor, x, ctxt) :
-    raise AbortAction(str_with_objs("You need something to pay [the $x] with.", x=x), actor=actor)
+    raise AbortAction(str_with_objs("You need something with which to pay [the $x].", x=x), actor=actor)
 
 class PayingWith(BasicAction) :
     verb = ("pay", "with")
@@ -274,6 +328,11 @@ quickdef(world, "Argentinian mongoose chair", "supporter", {
 
 parser.understand("sit on/in [object Argentinian mongoose chair]", Entering(actor, "Argentinian mongoose chair"))
 
+@before(Dropping(actor, "Argentinian mongoose chair") <= PEquals("The Store", ContainingRoom(actor)))
+def cant_drop_chair_in_store(actor, ctxt) :
+    ctxt.world.activity.put_in("Argentinian mongoose chair", "The Storeroom")
+    raise AbortAction("\"Hey!\" yells the store clerk.  \"What do you think you're doing?  I'll take that chair, thank you very much.\"")
+
 quickdef(world, "eye bolt", "thing", {
         Scenery : True,
         NoTakeMessage : """It's firmly cemented into the floor.
@@ -300,11 +359,12 @@ quickdef(world, "thick wire", "thing", {
 world.activity.attach_to("Argentinian mongoose chair", "thick wire")
 
 @before(Cutting(actor, "thick wire"))
-def before_cutting_default(actor, x, ctxt) :
+def before_cutting_default(actor, ctxt) :
     raise AbortAction("You can't cut the thick wire without some tool.  It's thick!")
 
 @trybefore(CuttingWith(actor, "thick wire", Y) <= PEquals(actor, Y))
 def trybefore_cancel_taking_self(actor, y, ctxt) :
+    """This is trybefore to prevent trying to take self."""
     raise AbortAction("That sounds like it would hurt.")
 
 @before(CuttingWith(actor, "thick wire", Y))
@@ -331,4 +391,5 @@ def report_cutting_wire_with_snips(actor, ctxt) :
 @trybefore(CuttingWith(actor, "Argentinian mongoose chair", Y))
 @trybefore(Attacking(actor, "Argentinian mongoose chair"))
 def disallow_hurting_chair(actor, ctxt, y=None) :
+    """These are trybefore to prevent trying to take anything."""
     raise AbortAction("You would <i>never</i> even consider such a thing.")

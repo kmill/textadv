@@ -132,10 +132,14 @@ class ActorContext(GameContext) :
                     action, disambiguated = self.parser.handle_all(input, self, self.actionsystem.verify_action)
                 else :
                     disambiguated = True
-                if disambiguated :
-                    self.actionsystem.run_action(action, self, write_action=True)
-                else :
-                    self.actionsystem.run_action(action, self)
+                try :
+                    if disambiguated :
+                        self.actionsystem.run_action(action, self, write_action=True)
+                    else :
+                        self.actionsystem.run_action(action, self)
+                except AbortAction as ab :
+                    if len(ab.args) > 0 : # the AbortAction may contain a message
+                        self.write(*ab.args, **ab.kwargs)
                 if self.world.get_property("Global", "end_game_message") :
                     self.activity.end_game_actions()
                     if self.world.get_property("Global", "end_game_message") :
@@ -153,13 +157,6 @@ class ActorContext(GameContext) :
                 pass
             except parser.Ambiguous as ex :
                 return (DisambiguationContext(self, ex), dict())
-            except AbortAction as ab :
-                if len(ab.args) > 0 : # the AbortAction may contain a message
-                    self.write(*ab.args, **ab.kwargs)
-#             except GameIsEnding as gis :
-#                 event_notify(gis.msg, context=self)
-#                 self.write_line("\n\n*** The game is over ***")
-#                 return None
             return (self, dict())
         except Exception :
             import traceback

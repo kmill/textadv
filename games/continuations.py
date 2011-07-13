@@ -23,6 +23,7 @@ def prop_set_attached(x, y, world) :
     world.add_relation(AttachedTo(x, y))
 
 @world.to("detach")
+@world.to("remove_obj")
 def prop_detach(x, world) :
     """Removes attachment of x to anything else."""
     world.remove_relation(AttachedTo(x, Y))
@@ -339,10 +340,11 @@ def cant_drop_chair_in_store(actor, ctxt) :
     raise AbortAction("\"Hey!\" yells the store clerk.  \"What do you think you're doing?  I'll take that chair, thank you very much.\"")
 
 quickdef(world, "eye bolt", "thing", {
+        Words : ["eye", "@bolt", "@eyebolt"],
         Scenery : True,
         NoTakeMessage : """It's firmly cemented into the floor.
         There's no chance of taking that.""",
-        Description : """This eyebolt was installed after you tried
+        Description : """This eye bolt was installed after you tried
         taking the [ob <Argentinian mongoose chair>] by more
         conventional means."""
         },

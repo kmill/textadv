@@ -525,7 +525,7 @@ class Entering(BasicAction) :
     gerund = "entering"
     numargs = 2
 parser.understand("enter [something x]", Entering(actor, X))
-parser.understand("get/go in/on [something x]", Entering(actor, X))
+parser.understand("get/go in/on/through [something x]", Entering(actor, X))
 
 require_xobj_visible(actionsystem, Entering(actor, X))
 
@@ -673,6 +673,7 @@ class Exiting(BasicAction) :
             return "exit"
 parser.understand("exit", Exiting(actor))
 parser.understand("leave", Exiting(actor))
+parser.understand("get out", Exiting(actor))
 
 @before(Exiting(actor), wants_event=True)
 def before_Exiting_set_exit_from(event, actor, ctxt) :

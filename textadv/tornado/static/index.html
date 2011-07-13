@@ -47,6 +47,18 @@ span.game_title {
   margin-right: 5px;
   margin-top: 2em;
 }
+#commandform {
+  margin: 0;
+  padding: 0;
+  display: inline;
+}
+#command {
+  border: 0;
+  outline: none;
+  font-weight: bold;
+  font-family: serif;
+  font-size: 100%;
+}
 </style>
 </head>
 
@@ -61,8 +73,8 @@ span.game_title {
 <table border="0px">
   <tr><td><span class="user_response" id="input_text">&gt;</span></td>
   <td>
-    <form style="margin:0;padding:0;display:inline;" action="javascript:send_command()" method="" autocomplete="off">
-    <input type="text" id="command" name="command" size="100" style="border:0;"/>
+    <form id="commandform" action="javascript:send_command()" method="" autocomplete="off">
+    <input type="text" id="command" name="command" size="100" />
     <input type="hidden" id="session" name="session" value="{{url_escape(session)}}"/>
     </form>
   </td></tr>

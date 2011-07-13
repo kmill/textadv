@@ -146,7 +146,8 @@ class ActorContext(GameContext) :
                         self.io.set_status_var("headline", "*** Game over ***")
                         self.io.flush()
                         return (None, {})
-                self.activity.step_turn()
+                for i in xrange(0, action.num_turns) :
+                    self.activity.step_turn()
                 self.io.set_status_var("headline", self.activity.make_current_location_headline(self.actor))
             except parser.NoSuchWord as ex :
                 esc = escape_str(ex.word)

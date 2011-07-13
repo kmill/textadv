@@ -107,6 +107,7 @@ class GettingHelp(BasicAction) :
     verb = "get help"
     gerund = "getting help"
     numargs = 1
+    num_turns = 0
 parser.understand("help", GettingHelp(actor))
 
 @when(GettingHelp(actor))
@@ -299,7 +300,7 @@ class Dropping(BasicAction) :
     numargs = 2
 parser.understand("drop [something x]", Dropping(actor, X))
 
-require_xobj_held(actionsystem, Dropping(actor, X), only_hint=True)
+require_xobj_held(actionsystem, Dropping(actor, X), only_hint=True, transitive=True)
 
 @before(Dropping(actor, X) <= PEquals(actor, X))
 def before_dropping_self(actor, x, ctxt) :

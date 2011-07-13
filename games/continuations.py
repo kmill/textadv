@@ -145,10 +145,11 @@ quickdef(world, "blue continuation", "continuation", {
         Description : """This is one of the two continuations you
         built to finally acquire your Argentinian mongoose chair.  You
         painted them different colors so you could tell them apart.
-        To operate them, you first take one.  Then, if you put
-        anything into it, you'll find that object in your possession
-        rather than the continuation.  They reset every time you drop
-        them."""
+        To operate a continuation, you first take it.  Then, putting
+        something into the continuation brings you back to right
+        before you took the continuation, but you will find you have
+        in your possession whatever you put in rather than the
+        continuation."""
         },
          put_on="workbench")
 
@@ -156,10 +157,11 @@ quickdef(world, "red continuation", "continuation", {
         Description : """This is one of the two continuations you
         built to finally acquire your Argentinian mongoose chair.  You
         painted them different colors so you could tell them apart.
-        To operate them, you first take one.  Then, if you put
-        anything into it, you'll find that object in your possession
-        rather than the continuation. They reset every time you drop
-        them."""
+        To operate a continuation, you first take it.  Then, putting
+        something into the continuation brings you back to right
+        before you took the continuation, but you will find you have
+        in your possession whatever you put in rather than the
+        continuation."""
         },
          put_on="workbench")
 
@@ -224,19 +226,22 @@ def repair_when_not_in_room(ctxt) :
             ctxt.world.activity.put_in("thick wire", "The Storeroom")
             ctxt.world.activity.attach_to("Argentinian mongoose chair", "thick wire")
             ctxt.world[Global("fixed_wire")] = True
-    if ctxt.world[Global("fixed_wire")] and ctxt.world[Location("player")] == "The Store" :
+    if ctxt.world[Global("fixed_wire")] and ctxt.world[Location("player")] == "The Store" and ctxt.world[Owner("Argentinian mongoose chair")] != "player" :
+        # the owner check is for the event a continuation copied the fixed_wire global
         ctxt.write("""The clerk leaves to go into the storeroom.  In a
         moment, she returns and says to you, "I don't know how you
         managed to cut that wire, but I've repaired it.  No more funny
         business, OK?"[newline]Drat.""")
         drats += 1
         ctxt.world[Global("fixed_wire")] = False
+
     if ctxt.world[Owner("wire snips")] != "player" and ctxt.world[ContainingRoom("player")] != ctxt.world[ContainingRoom("wire snips")] :
         if ctxt.world[ContainingRoom("wire snips")] in ["The Store", "The Storeroom"] and ctxt.world[Owner("wire snips")] != "store clerk" :
             ctxt.world[Global("snips_were_in_storeroom")] = (ctxt.world[Location("wire snips")] == "The Storeroom")
             ctxt.world.activity.give_to("wire snips", "store clerk")
             ctxt.world[Global("took_snips")] = True
-    if ctxt.world[Global("took_snips")] and ctxt.world[Location("player")] == "The Store" :
+    if ctxt.world[Global("took_snips")] and ctxt.world[Location("player")] == "The Store" and ctxt.world[Owner("wire snips")] != "player" :
+        # the owner check is for the event a continuation copied the took_snips global
         if drats :
             ctxt.write("""[newline]"I also found some [ob <wire
             snips>].  I don't want to see them in this store

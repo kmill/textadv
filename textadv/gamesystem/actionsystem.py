@@ -17,6 +17,7 @@ class BasicAction(BasicPattern) :
     something informative like "doing suchandsuch with whatever"."""
     verb = "NEED VERB"
     gerund = "NEEDING GERUND"
+    num_turns = 1
     dereference_dobj = True
     dereference_iobj = True
     def __init__(self, *args) :

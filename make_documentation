@@ -34,5 +34,6 @@ world.make_documentation(html_escape, heading_level=1)
 parser.make_documentation(html_escape, heading_level=1)
 actionsystem.make_documentation(html_escape, heading_level=1)
 actoractivities.make_documentation(html_escape, heading_level=1)
+stringeval.make_documentation(html_escape, heading_level=1)
 
 print "</body></html>"

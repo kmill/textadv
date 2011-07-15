@@ -8,7 +8,7 @@
 #
 # provides: execute_context and ActorContext
 
-from textadv.gamesystem.utilities import eval_str, as_actor
+from textadv.gamesystem.utilities import as_actor
 from textadv.core.rulesystem import AbortAction, ActionHandled, ActivityHelperObject, RuleHelperObject
 from textadv.core.rulesystem import ActivityTable, RuleTable
 from textadv.gamesystem.utilities import *
@@ -99,7 +99,7 @@ class ActorActivities(object) :
 class ActorContext(GameContext) :
     """Represents the context in which the player is assuming the role
     of the actor.  The parser is the main parser in the parser module."""
-    def __init__(self, parentcontext, io, world, actionsystem, parser, actoractivities, actor) :
+    def __init__(self, parentcontext, io, world, actionsystem, parser, stringeval, actoractivities, actor) :
         self.parentcontext = parentcontext
         self.io = io
         self.world = world
@@ -108,6 +108,7 @@ class ActorContext(GameContext) :
         self.rule = RuleHelperObject(self)
         self.actionsystem = actionsystem
         self.parser = parser
+        self.stringeval = stringeval
         self.actoractivities = actoractivities
     def write(self, *stuff, **kwargs) :
         """Writes a line by evaluating the string using the utilities
@@ -115,12 +116,12 @@ class ActorContext(GameContext) :
         that the text is rendered as if the actor were doing it."""
         if kwargs.has_key("actor") :
             stuff = [as_actor(s, kwargs["actor"]) for s in stuff]
-        newstuff = [eval_str(s, self) for s in stuff]
+        newstuff = [self.stringeval.eval_str(s, self) for s in stuff]
         self.io.write(*newstuff)
     def run(self, input=None, action=None) :
         if not self.world.get_property("Global", "game_started") :
             self.activity.start_game()
-            self.io.set_status_var("headline", self.activity.make_current_location_headline(self.actor))
+            self.io.set_status_var("headline", self.stringeval.eval_str(self.activity.make_current_location_headline(self.actor), self))
         try :
             if input is None and action is None:
                 input = self.io.get_input()
@@ -148,7 +149,7 @@ class ActorContext(GameContext) :
                         return (None, {})
                 for i in xrange(0, action.num_turns) :
                     self.activity.step_turn()
-                self.io.set_status_var("headline", self.activity.make_current_location_headline(self.actor))
+                self.io.set_status_var("headline", self.stringeval.eval_str(self.activity.make_current_location_headline(self.actor), self))
             except parser.NoSuchWord as ex :
                 esc = escape_str(ex.word)
                 self.write("I don't know what you mean by '%s'." % esc)

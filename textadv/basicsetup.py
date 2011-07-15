@@ -16,6 +16,7 @@ world = world.copy()
 actionsystem = actionsystem.copy()
 parser = parser.copy()
 actoractivities = actoractivities.copy()
+stringeval = stringeval.copy()
 
 verify = make_rule_decorator(actionsystem.action_verify)
 trybefore = make_rule_decorator(actionsystem.action_trybefore)
@@ -39,7 +40,7 @@ def quickdef(world, obname, kind, props={}, **kwargs) :
 
 def make_actorcontext_with_io(io_obj) :
     """Copies the game, and creates an ActorContext with the given io."""
-    return ActorContext(None, io_obj, world.copy(), actionsystem.copy(), parser.copy(), actoractivities.copy(), "player")
+    return ActorContext(None, io_obj, world.copy(), actionsystem.copy(), parser.copy(), stringeval.copy(), actoractivities.copy(), "player")
 
 def basic_begin_game(game_context) :
     """Just start up the game using the supplied context."""

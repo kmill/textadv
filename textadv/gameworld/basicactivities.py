@@ -253,10 +253,10 @@ actoractivities.define_activity("make_current_location_headline", accumulator=la
 def make_current_location_headline_Default(actor, ctxt) :
     """Takes the current location stuff like in
     describe_current_location, and then calls make_location_headline,
-    returning the result after calling eval_str."""
+    returning the result."""
     loc = ctxt.world[Location(actor)]
     vis_cont = ctxt.world[VisibleContainer(loc)]
-    raise ActionHandled(eval_str(ctxt.activity.make_location_headline(actor, loc, vis_cont), ctxt))
+    raise ActionHandled(ctxt.activity.make_location_headline(actor, loc, vis_cont))
 
 actoractivities.define_activity("make_location_headline", accumulator=join_with_spaces,
                                 doc="""Like describe_location_heading,

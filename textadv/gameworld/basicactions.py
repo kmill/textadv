@@ -1682,3 +1682,18 @@ def when_magically_taking(actor, x, ctxt) :
 @report(MagicallyTaking(actor, X))
 def report_magically_taking(actor, x, ctxt) :
     ctxt.write("*poof*[newline]Taken.")
+
+class MagicallyGoingTo(BasicAction) :
+    """MagicallyGoingTo(actor, X)"""
+    verb = "magically go to"
+    gerund = "magically going to"
+    numargs = 2
+parser.understand("magically go to [somewhere x]", MagicallyGoingTo(actor, X))
+parser.understand("magically goto [somewhere x]", MagicallyGoingTo(actor, X))
+
+@when(MagicallyGoingTo(actor, X))
+def when_magically_going_to(actor, x, ctxt) :
+    ctxt.world.activity.put_in(actor, x)
+@report(MagicallyGoingTo(actor, X))
+def report_magically_going_to(actor, x, ctxt) :
+    ctxt.write("*poof*")

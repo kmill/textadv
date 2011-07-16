@@ -27,5 +27,7 @@ class TerminalGameIO(object) :
                 one_p.append("\n".join(textwrap.wrap(f)))
             to_print.append("\n".join(one_p))
         print string.replace("\n\n".join(to_print)+"\n", "&nbsp;", " ")
+    def set_status_var(self, *args, **kwargs) :
+        pass
     def flush(self) :
         pass

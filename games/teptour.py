@@ -45,7 +45,7 @@ quickdef(world, "Irving Q. Tep", "person", {
 
         [newline]You can ask Irving Q. Tep about various concepts. For
         instance "[action <ask about stupidball>]" (which is shorthand
-        for "[action <ask Irving about stupidball>]")."""
+        for "[action <ask Irving about stupidball>]").""" # developers: see [ask ...] for links
         },
          make_part_of="player")
 # See section "Consulting Irving Q. Tep..." for adding things one can
@@ -177,12 +177,11 @@ def dont_wanna_leave(actor, ctxt) :
 quickdef(world, "chandelier", "thing", {
         Scenery : True,
         Description : """This chandelier, which is affixed to the
-        center of the ceiling, has clearly been [action <ask about
-        eit> eited] many times over the years by the game of [action
-        <ask about stupidball> stupidball].  One time, during one
-        particularly rousing game of stupidball, all of the sconces
-        exploded into a shower of glass.  It was really a sight to
-        see."""
+        center of the ceiling, has clearly been [ask eit eited] many
+        times over the years by the game of [ask stupidball].  One
+        time, during one particularly rousing game of stupidball, all
+        of the sconces exploded into a shower of glass.  It was really
+        a sight to see."""
         },
          put_in="Center Room")
 
@@ -323,6 +322,18 @@ quickdef(world, "Roof", "room", {
 ### Consulting Irving Q. Tep... ###
 ###################################
 
+@stringeval.add_eval_func("ask")
+def _str_eval_ob(eval, act, ctxt, *obs) :
+    """[ask ob <text>] is for adding links which ask Irving Q. Tep
+    about ob, where the optional text is the text of the link."""
+    if len(obs) == 1 :
+        topic = obs[0]
+        text = obs[0]
+    else :
+        topic = obs[0]
+        text = obs[1]
+    return [make_action_link(text, "ask Irving Q. Tep about "+topic)]
+
 
 parser.understand("consult [object Irving Q. Tep] about [text y]", AskingAbout(actor, "Irving Q. Tep", Y))
 parser.understand("ask about [text y]", AskingAbout(actor, "Irving Q. Tep", Y))
@@ -338,8 +349,8 @@ def asking_irving(actor, y, ctxt) :
     if text in ["stupidball"] :
         ctxt.write("""Stupidball is a fine game in which contestants
         take a large exercise ball and throw it around the center room
-        at a high energy.  This game has [action <ask about eit>
-        eited] many things, such as the chandelier in the center room.""")
+        at a high energy.  This game has [ask eit eited] many things,
+        such as the chandelier in the center room.""")
     elif text in ["eit", "eited"] :
         ctxt.write("""'Eit,' in short, means never having to say
         you're sorry.  For instance, let's say you're holding a cup of
@@ -359,18 +370,17 @@ def asking_irving(actor, y, ctxt) :
                    1. Hobart is not a dishwasher;[break]
                    2. Don't date Pikan women;[break]
                    3. All explosions must be videotaped;[break]
-                   Amendment 1. No [action <ask about Sawzalls> Sawzalls] without the express permission of
-                   the [action <ask about house mangler> <house mangler>]; and[break]
+                   Amendment 1. No [ask Sawzalls] without the express permission of
+                   the [ask <house mangler>]; and[break]
                    Amendment 2. The house mangler is not allowed to permit the use of Sawzalls.""")
     elif text in ["sawzall", "sawzalls"] :
         ctxt.write("""A Sawzall is a hand-held reciprocating saw which
         can basically cut through anything.  Their prohibition was
-        made into one of the [action <ask about rules> <rules of tep>]
-        after one brother repeatedly cut down the wall between 51 and
-        52 during the summer months to make a mega room, where it was
-        the duty of the [action <ask about house mangler> <house
-        mangler>] to mend the wall at the end of each summer for
-        [action <ask about work week> <work week>].""")
+        made into one of the [ask <rules of tep>] after one brother
+        repeatedly cut down the wall between 51 and 52 during the
+        summer months to make a mega room, where it was the duty of
+        the [ask <house mangler>] to mend the wall at the end of each
+        summer for [ask <work week>].""")
     elif text in ["work week"] :
         ctxt.write("""Work week occurs once at the end of the summer
         and once during winter break, and it's a time where tEps try
@@ -379,8 +389,8 @@ def asking_irving(actor, y, ctxt) :
         ctxt.write("""The house mangler has one of the most important
         jobs in the house: to make sure the house doesn't fall down.
         The house mangler accomplishes this by attempting to get tEps
-        to do their work assignments and to schedule [action <ask
-        about work week> <work week>].""")
+        to do their work assignments and to schedule [ask <work
+        week>].""")
     else :
         # current words have already been init'd
         res = ctxt.parser.run_parser("something",

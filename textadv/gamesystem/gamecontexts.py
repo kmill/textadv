@@ -15,13 +15,12 @@ from textadv.gamesystem.utilities import *
 from textadv.gamesystem import parser
 #from textadv.gamesystem.basicpatterns import X,Y,Z
 
-def execute_context(context) :
+def execute_context(context, **kwargs) :
     """Takes a context and runs it.  If it returns anything, it is
     treated to be a (context, nextargs), and that is run, and so
     on."""
-    ret, args = context.run()
-    while ret is not None :
-        ret, args = ret.run(**args)
+    while context is not None :
+        context, kwargs = context.run(**kwargs)
 
 class GameContext(object) :
     """Provides a way to look at the world.  Handles all user input in

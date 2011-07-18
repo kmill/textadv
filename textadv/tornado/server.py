@@ -5,6 +5,9 @@ import os
 import os.path
 import sys
 import time
+import stat
+import mimetypes
+import email
 
 sys.path.append(os.path.join(os.path.dirname(__file__), "../.."))
 
@@ -16,6 +19,8 @@ games = {"cloak" : __import__("games.cloak", fromlist=["cloak"]),
          "teptour" : __import__("games.teptour", fromlist=["teptour"]),
          }
 
+auxfiles = {"teptour" : "games/teptour_files"}
+
 class MainHandler(tornado.web.RequestHandler):
     def get(self) :
         self.write("<h1>Games</h1>")
@@ -23,8 +28,62 @@ class MainHandler(tornado.web.RequestHandler):
             self.write("<a href=\"game/"+game+"\">"+game+"</a><br>")
 
 class GameHandler(tornado.web.RequestHandler):
-    def get(self, game):
+    def get(self, arg):
         import base64, uuid, datetime
+
+        args = arg.split("/")
+        game = args[0]
+        auxfile = args[1:]
+        if auxfile :
+            print "retrieving for",game,auxfile
+            try :
+                filedir = auxfiles[game]
+            except KeyError :
+                raise tornado.web.HTTPError(404)
+            root_path = os.path.abspath(filedir)
+            auxfile_path = os.path.abspath(os.path.join(root_path, *auxfile))
+            prefix = os.path.commonprefix([auxfile_path, root_path])
+            if prefix != root_path :
+                raise tornado.web.HTTPError(403)
+            print auxfile_path
+            if not os.path.isfile(auxfile_path) :
+                raise tornado.web.HTTPError(404)
+
+            ### From StaticFileHandler: ###
+            stat_result = os.stat(auxfile_path)
+            modified = datetime.datetime.fromtimestamp(stat_result[stat.ST_MTIME])
+
+            self.set_header("Last-Modified", modified)
+            if "v" in self.request.arguments:
+                self.set_header("Expires", datetime.datetime.utcnow() + \
+                                    datetime.timedelta(days=365*10))
+                self.set_header("Cache-Control", "max-age=" + str(86400*365*10))
+            else:
+                self.set_header("Cache-Control", "public")
+            mime_type, encoding = mimetypes.guess_type(auxfile_path)
+            if mime_type:
+                self.set_header("Content-Type", mime_type)
+
+            #self.set_extra_headers(path)
+
+            # Check the If-Modified-Since, and don't send the result if the
+            # content has not been modified
+            ims_value = self.request.headers.get("If-Modified-Since")
+            if ims_value is not None:
+                date_tuple = email.utils.parsedate(ims_value)
+                if_since = datetime.datetime.fromtimestamp(time.mktime(date_tuple))
+                if if_since >= modified:
+                    self.set_status(304)
+                    return
+
+            #if not include_body:
+            #    return
+            file = open(auxfile_path, "rb")
+            try:
+                self.write(file.read())
+            finally:
+                file.close()
+            return
 
         if game not in games :
             self.write("No such game")
@@ -133,7 +192,7 @@ class PingHandler(tornado.web.RequestHandler) :
 
 application = tornado.web.Application(
     [(r"/", MainHandler),
-     (r"/game/(.*)", GameHandler),
+     (r"/game/(.+)", GameHandler),
      (r"/input", InputHandler),
      (r"/output", OutputHandler),
      (r"/ping", PingHandler),

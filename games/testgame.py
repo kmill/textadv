@@ -68,14 +68,13 @@ quickdef(world, "pocket", "container", {
         Description : """It's your pocket."""
         },
          make_part_of="player")
-#world.activity.make_part_of("pocket", "player")
 
 quickdef(world, "key", "thing", {
         Name : "useful key",
         IndefiniteName : "a useful key",
         Description : """It looks like it can open anything."""
-        })
-world.activity.put_in("key", "pocket")
+        },
+         put_in="pocket")
 
 @before(Examining("player", "pocket") <= Contains("pocket", "key"))
 def _before_examine_pocket_with_key(ctxt) :
@@ -128,7 +127,7 @@ def _when_taking_continuation(actor, x, ctxt) :
 @actoractivities.to("describe_object", insert_before=describe_object_default)
 def describe_object_continuation(actor, o, ctxt) :
     if ctxt.world[IsA(o, "continuation")] and ctxt.world[ContinuationData(o)] :
-        ctxt.write("The continuation is ready something to be inserted into it.")
+        ctxt.write("The continuation is ready for something to be inserted into it.")
 
 ##
 ## Room 41

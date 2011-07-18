@@ -169,7 +169,25 @@ parser.understand("look around", Looking(actor))
 
 @when(Looking(actor))
 def when_looking_default(actor, ctxt) :
+    """Calls activity describe_current_location."""
     ctxt.activity.describe_current_location(actor)
+
+##
+# Looking in a direction
+##
+
+class LookingToward(BasicAction) :
+    """LookingToward(actor, direction)"""
+    verb = "look to the"
+    gerund = "looking to the"
+    numargs = 2
+    dereference_dobj = False
+parser.understand("look/l [direction direction]", LookingToward(actor, direction))
+
+@when(LookingToward(actor, X))
+def when_looking_toward(actor, x, ctxt) :
+    """Calls activity describe_direction."""
+    ctxt.activity.describe_direction(actor, x)
 
 ##
 # Inventory

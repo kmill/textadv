@@ -80,6 +80,20 @@ def default_get_room_exit_directions(room, world) :
 ###
 
 ##
+## Activity: describing a direction
+##
+
+@actoractivities.to("describe_direction")
+def describe_direction_default(actor, direction, ctxt) :
+    """Just gets the DirectionDescription attribute."""
+    loc = ctxt.world[VisibleContainer(ctxt.world[Location(actor)])]
+    desc = ctxt.world[DirectionDescription(loc, direction)]
+    if desc :
+        ctxt.write(desc, actor=actor)
+    else :
+        ctxt.write("{Bob|cap} {sees} nothing in particular that way.", actor=actor)
+
+##
 ## Activity: describing a location
 ##
 

@@ -128,6 +128,16 @@ world[Description(X) <= IsA(X, "room")] = None
 world[ProperNamed(X) <= IsA(X, "room")] = True
 
 ##
+# Property: DirectionDescription
+##
+@world.define_property
+class DirectionDescription(Property) :
+    """Represents a description of a certain direction in a room."""
+    numargs = 2
+world[DirectionDescription(X, direction)] = None
+
+
+##
 # Property: Visited
 ##
 

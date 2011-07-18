@@ -1340,6 +1340,7 @@ class AskingTo(BasicAction) :
         comm = self.args[2].infinitive_form(ctxt)
         return self.verb[0] + " " + dobj + " to " + comm
 parser.understand("ask [something x] to [action y]", AskingTo(actor, X, Y))
+parser.understand("[something x] , [action y]", AskingTo(actor, X, Y))
 
 require_xobj_accessible(actionsystem, AskingTo(actor, X, Y))
 

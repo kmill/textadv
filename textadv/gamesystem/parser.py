@@ -303,18 +303,12 @@ class Parser(object) :
                 out.extend(product([[m]], rest))
             return out
 
-    def transform_command_to_words(self, text) :
-        #text = text.lower()
-        if "," in text :
-            actor, action = text.split(",",1)
-            text = "ask "+actor+" to "+action
-        return text.split()
     def transform_text_to_words(self, text) :
-        #text = text.lower()
+        text = text.replace(",", " , ")
         return text.split()
 
     def handle_all(self, input, ctxt, action_verifier) :
-        words = self.transform_command_to_words(input)
+        words = self.transform_text_to_words(input)
         if not words :
             raise NoInput()
         self.init_current_objects(ctxt)

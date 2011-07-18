@@ -20,8 +20,8 @@ Requirements
 ------------
 
 This system requires the tornado library for Python, and I implemented
-the system with Python 2.7.  I don't know if it works in other
-versions of Python.
+the system on Python 2.7.  Beyond it working also in Python 2.6, I
+don't know if it works in other versions of Python.
 
 
 -----------------
@@ -30,7 +30,7 @@ Running the games
 
 Run, with respect to the root of the repository,
 
-$ python textadv/tornado/server.py
+$ ./startserver
 
 Then, point your browser to the URL http://localhost:8888/
 
@@ -111,8 +111,8 @@ Acknowledgements
 
 Many ideas have been taken from reading about Inform 7 and TADS.  I
 thank Zarf for codifying on his website ideas similar to the ones I
-was thinking about.  Also, thanks to Will Doenlen and Colleen
-Josephson for testing the engine.
+was thinking about.  Also, thanks to Will Doenlen, Steven Valdez, and
+Colleen Josephson for testing the engine.
 
 
 -------

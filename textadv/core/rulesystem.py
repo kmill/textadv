@@ -6,7 +6,7 @@
 # Exceptions: NotHandled, AbortAction, ActionHandled, MultipleResults, FinishWith, RestartWith
 # Classes: ActionTable, PropertyTable, EventTable
 
-from patterns import NoMatchException, AbstractPattern, BasicPattern
+from patterns import NoMatchException, AbstractPattern, BasicPattern, VarPattern
 
 class AbortAction(Exception) :
     """Raised when a handler wants to stop the action from being
@@ -305,7 +305,7 @@ class RuleTable(object) :
     This is basically an ActivityTable which also first pattern
     matches."""
     def __init__(self, accumulator=None, reverse=True, doc=None) :
-        self.actions = []
+        self.actions = {"default" : []} # default is for the tables not defined yet.
         self.accumulator = accumulator or identity
         self.reverse = reverse
         self.doc = doc
@@ -327,24 +327,35 @@ class RuleTable(object) :
         if insert_first is None and insert_last is None and insert_before is None and insert_after is None :
             if self.reverse : insert_first=True
             else : insert_last=True
-        if insert_first :
-            self.actions.insert(0, (pattern, f, wants_event, wants_table))
-        elif insert_last :
-            self.actions.append((pattern, f, wants_event, wants_table))
-        elif insert_before :
-            for i in xrange(0, len(self.actions)) :
-                if self.actions[i][1] is insert_before : break
-            self.actions.insert(i, (pattern, f, wants_event, wants_table))
-        elif insert_after :
-            for i in xrange(0, len(self.actions)) :
-                if self.actions[i][1] is insert_after : break
-            self.actions.insert(i+1, (pattern, f, wants_event, wants_table))
+        file_under = pattern.file_under()
+        if issubclass(file_under, BasicPattern) :
+            if file_under not in self.actions :
+                self.actions[file_under] = list(self.actions["default"])
+            destinations = [self.actions[file_under]]
+        else :
+            destinations = self.actions.values()
+            
+        for actions in destinations :
+            if insert_first :
+                actions.insert(0, (pattern, f, wants_event, wants_table))
+            elif insert_last :
+                actions.append((pattern, f, wants_event, wants_table))
+            elif insert_before :
+                for i in xrange(0, len(actions)) :
+                    if actions[i][1] is insert_before : break
+                else : raise Exception("insert_before failed, since %r not in table." % insert_before)
+                actions.insert(i, (pattern, f, wants_event, wants_table))
+            elif insert_after :
+                for i in xrange(0, len(actions)) :
+                    if actions[i][1] is insert_after : break
+                else : raise Exception("insert_after failed, since %r not in table." % insert_after)
+                actions.insert(i+1, (pattern, f, wants_event, wants_table))
     def notify(self, event, data, pattern_data=None, disable=None) :
         self.__push_current_disabled(disable or [])
         accum = []
         if not pattern_data :
             pattern_data = data
-        for (pattern, f, wants_event, wants_table) in self.actions :
+        for (pattern, f, wants_event, wants_table) in self.actions.get(event.file_under(), []) :
             if f in self.current_disabled :
                 continue
             try :
@@ -391,7 +402,7 @@ class RuleTable(object) :
         if self.current_disabled is not None :
             raise Exception("Should be using temp_disable.")
         if f :
-            if any(f==f0 for (p,f0,we,wt) in self.actions) :
+            if any(f==f0 for (p,f0,we,wt) in list_append(self.actions.values())) :
                 self.disabled.append(f)
             else :
                 raise Exception("The given f=%r is not in the table." % f)
@@ -401,7 +412,7 @@ class RuleTable(object) :
         """This disables a function temporarily during the execution
         of the table."""
         if f :
-            if any(f==f0 for (p,f0,we,wt) in self.actions) :
+            if any(f==f0 for (p,f0,we,wt) in list_append(self.actions.values())) :
                 self.current_disabled.append(f)
             else :
                 raise Exception("The given f=%r is not in the table." % f)
@@ -423,11 +434,14 @@ class RuleTable(object) :
         newtable = RuleTable(accumulator=self.accumulator,
                              reverse=self.reverse,
                              doc=self.doc)
-        newtable.actions = list(self.actions)
+        newtable.actions = dict()
+        for key, actions in self.actions.iteritems() :
+            newtable.actions[key] = list(actions)
         newtable.disabled = list(self.disabled)
         return newtable
     def make_documentation(self, escape, heading_level=1) :
         import inspect
+        hls = str(heading_level)
         print "<p>"
         if self.doc : print escape(self.doc)
         else : print "<i>(No documentation)</i>"
@@ -437,28 +451,33 @@ class RuleTable(object) :
         print "Accumulator: "
         print "<tt>"+escape(self.accumulator.__name__)+"</tt></p>"
         if self.actions :
-            print "<ol>"
-            for key,handler,we,wt in self.actions :
-                print "<li><p>"
-                if handler in self.disabled :
-                    print "<b><i>DISABLED</i></b>"
-                print escape(repr(key))#+"<br>"
-                print "<b>calls</b> <tt>"+escape(handler.__name__)+"</tt>"
-                withs = []
-                if we :
-                    withs.append("event")
-                if wt :
-                    withs.append("table")
-                print "<b>with "+"and".join(withs)+"</b>"
-                try :
-                    print "<small><i>(from <tt>"+inspect.getsourcefile(handler)+"</tt>)</i></small>"
-                except TypeError :
-                    pass
-                print "</p>"
-                print "<p><i>"+(escape(handler.__doc__) or "(No documentation)")+"</i>"
-                print "</p>"
-                print "</li>"
-            print "</ol>"
+            for file_under,actions in self.actions.iteritems() :
+                if file_under == "default" :
+                    continue # we don't need to see anything about 'default'
+                print "<h"+hls+">"+escape(file_under.__name__)+"</h"+hls+">"
+                print "<p>"+(escape(file_under.__doc__) or "<i>No documentation for pattern.</i>")+"</p>"
+                print "<ol>"
+                for key,handler,we,wt in actions :
+                    print "<li><p>"
+                    if handler in self.disabled :
+                        print "<b><i>DISABLED</i></b>"
+                    print escape(repr(key))#+"<br>"
+                    print "<b>calls</b> <tt>"+escape(handler.__name__)+"</tt>"
+                    withs = []
+                    if we :
+                        withs.append("event")
+                    if wt :
+                        withs.append("table")
+                    print "<b>with "+"and".join(withs)+"</b>"
+                    try :
+                        print "<small><i>(from <tt>"+inspect.getsourcefile(handler)+"</tt>)</i></small>"
+                    except TypeError :
+                        pass
+                    print "</p>"
+                    print "<p><i>"+(escape(handler.__doc__) or "(No documentation)")+"</i>"
+                    print "</p>"
+                    print "</li>"
+                print "</ol>"
         else :
             print "<p><i>No entries</i></p>"
 

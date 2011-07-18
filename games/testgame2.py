@@ -89,7 +89,7 @@ def cant_take_table(actor, ctxt) :
 
 #world.actions.describe_room("room1")
 
-if False :
+if False : # to check the light model 
     print world[Openable("big box")]
     print world[IsOpen("big box")]
     print world[IsOpaque("big box")]
@@ -103,7 +103,7 @@ from textadv.gamesystem.parser import *
 @parser.add_subparser("something")
 def my_something(parser, var, input, i, ctxt, actor, next) :
     if i < len(input) and input[i] == "woo" :
-        return product([[Matched(input[i:i+1], "whatchamacallit", 2, var)]],
+        return product([[Matched(input[i:i+1], "whatchamacallit", 2, "something", var)]],
                        next(i+1))
     return []
 

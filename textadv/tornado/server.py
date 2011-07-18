@@ -1,6 +1,7 @@
 import tornado.ioloop
 import tornado.web
 from tornado.escape import json_encode, url_unescape, url_escape
+import os
 import os.path
 import sys
 import time
@@ -238,7 +239,7 @@ class GameThread(threading.Thread) :
         self.game = game
         dirname = os.path.join(os.path.dirname(__file__), "logs")
         if not os.path.exists(dirname) :
-            os.path.mkdir(dirname)
+            os.mkdir(dirname)
         logfile = open(os.path.join(dirname, gamename+"_"+url_escape(session)+".html"), "w")
         self.game_context = self.game.make_actorcontext_with_io(TornadoGameIO(logfile))
         self.session = session

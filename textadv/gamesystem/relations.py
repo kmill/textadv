@@ -5,7 +5,7 @@
 #
 # provides: make_many_to_one_relation, make_one_to_many_relation
 
-from textadv.core.patterns import BasicPattern, VarPattern, NoMatchException
+from textadv.core.patterns import BasicPattern, VarPattern, NoMatchException, AbstractPattern
 from textadv.gamesystem.basicpatterns import *
 
 class Relation(BasicPattern) :
@@ -40,11 +40,12 @@ class ManyToOneRelation(Relation) :
         self.args = [a, b]
     @staticmethod
     def setup_table() :
-        return [dict(), []]
+        return [dict(), [], dict()] # rel,bounded,cache
     def add_relation(self, data) :
         a, b = self.args
-        rels,bounded = data
-        if a in bounded :
+        rels,bounded,cache = data
+        data[2] = dict() # clear cache
+        if a in bounded : # has 'a' been bounded already?
             raise Exception("Already in a "+type(self).__name__+" many-to-one relation", a)
         bounded.append(a)
         rels[a] = b
@@ -53,32 +54,57 @@ class ManyToOneRelation(Relation) :
         a, b = self.args
         if type(b) is not VarPattern :
             raise Exception("Many-to-one relation requires b to be variable for removal", b)
-        rels,bounded = data
+        rels,bounded,cache = data
+        data[2] = dict() # clear cache
         if a in bounded :
             bounded.remove(a)
             del rels[a]
     def query_relation(self, data) :
-        rels,bounded = data
-        out = []
-        for a,b in rels.iteritems() :
+        rels,bounded,cache = data
+        if isinstance(self.args[0], AbstractPattern) :
+            out = []
+            for a,b in rels.iteritems() :
+                try :
+                    out.append(self.match(type(self)(a,b)))
+                except NoMatchException :
+                    pass
+            return out
+        else : # so we can try looking args[0] up directly
             try :
-                out.append(self.match(type(self)(a,b)))
-            except NoMatchException :
-                pass
-        return out
+                poss_b = rels[self.args[0]]
+            except KeyError :
+                return []
+            if isinstance(self.args[1], AbstractPattern) :
+                try :
+                    return [self.args[1].match(poss_b)]
+                except NoMatchException :
+                    return []
+            elif self.args[1] == poss_b :
+                return [{}]
+            else :
+                return []
     @classmethod
     def path_to(r, data, a, b) :
-        rels, bounded = data
+        """Does an optimized search by just walking up the
+        hierarchy."""
+        rels,bounded,cache = data
+        try : # check the cache!
+            return list(cache[a][b])
+        except KeyError :
+            pass # too bad.
         out = [a]
         while a != b :
             if not rels.has_key(a) :
                 return None
             a = rels[a]
             out.append(a)
+        if not cache.has_key(a) :
+            cache[a] = dict()
+        cache[a][b] = out
         return out
     @classmethod
     def copy(r, data) :
-        return [data[0].copy(), list(data[1])]
+        return [data[0].copy(), list(data[1]), dict()]
     @classmethod
     def dump(r, data) :
         for a,b in data[0].iteritems() :
@@ -90,10 +116,11 @@ class OneToManyRelation(Relation) :
         self.args = [a, b]
     @staticmethod
     def setup_table() :
-        return [dict(), []]
+        return [dict(), [], dict()]
     def add_relation(self, data) :
         a, b = self.args
-        rels,bounded = data
+        rels,bounded,cache = data
+        data[2] = dict() # clear cache
         if b in bounded :
             raise Exception("Already in a "+type(self).__name__+" many-to-one relation", b)
         bounded.append(b)
@@ -103,32 +130,55 @@ class OneToManyRelation(Relation) :
         a, b = self.args
         if type(a) is not VarPattern :
             raise Exception("One-to-many relation requires a to be variable for removal", b)
-        rels,bounded = data
+        rels,bounded,cache = data
+        data[2] = dict() # clear cache
         if b in bounded :
             bounded.remove(b)
             del rels[b]
     def query_relation(self, data) :
-        rels,bounded = data
-        out = []
-        for b,a in rels.iteritems() :
+        rels,bounded,cache = data
+        if isinstance(self.args[1], AbstractPattern) :
+            out = []
+            for b,a in rels.iteritems() :
+                try :
+                    out.append(self.match(type(self)(a,b)))
+                except NoMatchException :
+                    pass
+            return out
+        else : # so we can try looking args[0] up directly
             try :
-                out.append(self.match(type(self)(a,b)))
-            except NoMatchException :
-                pass
-        return out
+                poss_a = rels[self.args[1]]
+            except KeyError :
+                return []
+            if isinstance(self.args[0], AbstractPattern) :
+                try :
+                    return [self.args[0].match(poss_a)]
+                except NoMatchException :
+                    return []
+            elif self.args[0] == poss_a :
+                return [{}]
+            else :
+                return []
     @classmethod
     def path_to(r, data, a, b) :
-        rels, bounded = data
+        rels,bounded,cache = data
+        try : # check the cache!
+            return list(cache[a][b])
+        except KeyError :
+            pass # too bad.
         out = [b]
         while a != b :
             if not rels.has_key(b) :
                 return None
             b = rels[b]
             out.insert(0,b)
+        if not cache.has_key(a) :
+            cache[a] = dict()
+        cache[a][b] = out
         return out
     @classmethod
     def copy(r, data) :
-        return [data[0].copy(), list(data[1])]
+        return [data[0].copy(), list(data[1]), dict()]
     @classmethod
     def dump(r, data) :
         for b,a in data[0].iteritems() :

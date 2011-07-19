@@ -534,6 +534,65 @@ def before_going_to_intermediate_walk(actor, x, ctxt) :
 # no 'report' is needed.
 
 ##
+# Going into a room
+##
+
+class GoingInto(BasicAction) :
+    """GoingInto(actor, x)"""
+    verb = "go into"
+    gerund = "going into"
+    numargs = 2
+parser.understand("go into [somewhere x]", GoingInto(actor, X))
+parser.understand("enter [somewhere x]", GoingInto(actor, X))
+
+@verify(GoingInto(actor, X))
+def verify_going_into_nearby(actor, x, ctxt) :
+    """Makes sure that the thing to be entered is nearby."""
+    def is_going_into_able(a) :
+        """Something is going-into-able if it is a door, if it is
+        actually visited, or if it is the destination (we want to make
+        sure the planned path doesn't go through unvisited rooms!)"""
+        if ctxt.world[IsA(a, "door")] or ctxt.world[Visited(a)] :
+            return True
+        elif a == x :
+            return True
+        else :
+            return False
+    if not ctxt.world[Visited(x)] :
+        return IllogicalNotVisible("{Bob} {knows} of no such place.", actor=actor)
+    currloc = ctxt.world[ContainingRoom(actor)]
+    path = ctxt.world.r_path_to(Adjacent, currloc, x,
+                                predicate=is_going_into_able)
+    if not path :
+        return IllogicalNotVisible("{Bob} can't get there from here.", actor=actor)
+    dest = path[1]
+    if ctxt.world[IsA(path[1], "door")] :
+        dest = path[2]
+    if dest != x :
+        return IllogicalNotVisible("{Bob} can't get there from here.", actor=actor)
+
+
+@before(GoingInto(actor, X))
+def before_goinginto_check_nearby(actor, x, ctxt) :
+    """We require that when one is going into a room that it is
+    adjacent to the player (or on the other side of a door)."""
+    def is_going_into_able(a) :
+        """Something is going-into-able if it is a door, if it is
+        actually visited, or if it is the destination (we want to make
+        sure the planned path doesn't go through unvisited rooms!)"""
+        if ctxt.world[IsA(a, "door")] or ctxt.world[Visited(a)] :
+            return True
+        elif a == x :
+            return True
+        else :
+            return False
+    currloc = ctxt.world[ContainingRoom(actor)]
+    path = ctxt.world.r_path_to(Adjacent, currloc, x,
+                                predicate=is_going_into_able)
+    dir = ctxt.world.query_relation(Exit(currloc, Y, path[1]), var=Y)[0]
+    raise DoInstead(Going(actor, dir), suppress_message=True)
+
+##
 # Entering
 ##
 

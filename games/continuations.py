@@ -300,6 +300,11 @@ def before_payingwith_store_clerk_anything(actor, y, ctxt) :
 @before(PayingWith(actor, "store clerk", "small coin"))
 def before_payingwith_store_clerk_coin(actor, ctxt) :
     raise AbortAction("The store clerk laughs.  \"That's hardly enough to pay for <i>anything</i> in this store.\"")
+@before(PayingWith(actor, "store clerk", "Argentinian mongoose chair"))
+def before_payingwith_store_clerk_chair(actor, ctxt) :
+    raise AbortAction("""Between laughing and striking her knee, she
+    manages to say "that's really funny." Suddenly, she becomes quite
+    serious and informs you that it will be $10 for the chair.""")
 
 @before(GivingTo(actor, X, "store clerk"))
 def before_givingto_clerk(actor, x, ctxt) :

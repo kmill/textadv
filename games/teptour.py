@@ -427,7 +427,7 @@ def asking_irving(actor, y, ctxt) :
         acceptible is to say 'eit' to the following: "My family just
         got eaten by a pack of wolves."  Remember, this is not an eit!
 
-        [newline]There is a mural in 22 commemorating the sacrement of
+        [newline]There is a mural in 22 commemorating the sacrament of
         eit.""")
     elif text in ["rules", "rules of tep", "the rules", "the rules of tep"] :
         ctxt.write("""The rules of tEp are threefold:[break]

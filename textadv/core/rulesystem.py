@@ -334,7 +334,6 @@ class RuleTable(object) :
             destinations = [self.actions[file_under]]
         else :
             destinations = self.actions.values()
-            
         for actions in destinations :
             if insert_first :
                 actions.insert(0, (pattern, f, wants_event, wants_table))
@@ -355,7 +354,7 @@ class RuleTable(object) :
         accum = []
         if not pattern_data :
             pattern_data = data
-        for (pattern, f, wants_event, wants_table) in self.actions.get(event.file_under(), []) :
+        for (pattern, f, wants_event, wants_table) in self.actions.get(event.file_under(), self.actions["default"]) :
             if f in self.current_disabled :
                 continue
             try :

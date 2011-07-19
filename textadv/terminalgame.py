@@ -14,6 +14,7 @@ class TerminalGameIO(object) :
     def write(self, *data) :
         d = " ".join(data)
         d = " ".join(re.split("\\s+", d))
+        d = re.sub('<[^<]+?>', '', d) # strip out html
         pars = d.replace("[newline]", "\n\n").replace("[break]", "\n").replace("[indent]","  ").split("\n")
         wrapped = ["\n".join(textwrap.wrap(p)) for p in pars]
         print "\n".join(wrapped),

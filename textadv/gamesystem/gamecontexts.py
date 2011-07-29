@@ -186,15 +186,15 @@ class DisambiguationContext(GameContext) :
         if len(self.amb.options) > 1 :
             self.parent.write("I'm a bit confused by what you meant in a couple of places.")
         for var, opts in self.amb.options.iteritems() :
-            res = serial_comma([self.parent.world.get_property("DefiniteName", o)
-                                for o in opts], conj="or")
-            self.parent.write("Did you mean "+res+"?")
+            query = serial_comma([self.parent.world.get_property("DefiniteName", o)
+                                  for o in opts], conj="or")
+            self.parent.write("Did you mean "+query+"?")
             input = self.parent.io.get_input(">>>")
-            self.parent.parser.init_current_objects(self.parent, opts)
+            self.parent.parser.init_current_objects(self.parent, {self.amb.subparsers[var] : opts})
             res = self.parent.parser.run_parser(self.amb.subparsers[var],
                                                 self.parent.parser.transform_text_to_words(input),
                                                 self.parent)
-            if len(res) == 0 :
+            if len(res) == 0 : # let the parent parse it instead.
                 return (self.parent, {"input" : input})
             elif len(res) == 1 :
                 repl[var] = res[0][0].value

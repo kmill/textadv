@@ -400,64 +400,52 @@ quickdef(world, "The Roof", "room", {
 ### Consulting Irving Q. Tep... ###
 ###################################
 
+# We define a new kind to the game called "lore" which represents
+# stories which Irving Q. Tep can talk about.  Lore acts just like
+# things in that they have a Name, their Words, and a Description.  We
+# also modify the parser to have a somelore subparser.  To know what
+# is and what is not a word in the game, we must add an object class
+# "somelore" so that init_current_objects pulls in anything which has
+# kind "lore."  The definition of the subparser is the basic
+# definition used by something and somewhere (at the end of
+# parser.py).
+
+world.add_relation(KindOf("lore", "kind"))
+
+parser.define_subparser("somelore", "A parser to match against lore in the game.")
+parser.add_object_class("somelore", "lore")
+
+@parser.add_subparser("somelore")
+def default_somelore(parser, var, input, i, ctxt, actor, next) :
+    """Tries to parse as if the following input were a room."""
+    return list_append([parser.parse_thing.notify([parser, "somelore", var, name, words,input,i,ctxt,next],{})
+                        for name,words in zip(parser.current_objects["somelore"], parser.current_words["somelore"])])
+
+# Finally, we modify the parser to add some synonyms for asking Irving about things.
+
 parser.understand("consult [object Irving Q. Tep] about [text y]", AskingAbout(actor, "Irving Q. Tep", Y))
 parser.understand("ask about [text y]", AskingAbout(actor, "Irving Q. Tep", Y))
 
 @report(AskingAbout(actor, "Irving Q. Tep", Y))
 def asking_irving(actor, y, ctxt) :
-    """Irving Q. Tep knows about various abstract ideas and can talk
-    about them.  But, if he doesn't know about a topic, it's assumed
-    that the player is asking about an object in the room, and we turn
-    it into an Examining action.  Otherwise, if there's no relevant
-    object, Irving 'has nothing to say about that.'"""
-    text = y.strip().lower()
-    if text in ["stupidball"] :
-        ctxt.write("""Stupidball is a fine game in which contestants
-        take a large exercise ball and throw it around the center room
-        at a high energy.  This game has [ask eit eited] many things,
-        such as the chandelier in the center room.""")
-    elif text in ["eit", "eited"] :
-        ctxt.write("""'Eit,' in short, means never having to say
-        you're sorry.  For instance, let's say you're holding a cup of
-        water.  I can then come up to you and knock the cup out of
-        your hand whilst saying "eit!" (of course, I should help clean
-        up).  The word can also be used when someone recognizes
-        something eitful.  For instance, if you told me you didn't do
-        well on an exam, I could say "eit, man."  However, what's not
-        acceptible is to say 'eit' to the following: "My family just
-        got eaten by a pack of wolves."  Remember, this is not an eit!
-
-        [newline]There is a mural in 22 commemorating the sacrament of
-        eit.""")
-    elif text in ["rules", "rules of tep", "the rules", "the rules of tep"] :
-        ctxt.write("""The rules of tEp are threefold:[break]
-                   0. Don't die;[break]
-                   1. Hobart is not a dishwasher;[break]
-                   2. Don't date Pikan women;[break]
-                   3. All explosions must be videotaped;[break]
-                   Amendment 1. No [ask Sawzalls] without the express permission of
-                   the [ask <house mangler>]; and[break]
-                   Amendment 2. The house mangler is not allowed to permit the use of Sawzalls.""")
-    elif text in ["sawzall", "sawzalls"] :
-        ctxt.write("""A Sawzall is a hand-held reciprocating saw which
-        can basically cut through anything.  Their prohibition was
-        made into one of the [ask <rules of tep>] after one brother
-        repeatedly cut down the wall between 51 and 52 during the
-        summer months to make a mega room, where it was the duty of
-        the [ask <house mangler>] to mend the wall at the end of each
-        summer for [ask <work week>].""")
-    elif text in ["work week"] :
-        ctxt.write("""Work week occurs once at the end of the summer
-        and once during winter break, and it's a time where tEps try
-        to repair the house.""")
-    elif text in ["house mangler", "house manager"] :
-        ctxt.write("""The house mangler has one of the most important
-        jobs in the house: to make sure the house doesn't fall down.
-        The house mangler accomplishes this by attempting to get tEps
-        to do their work assignments and to schedule [ask <work
-        week>].""")
+    """Irving Q. Tep knows about various abstract ideas ("lore") and
+    can talk about them.  But, if he doesn't know about a topic, it's
+    assumed that the player is asking about an object in the room, and
+    we turn it into an Examining action.  Otherwise, if there's no
+    relevant object, Irving 'has nothing to say about that.'"""
+    # current words have already been init'd since we're parsing
+    res = ctxt.parser.run_parser("somelore",
+                                 ctxt.parser.transform_text_to_words(y),
+                                 ctxt)
+    if len(res) == 1 :
+        desc = ctxt.world[Description(res[0][0].value)]
+        if desc :
+            ctxt.write(desc)
+        else : # just in case, for debugging
+            ctxt.write("""Irving Q. Tep has nothing to say about that.""")
+    elif len(res) > 1 :
+        raise Ambiguous(AskingAbout(actor, "Irving Q. Tep", X), {X : [r[0].value for r in res]}, {X : "somelore"})
     else :
-        # current words have already been init'd
         res = ctxt.parser.run_parser("something",
                                      ctxt.parser.transform_text_to_words(y),
                                      ctxt)
@@ -468,3 +456,95 @@ def asking_irving(actor, y, ctxt) :
         else :
             raise Ambiguous(Examining(actor, X), {X : [r[0].value for r in res]}, {X : "something"})
     raise ActionHandled()
+
+
+###
+### Lore
+###
+
+# These are basically short entries for a wiki-like system of things
+# about the house that you couldn't learn about by just looking at
+# objects.
+#
+# Links are created by [ask x] for a link to x, ore [ask x text] for a
+# link to x with prettier link text.
+#
+# The naming scheme is to have the id be "lore: unique name" (it
+# doesn't really matter), and then put the actual name in the name
+# field.  This way if there actually a sawzall lying around (which
+# there shouldn't), the description of the sawzall lore won't eit it.
+
+quickdef(world, "lore: stupidball", "lore", {
+        Name : "stupidball",
+        Description : """Stupidball is a fine game in which
+        contestants take a large exercise ball and throw it around the
+        center room at a high energy.  This game has [ask eit eited]
+        many things, such as the chandelier in the center room."""
+        })
+
+quickdef(world, "lore: eit", "lore", {
+        Name : "eit",
+        Words : ["@eit", "@eited"],
+        Description : """'Eit,' in short, means never having to say
+        you're sorry.  For instance, let's say you're holding a cup of
+        water.  I can then come up to you and knock the cup out of
+        your hand whilst saying "eit!" (of course, I should help clean
+        up).  The word can also be used when someone recognizes
+        something eitful.  For instance, if you told me you didn't do
+        well on an exam, I could say "eit, man."  However, what's not
+        acceptible is to say 'eit' to the following: "My family just
+        got eaten by a pack of wolves."  Remember, this is not an eit!
+
+        [newline]There is a mural in 22 commemorating the sacrament of
+        eit."""
+        })
+
+quickdef(world, "lore: rules of tep", "lore", {
+        Name : "rules of tEp",
+        Words : ["rules", "of", "tep", "@rules"],
+        Description : """The rules of tEp are threefold:[break]
+        0. Don't die;[break]
+        1. Hobart is not a dishwasher;[break]
+        2. Don't date Pikan women;[break]
+        3. All explosions must be videotaped;[break]
+        Amendment 1. No [ask Sawzalls] without the express permission of
+        the [ask <house mangler>]; and[break]
+        Amendment 2. The house mangler is not allowed to permit the use of Sawzalls."""
+        })
+
+quickdef(world, "lore: sawzall", "lore", {
+        Name : "sawzall",
+        Words : ["@sawzall", "@sawzalls"],
+        Description : """A Sawzall is a hand-held reciprocating saw
+        which can basically cut through anything.  Their prohibition
+        was made into one of the [ask <rules of tep>] after one
+        brother repeatedly cut down the wall between 51 and 52 during
+        the summer months to make a mega room, where it was the duty
+        of the [ask <house mangler>] to mend the wall at the end of
+        each summer for [ask <work week>]."""
+        })
+
+quickdef(world, "lore: work week", "lore", {
+        Name : "work week",
+        Description : """Work week occurs once at the end of the
+        summer and once during winter break, and it's a time where
+        tEps try to repair the house."""
+        })
+
+quickdef(world, "lore: house mangler", "lore", {
+        Name : "house mangler",
+        Words : ["house", "@mangler", "@manager"],
+        Description : """The house mangler has one of the most important
+        jobs in the house: to make sure the house doesn't fall down.
+        The house mangler accomplishes this by attempting to get tEps
+        to do their work assignments and to schedule [ask <work
+        week>]."""
+        })
+
+quickdef(world, "lore: 22", "lore", {
+        Name : "22",
+        Words : ["@22", "@twenty-two", "twenty", "@two"],
+        Description : """The number 22 is a number of cosmic
+        significance.  If you look around you, you will invariably see
+        it everywhere."""
+        })

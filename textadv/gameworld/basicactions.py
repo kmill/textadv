@@ -103,7 +103,9 @@ def hint_xobj_notheld(actionsystem, action) :
 ##
 
 class GettingHelp(BasicAction) :
-    """GettingHelp(actor)"""
+    """GettingHelp(actor) for when the actor wants to get help about
+    how to play the game.  This probably shouldn't actually be an
+    action since it's an out-of-game-world command."""
     verb = "get help"
     gerund = "getting help"
     numargs = 1
@@ -160,7 +162,7 @@ def when_getting_help(actor, ctxt) :
 ##
 
 class Looking(BasicAction) :
-    """Looking(actor)"""
+    """Looking(actor) for the actor looking at their surroundings."""
     verb = "look"
     gerund = "looking"
     numargs = 1
@@ -177,7 +179,8 @@ def when_looking_default(actor, ctxt) :
 ##
 
 class LookingToward(BasicAction) :
-    """LookingToward(actor, direction)"""
+    """LookingToward(actor, direction) for the actor looking in the
+    specified direction."""
     verb = "look to the"
     gerund = "looking to the"
     numargs = 2
@@ -194,7 +197,8 @@ def when_looking_toward(actor, x, ctxt) :
 ##
 
 class TakingInventory(BasicAction) :
-    """TakingInventory(actor)"""
+    """TakingInventory(actor) for the actor listing what is in their
+    inventory."""
     verb = "take inventory"
     gerund = "taking out inventory"
     numargs = 1
@@ -215,7 +219,7 @@ def when_takinginventory(actor, ctxt) :
 ##
 
 class Examining(BasicAction) :
-    """Examining(actor, x)"""
+    """Examining(actor, x) for the actor examining a thing x."""
     verb = "examine"
     gerund = "examining"
     numargs = 2
@@ -232,7 +236,7 @@ def when_examining_default(actor, x, ctxt) :
 ##
 
 class Taking(BasicAction) :
-    """Taking(actor, obj_to_take)"""
+    """Taking(actor, x) for the actor taking a thing x."""
     verb = "take"
     gerund = "taking"
     numargs = 2
@@ -312,7 +316,7 @@ def report_taking_default(actor, x, ctxt) :
 ##
 
 class Dropping(BasicAction) :
-    """Dropping(actor, obj_to_drop)"""
+    """Dropping(actor, x) for the actor dropping the thing x."""
     verb = "drop"
     gerund = "dropping"
     numargs = 2
@@ -325,6 +329,7 @@ def before_dropping_self(actor, x, ctxt) :
     """One can't drop oneself."""
     raise AbortAction("{Bob|cap} can't be dropped.", actor=actor)
 
+# this is commented out because it's probably handled by require_xobj_held
 # @before(Dropping(actor, X))
 # def before_dropping_worn_items(actor, x, ctxt) :
 #     """One can't drop what's being worn."""
@@ -352,7 +357,8 @@ def report_drop_default(actor, x, ctxt) :
 ##
 
 class Going(BasicAction) :
-    """Going(actor, direction)"""
+    """Going(actor, direction) for an actor moving to a new room in a
+    specified direction."""
     verb = "go"
     gerund = "going"
     numargs = 2
@@ -458,7 +464,7 @@ def report_going_default(action, actor, direction, ctxt) :
 ##
 
 class GoingTo(BasicAction) :
-    """GoingTo(actor, X)"""
+    """GoingTo(actor, x) for an actor going to a room x."""
     verb = "go to"
     gerund = "going to"
     numargs = 2
@@ -538,7 +544,9 @@ def before_going_to_intermediate_walk(actor, x, ctxt) :
 ##
 
 class GoingInto(BasicAction) :
-    """GoingInto(actor, x)"""
+    """GoingInto(actor, x) for an actor wanting to go into an adjacent
+    room by name.  This action is probably actually superfluous given
+    the existence of GoingTo."""
     verb = "go into"
     gerund = "going into"
     numargs = 2
@@ -597,7 +605,7 @@ def before_goinginto_check_nearby(actor, x, ctxt) :
 ##
 
 class Entering(BasicAction) :
-    """Entering(actor, x)"""
+    """Entering(actor, x) for an actor entering an enterable x."""
     verb = "enter"
     gerund = "entering"
     numargs = 2
@@ -731,7 +739,9 @@ def report_entering_supporter(actor, x, ctxt) :
 ##
 
 class Exiting(BasicAction) :
-    "Exiting(actor)"
+    """Exiting(actor) for an actor leaving the container in which they
+    currently are contained.  If they are on a supporter, then it's
+    gracefully turned into a GettingOff action."""
     verb = "exit"
     gerund = "exiting"
     numargs = 1
@@ -796,7 +806,8 @@ def report_Exiting_default(event, actor, ctxt) :
 ##
 
 class GettingOff(BasicAction) :
-    "GettingOff(actor)"
+    """GettingOff(actor) for an actor getting of their current
+    supporter."""
     verb = "get off"
     gerund = "getting off"
     numargs = 1
@@ -853,7 +864,8 @@ def report_GettingOff_default(event, actor, ctxt) :
 ##
 
 class ExitingParticular(BasicAction) :
-    """ExitingParticular(actor, x)"""
+    """ExitingParticular(actor, x) for an actor attempting to leave
+    something in particular (contrast with Exiting(actor))."""
     verb = "exit"
     gerund = "exiting"
     numargs = 2
@@ -866,7 +878,12 @@ require_xobj_visible(actionsystem, ExitingParticular(actor, X))
 @before(ExitingParticular(actor, X))
 def before_ExitingParticular_needs_to_be_in_x(actor, x, ctxt) :
     """Just checks that the actor is in the x, and then redirects to
-    GettingOff."""
+    GettingOff.
+
+    A possible modification would be to make it so that if actor is in
+    A which is in B, and the actor tries to exit B in particular (this
+    fails at the moment), then the actor first leaves A, and then
+    leaves B."""
     if x != ctxt.world[Location(actor)] :
         raise AbortAction(str_with_objs("{Bob|cap} {is} not in [the $x].", x=x), actor=actor)
     raise DoInstead(Exiting(actor), suppress_message=True)
@@ -877,7 +894,8 @@ def before_ExitingParticular_needs_to_be_in_x(actor, x, ctxt) :
 ##
 
 class GettingOffParticular(BasicAction) :
-    """GettingOffParticular(actor, x)"""
+    """GettingOffParticular(actor, x) for an actor attempting to get
+    off something in particular (contrast with GettingOff(actor))."""
     verb = "get off"
     gerund = "getting off"
     numargs = 2
@@ -899,7 +917,8 @@ def before_GettingOffParticular_needs_to_be_on_x(actor, x, ctxt) :
 ##
 
 class InsertingInto(BasicAction) :
-    """InsertingInto(actor, x, y)"""
+    """InsertingInto(actor, x, y) for the actor inserting thing x into
+    container y."""
     verb = ("insert", "into")
     gerund = ("inserting", "into")
     numargs = 3
@@ -957,7 +976,7 @@ def report_InsertingInto_default(actor, x, y, ctxt) :
 ##
 
 class PlacingOn(BasicAction) :
-    """PlacingOn(actor, x, y)"""
+    """PlacingOn(actor, x, y) for the actor placing x on supporter y."""
     verb = ("place", "on")
     gerund = ("placing", "on")
     numargs = 3
@@ -1008,7 +1027,7 @@ def report_PlacingOn_default(actor, x, y, ctxt) :
 ##
 
 class Opening(BasicAction) :
-    """Opening(actor, x)"""
+    """Opening(actor, x) for the actor opening an openable x."""
     verb = "open"
     gerund = "opening"
     numargs = 2
@@ -1059,7 +1078,7 @@ def report_opening(actor, x, ctxt) :
 ##
 
 class Closing(BasicAction) :
-    """Closing(actor, x)"""
+    """Closing(actor, x) for the actor closing the openable x."""
     verb = "close"
     gerund = "closing"
     numargs = 2
@@ -1098,7 +1117,7 @@ def report_closing(actor, x, ctxt) :
 ##
 
 class UnlockingWith(BasicAction) :
-    """UnlockingWith(actor, x, key)"""
+    """UnlockingWith(actor, x, key) for the actor unlocking x with a key."""
     verb = ("unlock", "with")
     gerund = ("unlocking", "with")
     numargs = 3
@@ -1137,7 +1156,7 @@ def report_unlocking_locked(actor, x, y, ctxt) :
 # Help the user know they need a key
 #
 class Unlocking(BasicAction) :
-    """Unlock(actor, x)"""
+    """Unlock(actor, x) for the actor unlocking some x."""
     verb = "unlock"
     gerund = "unlocking"
     numargs = 2
@@ -1154,7 +1173,7 @@ def before_unlocking_fail(actor, x, ctxt) :
 ##
 
 class LockingWith(BasicAction) :
-    """LockingWith(actor, x, key)"""
+    """LockingWith(actor, x, key) for the actor locking x with a key."""
     verb = ("lock", "with")
     gerund = ("locking", "with")
     numargs = 3
@@ -1193,7 +1212,7 @@ def report_locking_locked(actor, x, y, ctxt) :
 # Help the user know they need a key
 #
 class Locking(BasicAction) :
-    """Locking(actor, x)"""
+    """Locking(actor, x) for the actor locking some x."""
     verb = "lock"
     gerund = "locking"
     numargs = 2
@@ -1209,7 +1228,7 @@ def before_locking_fail(actor, x, ctxt) :
 # Wearing
 ##
 class Wearing(BasicAction) :
-    """Wearing(actor, x)"""
+    """Wearing(actor, x) for the actor putting on the wearable x."""
     verb = "wear"
     gerund = "wearing"
     numargs = 2
@@ -1245,7 +1264,7 @@ def report_wearing_default(actor, x, ctxt) :
 # Taking off
 ##
 class TakingOff(BasicAction) :
-    """TakingOff(actor, x)"""
+    """TakingOff(actor, x) for the actor taking off the wearable x."""
     verb = "take off"
     gerund = "taking off"
     numargs = 2
@@ -1276,7 +1295,7 @@ def report_takingoff_default(actor, x, ctxt) :
 ##
 
 class SwitchingOn(BasicAction) :
-    """SwitchingOn(actor, x)"""
+    """SwitchingOn(actor, x) for the actor switching the x on."""
     verb = "switch on"
     gerund = "switching on"
     numargs = 2
@@ -1315,7 +1334,7 @@ def report_switching_on(actor, x, ctxt) :
 ##
 
 class SwitchingOff(BasicAction) :
-    """SwitchingOff(actor, x)"""
+    """SwitchingOff(actor, x) for the actor switching the x off."""
     verb = "switch off"
     gerund = "switching off"
     numargs = 2
@@ -1354,11 +1373,11 @@ def report_switching_off(actor, x, ctxt) :
 ##
 
 class Switching(BasicAction) :
-    """Switching(actor, x)"""
+    """Switching(actor, x) for the actor toggling the switchable x."""
     verb = "switch"
     gerund = "switching"
     numargs = 2
-parser.understand("switch/turn [something x]", Switching(actor, X))
+parser.understand("switch/turn/toggle [something x]", Switching(actor, X))
 
 require_xobj_accessible(actionsystem, Switching(actor, X))
 
@@ -1386,6 +1405,8 @@ def before_switching_switchable(actor, x, ctxt) :
 ##
 
 class AskingFor(BasicAction) :
+    """AskingFor(actor, x, y) for the actor asking the person x for
+    the thing y."""
     verb = ("ask", "for")
     gerund = ("asking", "for")
     numargs = 3
@@ -1405,6 +1426,8 @@ def before_askingfor_turn_to_givingto(actor, x, y, ctxt) :
 ##
 
 class AskingTo(BasicAction) :
+    """AskingTo(actor, x, action) for the actor asking the person x to
+    do the action."""
     verb = ("ask", "to")
     gerund = ("asking", "to")
     numargs = 3
@@ -1446,7 +1469,8 @@ def when_askingto_make_it_happen(actor, x, y, ctxt) :
 ##
 
 class GivingTo(BasicAction) :
-    """GivingTo(actor, X, Y)"""
+    """GivingTo(actor, X, Y) for the actor giving the thing x to a
+    person y."""
     verb = ("give", "to")
     gerund = ("giving", "to")
     numargs = 3
@@ -1493,7 +1517,7 @@ def report_giving_to_default(actor, x, y, ctxt) :
 # Attacking
 ##
 class Attacking(BasicAction) :
-    """Attacking(actor, x)"""
+    """Attacking(actor, x) for the actor attacking a thing x."""
     verb = "attack"
     gerund = "attacking"
     numargs = 2
@@ -1510,7 +1534,7 @@ def before_attacking_default(actor, x, ctxt) :
 # Eating
 ##
 class Eating(BasicAction) :
-    """Eating(actor, x)"""
+    """Eating(actor, x) for the actor eating the x if it is edible."""
     verb = "eat"
     gerund = "eating"
     numargs = 2
@@ -1538,12 +1562,12 @@ def report_eating_default(actor, x, ctxt) :
 ##
 
 class Swimming(BasicAction) :
-    """Swimming(actor)"""
+    """Swimming(actor) for the actor swimming (wherever that may be)."""
     verb = "swim"
     gerund = "swimming"
     numargs = 1
 class SwimmingIn(BasicAction) :
-    """SwimmingIn(actor, X)"""
+    """SwimmingIn(actor, x) for the actor swimming in the x."""
     verb = "swim"
     gerund = "swimming in"
     numargs = 2
@@ -1567,7 +1591,7 @@ def before_swimming_in_default(actor, x, ctxt) :
 ##
 
 class Cutting(BasicAction) :
-    """Cutting(actor, X)"""
+    """Cutting(actor, x) for the actor cutting the x."""
     verb = "cut"
     gerund = "cutting"
     numargs = 2
@@ -1581,7 +1605,7 @@ def before_cutting_default(actor, x, ctxt) :
     raise AbortAction("{Bob|cap} can't cut that.", actor=actor)
 
 class CuttingWith(BasicAction) :
-    """CuttingWith(actor, X, Y)"""
+    """CuttingWith(actor, x, y) for the actor cutting the x with the y."""
     verb = ("cut", "with")
     gerund = ("cutting", "with")
     numargs = 3
@@ -1606,7 +1630,7 @@ def before_cutting_a_person_with(actor, x, y, ctxt) :
 ##
 
 class Climbing(BasicAction) :
-    """Climbing(actor, X)"""
+    """Climbing(actor, x) for the actor climbing the x."""
     verb = "climb"
     gerund = "climbing"
     numargs = 2
@@ -1624,7 +1648,7 @@ def before_climbing_default(actor, x, ctxt) :
 ##
 
 class Pushing(BasicAction) :
-    """Pushing(actor, X)"""
+    """Pushing(actor, x) for the actor pushing the x."""
     verb = "push"
     gerund = "pushing"
     numargs = 2
@@ -1643,7 +1667,9 @@ def before_pushing_default(actor, x, ctxt) :
 ##
 
 class AskingAbout(BasicAction) :
-    """AskingAbout(actor, X, 'text')"""
+    """AskingAbout(actor, x, text) for the actor asking the person x
+    about some arbitrary text.  It's up to the programmer to parse
+    this text."""
     verb = ("ask", "about")
     gerund = ("asking", "about")
     dereference_iobj = False
@@ -1663,7 +1689,7 @@ def report_asking_about_default(actor, x, y, ctxt) :
 ##
 
 class Laughing(BasicAction) :
-    """Laughing(actor)"""
+    """Laughing(actor) for the actor laughing."""
     verb = "laugh"
     gerund = "laughing"
     numargs = 1
@@ -1679,7 +1705,7 @@ def report_laughing_default(actor, ctxt) :
 ##
 
 class Singing(BasicAction) :
-    """Singing(actor)"""
+    """Singing(actor) for the actor singing."""
     verb = "sing"
     gerund = "singing"
     numargs = 1
@@ -1695,7 +1721,7 @@ def report_singing_default(actor, ctxt) :
 ##
 
 class Jumping(BasicAction) :
-    """Jumping(actor)"""
+    """Jumping(actor) for the actor jumping."""
     verb = "jump"
     gerund = "jumping"
     numargs = 1
@@ -1712,7 +1738,7 @@ def report_jumping_default(actor, ctxt) :
 ##
 
 class Waiting(BasicAction) :
-    """Waiting(actor)"""
+    """Waiting(actor) for the actor not doing anything."""
     verb = "wait"
     gerund = "waiting"
     numargs = 1

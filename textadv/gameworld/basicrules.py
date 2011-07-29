@@ -93,7 +93,7 @@ def default_IndefiniteName(x, world) :
 
 @world.define_property
 class Description(Property) :
-    """Represents a textual description of a kind.  There is no
+    """Represents a textual description of an object.  There is no
     default value of this for kinds."""
     numargs = 1
 
@@ -103,9 +103,12 @@ class Description(Property) :
 
 @world.define_property
 class Words(Property) :
-    """This is a list of words which can describe the kind.  Words may
-    be prefixed with @ to denote that they are nouns (and matching a
-    noun gives higher priority to the disambiguator)."""
+    """This represents a list of words which can describe the
+    object. Words may be prefixed with @ to denote that they are nouns
+    (and matching a noun gives higher priority to the disambiguator,
+    but keep in mind there is no match when an adjective comes before
+    a noun: ["red", "@ball"] will match "red", "ball", and "red ball",
+    but not "ball red")."""
     numargs = 1
 
 @world.handler(Words(X))
@@ -928,11 +931,11 @@ def person_PossessivePronoun(x, world) :
     if gender == "male" :
         return "his"
     elif gender == "female" :
-        return "her"
+        return "hers"
     elif gender == "none" :
         return "its"
     else :
-        return "their"
+        return "theirs"
 
 @world.handler(ReflexivePronoun(X) <= IsA(X, "person"))
 def person_ReflexivePronoun(x, world) :

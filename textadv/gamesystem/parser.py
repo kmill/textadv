@@ -135,6 +135,7 @@ class Parser(object) :
         self.add_known_words(*PARSER_ARTICLES)
         # subparser takes (parser, var, input, i, ctxt, actor, next)
         self.subparsers = dict()
+        self.object_classes = {"something" : "thing", "somewhere" : "room"}
         self.parse_thing = ActivityTable(accumulator=list_append, doc="""A
         parse_thing parser takes the arguments (parser, subparser,
         var, name, words, input, i, ctxt, next, multiplier=1), and
@@ -145,32 +146,33 @@ class Parser(object) :
         what is expected--we try to find the thing we're looking for
         rather than try to find any thing.  Should return
         [Matched(..), ...] or something.""")
-    def init_current_objects(self, ctxt, with_objs=None, with_rooms=None) :
+    def init_current_objects(self, ctxt, with_objs=None) :
         """For parsing efficiency of things (needed in the something
         parser).  Gets the referenceable objects and their words."""
-        if with_objs :
-            self.CURRENT_OBJECTS = list(with_objs)
-        else :
-            self.CURRENT_OBJECTS = ctxt.world.activity.referenceable_things()
-        if with_rooms :
-            self.CURRENT_ROOMS = list(with_rooms)
-        else :
-            self.CURRENT_ROOMS = ctxt.world.activity.referenceable_rooms()
-        self.CURRENT_WORDS = [separate_object_words(ctxt.world.get_property("Words", o))
-                              for o in self.CURRENT_OBJECTS]
-        self.CURRENT_ROOM_WORDS = [separate_object_words(ctxt.world.get_property("Words", o))
-                                   for o in self.CURRENT_ROOMS]
+        self.current_objects = dict()
+        self.current_words = dict()
+        for parser, kind in self.object_classes.iteritems() :
+            if with_objs and parser in with_objs :
+                self.current_objects[parser] = with_objs[parser]
+            else :
+                self.current_objects[parser] = ctxt.world.activity.objects_of_kind(kind)
+            self.current_words[parser] = [separate_object_words(ctxt.world.get_property("Words", o))
+                                          for o in self.current_objects[parser]]
+    def add_object_class(self, parsername, kind) :
+        """Sets up the object_classes dictionary for a subparser
+        called parsername so that current_objects[parsername] will be
+        loaded with objects of kind kind when init_current_objects is
+        run.  The current_words[parsername] entry will be updated."""
+        self.object_classes[parsername] = kind
     def add_known_words(self,*words) :
         """Helps let the user know which word was not recognized when
         they make a typo."""
         self.KNOWN_WORDS.extend(words)
     def __is_word_for_thing(self, word) :
-        for adjs,nouns in self.CURRENT_WORDS :
-            if word in adjs or word in nouns :
-                return True
-        for adjs,nouns in self.CURRENT_ROOM_WORDS :
-            if word in adjs or word in nouns :
-                return True
+        for word_list in self.current_words.itervalues() :
+            for adjs,nouns in word_list :
+                if word in adjs or word in nouns :
+                    return True
         return False
 
     def define_subparser(self, name, doc=None) :
@@ -434,6 +436,7 @@ class Parser(object) :
         for name, table in self.subparsers.iteritems() :
             newparser.subparsers[name] = table.copy()
         newparser.parse_thing = self.parse_thing.copy()
+        newparser.object_classes = self.object_classes.copy()
         return newparser
     def make_documentation(self, escape, heading_level=1) :
         hls = str(heading_level)
@@ -496,7 +499,7 @@ default_parser.define_subparser("something", "A parser to match against things i
 def default_something(parser, var, input, i, ctxt, actor, next) :
     """Tries to parse as if the following input were a thing."""
     return list_append([parser.parse_thing.notify([parser, "something", var, name, words,input,i,ctxt,next],{})
-                        for name,words in zip(parser.CURRENT_OBJECTS, parser.CURRENT_WORDS)])
+                        for name,words in zip(parser.current_objects["something"], parser.current_words["something"])])
 
 
 default_parser.define_subparser("somewhere", "A parser to match against rooms in the game.")
@@ -505,7 +508,7 @@ default_parser.define_subparser("somewhere", "A parser to match against rooms in
 def default_somewhere(parser, var, input, i, ctxt, actor, next) :
     """Tries to parse as if the following input were a room."""
     return list_append([parser.parse_thing.notify([parser, "somewhere", var, name, words,input,i,ctxt,next],{})
-                        for name,words in zip(parser.CURRENT_ROOMS, parser.CURRENT_ROOM_WORDS)])
+                        for name,words in zip(parser.current_objects["somewhere"], parser.current_words["somewhere"])])
 
 
 default_parser.define_subparser("object", "A parser which uses its variable as an object id, instead.")

@@ -8,11 +8,18 @@ import textwrap
 class TerminalGameIO(object) :
     """This class may be replaced in the GameContext by anything which
     implements the following two methods."""
+    def __init__(self) :
+        self.data = []
     def get_input(self, prompt=">") :
         self.flush()
         return raw_input("\n"+prompt + " ")
     def write(self, *data) :
-        d = " ".join(data)
+        self.data.extend(data)
+    def set_status_var(self, *args, **kwargs) :
+        pass
+    def flush(self) :
+        d = " ".join(self.data)
+        self.data = []
         d = " ".join(re.split("\\s+", d))
         d = re.sub('<[^<]+?>', '', d) # strip out html
         pars = d.replace("[newline]", "\n\n").replace("[break]", "\n").replace("[indent]","  ").split("\n")
@@ -28,7 +35,3 @@ class TerminalGameIO(object) :
                 one_p.append("\n".join(textwrap.wrap(f)))
             to_print.append("\n".join(one_p))
         print string.replace("\n\n".join(to_print)+"\n", "&nbsp;", " ")
-    def set_status_var(self, *args, **kwargs) :
-        pass
-    def flush(self) :
-        pass

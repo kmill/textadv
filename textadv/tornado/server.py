@@ -11,15 +11,24 @@ import email
 
 sys.path.append(os.path.join(os.path.dirname(__file__), "../.."))
 
-games = {"cloak" : __import__("games.cloak", fromlist=["cloak"]),
-         "testgame" : __import__("games.testgame", fromlist=["testgame"]),
-         "testgame2" : __import__("games.testgame2", fromlist=["testgame2"]),
-         "continuations" : __import__("games.continuations", fromlist=["continuations"]),
-         "isleadv" : __import__("games.isleadv", fromlist=["isleadv"]),
-         "teptour" : __import__("games.teptour", fromlist=["teptour"]),
-         }
+games = dict()
+auxfiles = dict()
 
-auxfiles = {"teptour" : "games/teptour_files"}
+def add_game_path(path) :
+    sys.path.append(path)
+
+def add_game(package, name, auxfile_dir=None) :
+    games[name] = __import__(package+"."+name, fromlist=[name])
+    if auxfile_dir :
+        auxfiles[name] = auxfile_dir
+
+add_game_path(os.path.join(os.path.dirname(__file__), "../.."))
+add_game("games", "cloak")
+add_game("games", "testgame")
+add_game("games", "testgame2")
+add_game("games", "continuations")
+add_game("games", "isleadv")
+add_game("games", "teptour", auxfile_dir="games/teptour_files")
 
 class MainHandler(tornado.web.RequestHandler):
     def get(self) :

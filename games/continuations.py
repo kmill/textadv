@@ -190,7 +190,8 @@ quickdef(world, "The Store", "room", {
         Description : """This store is where they have your
         Argentinian mongoose chair.  Why it's not on your pedestal
         already, you do not know.  To the [dir north] is where they
-        keep it."""
+        keep it, and to the [dir south] is back to your trophy
+        room."""
         })
 world.activity.connect_rooms("The Store", "north", "The Storeroom")
 
@@ -198,7 +199,14 @@ quickdef(world, "store clerk", "person", {
         Gender : "female",
         Description : """This store clerk has been depriving you of
         your Argentinian mongoose chair for years.  Today's the day
-        that you'll show her, though.  You will show her."""
+        that you'll show her, though.  You will show her.[if [when
+        <store clerk> Has <wire snips>]][newline]She is currently
+        holding your wire snips!  You should try asking her for them
+        to get them back.[endif]""",
+        NotableDescription : """[newline][if [when <store clerk> Has
+        <wire snips>]]The store clerk has your wire
+        snips![else]Glaring at you with intense suspicion is the store
+        clerk.[endif]"""
         },
          put_in="The Store")
 
@@ -317,7 +325,7 @@ def before_givingto_clerk(actor, x, ctxt) :
 quickdef(world, "The Storeroom", "room", {
         Description : """Ah, yes.  This is where they keep it.  Why
         they keep it under such terrible [ob <fluorescent lighting>],
-        you have no idea."""
+        you have no idea.  You can go [dir south]."""
         })
 
 quickdef(world, "fluorescent lighting", "thing", {

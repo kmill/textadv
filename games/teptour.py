@@ -352,7 +352,7 @@ quickdef(world, "24", "room")
 quickdef(world, "Second Front", "room", {
         Description : """This is second front, a bathroom named for
         its presence on the second floor and closer to the front of
-        the house.  You can go [dir southeast] to the second
+        the house.  You can go [dir northeast] to the second
         landing."""
         })
 world[DirectionDescription("Second Front", "up")] = """Looking up, you

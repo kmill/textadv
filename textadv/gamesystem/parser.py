@@ -151,6 +151,7 @@ class Parser(object) :
         parser).  Gets the referenceable objects and their words."""
         self.current_objects = dict()
         self.current_words = dict()
+        self.current_names = dict()
         for parser, kind in self.object_classes.iteritems() :
             if with_objs and parser in with_objs :
                 self.current_objects[parser] = with_objs[parser]
@@ -158,6 +159,9 @@ class Parser(object) :
                 self.current_objects[parser] = ctxt.world.activity.objects_of_kind(kind)
             self.current_words[parser] = [separate_object_words(ctxt.world.get_property("Words", o))
                                           for o in self.current_objects[parser]]
+            self.current_names[parser] = dict()
+            for o in self.current_objects[parser] :
+                self.current_names[parser][o] = " ".join(ctxt.stringeval.eval_str(ctxt.world.get_property("Name", o), ctxt).split())
     def add_object_class(self, parsername, kind) :
         """Sets up the object_classes dictionary for a subparser
         called parsername so that current_objects[parsername] will be
@@ -470,12 +474,18 @@ def default_parse_thing(parser, subparser, var, name, words, input, i, ctxt, nex
             # or try concluding with a noun
             if input[i2].lower() in nouns :
                 # already a match because input[i2] is one of the nouns.
-                poss.extend(product([[Matched(input[i:i2+1], name, 2*multiplier, subparser, var=var)]],
+                m2 = 1
+                if parser.current_names[subparser][name] == " ".join(input[i:i2+1]) :
+                    m2 += 0.5
+                poss.extend(product([[Matched(input[i:i2+1], name, 2*multiplier*m2, subparser, var=var)]],
                                     next(i2+1)))
         # or just try concluding
         if len(curr_adjs) > 0 :
             # already a match
-            poss.extend(product([[Matched(input[i:i2], name, 1*multiplier, subparser, var)]],
+            m2 = 1
+            if parser.current_names[subparser][name] == " ".join(input[i:i2]) :
+                m2 += 0.5
+            poss.extend(product([[Matched(input[i:i2], name, 1*multiplier*m2, subparser, var)]],
                                 next(i2)))
         return poss
     adjs,nouns = words
@@ -485,6 +495,7 @@ def default_parse_thing(parser, subparser, var, name, words, input, i, ctxt, nex
         # skip over articles
         if input[i].lower() in PARSER_ARTICLES :
             i2 += 1
+            i += 1 # for bumping up score for exact matches
         poss.extend(match_adjs_nouns([], i2))
     return poss
 

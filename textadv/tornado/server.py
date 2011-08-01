@@ -13,14 +13,18 @@ sys.path.append(os.path.join(os.path.dirname(__file__), "../.."))
 
 games = dict()
 auxfiles = dict()
+alt_indices = dict()
 
 def add_game_path(path) :
     sys.path.append(path)
 
-def add_game(package, name, auxfile_dir=None) :
+def add_game(package, name, auxfile_dir=None, altindex=None) :
+    """altindex is with respect to auxfile_dir, if auxfile_dir is set."""
     games[name] = __import__(package+"."+name, fromlist=[name])
     if auxfile_dir :
         auxfiles[name] = auxfile_dir
+    if altindex :
+        alt_indices[name] = altindex
 
 add_game_path(os.path.join(os.path.dirname(__file__), "../.."))
 add_game("games", "cloak")
@@ -28,7 +32,7 @@ add_game("games", "testgame")
 add_game("games", "testgame2")
 add_game("games", "continuations")
 add_game("games", "isleadv")
-add_game("games", "teptour", auxfile_dir="games/teptour_files")
+add_game("games", "teptour", auxfile_dir="games/teptour_files", altindex="tepindex.html")
 
 class MainHandler(tornado.web.RequestHandler):
     def get(self) :
@@ -114,7 +118,12 @@ class GameHandler(tornado.web.RequestHandler):
         sessions[session] = t
         sessions_timer[session] = time.time()
         sessions_lock.release()
-        self.render('static/index.html', session=session)
+        if alt_indices.has_key(game) :
+            index_file = os.path.join(os.path.abspath(auxfiles.get(game, "")), alt_indices[game])
+        else :
+            index_file = 'static/index.html'
+        print index_file
+        self.render(index_file, session=session)
 
 class InputHandler(tornado.web.RequestHandler) :
     def post(self) :

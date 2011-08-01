@@ -65,8 +65,8 @@ def docstring(s) :
 def make_action_link(text, action) :
     return '<a class="action" href="" onclick="return run_action(\'%s\');">%s</a>' % (action, text)
 
-def wrap_examine(obj, text, ctxt) :
-    return make_action_link(text, "examine "+ctxt.world.get_property("Name", obj))
+def wrap_examine(eval, act, obj, text, ctxt) :
+    return make_action_link(eval.eval_str(text, ctxt, actor=act), "examine "+eval.eval_str(ctxt.world.get_property("Name", obj), ctxt, actor=act))
 
 ###
 ### Object interface for fancy strings
@@ -144,7 +144,7 @@ class StringEvaluator(object) :
             return f
         return _add_eval_func
 
-    def eval_str(self, input, context) :
+    def eval_str(self, input, context, actor=None) :
         """Takes a string and evaluates constructs to reflect the
         state of the game world.
     
@@ -160,6 +160,8 @@ class StringEvaluator(object) :
 
         More can be defined using the decorator add_eval_func.
         """
+        if not actor :
+            actor = context.actor
         # first we need to parse the string
         parsed, i = self.__eval_parse(input)
         code = ["append"]
@@ -172,7 +174,7 @@ class StringEvaluator(object) :
             print "eval_str: Offending input is"
             print input
             raise x
-        evaled = self.__eval(code, context, context.actor)
+        evaled = self.__eval(code, context, actor)
         return "".join([str(o) for o in evaled])
 
     def __eval_parse(self, input, i=0, in_code=False) :
@@ -280,7 +282,7 @@ class StringEvaluator(object) :
 
     def __eval(self, expr, context, actor) :
         if expr[0] == "lit" :
-            return expr[1]
+            return [expr[1]]
         elif expr[0] == "if" :
             res = self.__eval(expr[1], context, actor)
             # res might be the empty list
@@ -350,62 +352,84 @@ def _str_eval_true(eval, act, ctxt, x) :
     """Returns the Python 'not' of the argument."""
     return [not x]
 
+@stringeval.add_eval_func("==")
+def _str_eval_eq(eval, act, ctxt, x, y) :
+    """Returns the Python == of the arguments."""
+    return [x == y]
+
+@stringeval.add_eval_func("first")
+def _str_eval_first(eval, act, ctxt, x) :
+    """Returns the first element of the argument."""
+    return [x[0]]
+
 @stringeval.add_eval_func("get")
 def _str_eval_get(eval, act, ctxt, prop, *args) :
     """Calls ctxt.world.get_property on the arguments."""
-    return [ctxt.world.get_property(prop, *args)]
+    args = [a[0] for a in args]
+    return [ctxt.world.get_property(prop[0], *args)]
 
 @stringeval.add_eval_func("the")
 def _str_eval_the(eval, act, ctxt, ob) :
     """Gets DefiniteName of the supplied object."""
-    return [wrap_examine(ob, eval.eval_str(ctxt.world.get_property("DefiniteName", ob), ctxt), ctxt)]
+    ob = ob[0]
+    return [wrap_examine(eval, act, ob, eval.eval_str(ctxt.world.get_property("DefiniteName", ob), ctxt, actor=act), ctxt)]
 
 @stringeval.add_eval_func("a")
 def _str_eval_a(eval, act, ctxt, ob) :
     """Gets IndefiniteName of the supplied object."""
-    return [wrap_examine(ob, eval.eval_str(ctxt.world.get_property("IndefiniteName", ob), ctxt), ctxt)]
+    ob = ob[0]
+    return [wrap_examine(eval, act, ob, eval.eval_str(ctxt.world.get_property("IndefiniteName", ob), ctxt, actor=act), ctxt)]
 
 @stringeval.add_eval_func("The")
 def _str_eval_The(eval, act, ctxt, ob) :
     """Gets DefiniteName of the supplied object, capitalized."""
-    return [wrap_examine(ob, _cap(eval.eval_str(ctxt.world.get_property("DefiniteName", ob), ctxt)), ctxt)]
+    ob = ob[0]
+    return [wrap_examine(eval, act, ob, _cap(eval.eval_str(ctxt.world.get_property("DefiniteName", ob), ctxt, actor=act)), ctxt)]
 
 @stringeval.add_eval_func("A")
 def _str_eval_A(eval, act, ctxt, ob) :
     """Gets IndefiniteName of the supplied object, capitalized."""
-    return [wrap_examine(ob, _cap(eval.eval_str(ctxt.world.get_property("IndefiniteName", ob), ctxt)), ctxt)]
+    ob = ob[0]
+    return [wrap_examine(eval, act, ob, _cap(eval.eval_str(ctxt.world.get_property("IndefiniteName", ob), ctxt, actor=act)), ctxt)]
 
 @stringeval.add_eval_func("cap")
 def _str_eval_cap(eval, act, ctxt, s) :
     """Capitalizes the string using utilities._cap."""
+    s = s[0]
     return [_cap(s)]
 
 @stringeval.add_eval_func("char")
 def _str_eval_char(eval, act, ctxt, n) :
     """Runs python chr on the argument as an integer."""
+    n = n[0]
     return [chr(int(n))]
 
 @stringeval.add_eval_func("eval_str")
 def _str_eval_eval_str(eval, act, ctxt, x) :
     """Call eval_str on the argument."""
-    return [eval.eval_str(x, ctxt)]
+    x = x[0]
+    return [eval.eval_str(x, ctxt, actor=act)]
 
 @stringeval.add_eval_func("he")
 def _str_eval_he(eval, act, ctxt, ob) :
     """Gets SubjectPronoun of the supplied object."""
-    return [wrap_examine(ob, eval.eval_str(ctxt.world.get_property("SubjectPronoun", ob), ctxt), ctxt)]
+    ob = ob[0]
+    return [wrap_examine(eval, act, ob, eval.eval_str(ctxt.world.get_property("SubjectPronoun", ob), ctxt, actor=act), ctxt)]
 @stringeval.add_eval_func("him")
 def _str_eval_him(eval, act, ctxt, ob) :
     """Gets ObjectPronoun of the supplied object."""
-    return [wrap_examine(ob, eval.eval_str(ctxt.world.get_property("ObjectPronoun", ob), ctxt), ctxt)]
+    ob = ob[0]
+    return [wrap_examine(eval, act, ob, eval.eval_str(ctxt.world.get_property("ObjectPronoun", ob), ctxt, actor=act), ctxt)]
 @stringeval.add_eval_func("He")
 def _str_eval_He(eval, act, ctxt, ob) :
     """Gets SubjectPronoun of the supplied object, capitalized."""
-    return [wrap_examine(ob, _cap(eval.eval_str(ctxt.world.get_property("SubjectPronoun", ob), ctxt)), ctxt)]
+    ob = ob[0]
+    return [wrap_examine(eval, act, ob, _cap(eval.eval_str(ctxt.world.get_property("SubjectPronoun", ob), ctxt, actor=act)), ctxt)]
 @stringeval.add_eval_func("Him")
 def _str_eval_Him(eval, act, ctxt, ob) :
     """Gets ObjectPronoun of the supplied object, capitalized."""
-    return [wrap_examine(ob, _cap(eval.eval_str(ctxt.world.get_property("ObjectPronoun", ob), ctxt)), ctxt)]
+    ob = ob[0]
+    return [wrap_examine(eval, act, ob, _cap(eval.eval_str(ctxt.world.get_property("ObjectPronoun", ob), ctxt, actor=act)), ctxt)]
 
 @stringeval.add_eval_func("newline")
 def _str_eval_newline(eval, act, ctxt) :
@@ -431,28 +455,28 @@ def _str_eval_when(eval, act, ctxt, *obs) :
     can write [when box Contains] instead of [when box Contains
     actor])"""
     if len(obs) == 2 :
-        ob1, relation, ob2 = obs[0], obs[1], act
+        ob1, relation, ob2 = obs[0], obs[1], [act]
     else :
         ob1, relation, ob2 = obs
-    return [ctxt.world.query_relation(ctxt.world.get_relation(relation)(ob1, ob2))]
+    return [ctxt.world.query_relation(ctxt.world.get_relation(relation[0])(ob1[0], ob2[0]))]
 
 @stringeval.add_eval_func("is_are_list")
 def _str_eval_is_are_list(eval, act, ctxt, *obs) :
     """Concatenates a list of objects, getting indefinite names, and
     puts proper is/are in front (using is_are_list)."""
     objs = [str_with_objs("[a $o]", o=o) for o in list_append(*obs)]
-    return eval.eval_str(is_are_list(objs), ctxt)
+    return eval.eval_str(is_are_list(objs), ctxt, actor=act)
 
 @stringeval.add_eval_func("dir")
 def _str_eval_dir(eval, act, ctxt, *obs) :
     """Takes a direction and possibly some text, and provides a link
     to go in that direction."""
     if len(obs) == 1 :
-        dir = obs[0]
-        text = obs[0]
+        dir = obs[0][0]
+        text = obs[0][0]
     else :
-        dir = obs[0]
-        text = obs[1]
+        dir = obs[0][0]
+        text = obs[1][0]
     return [make_action_link(text, "go "+dir)]
 
 @stringeval.add_eval_func("ob")
@@ -460,11 +484,13 @@ def _str_eval_ob(eval, act, ctxt, *obs) :
     """Takes an object and possible text, and provides a link to
     examine that object."""
     if len(obs) == 1 :
-        ob = obs[0]
-        text = obs[0]
+        ob = obs[0][0]
+        text = obs[0][0]
     else :
-        ob = obs[0]
-        text = obs[1]
+        ob = obs[0][0]
+        text = obs[1][0]
+    ob = eval.eval_str(ob, ctxt, actor=act)
+    text = eval.eval_str(text, ctxt, actor=act)
     return [make_action_link(text, "examine "+ob)]
 
 @stringeval.add_eval_func("action")
@@ -472,11 +498,13 @@ def _str_eval_action(eval, act, ctxt, *obs) :
     """Takes an action (as a string) and possible text, and provides a
     link to do that action.  Calls make_action_link."""
     if len(obs) == 1 :
-        action = obs[0]
-        text = obs[0]
+        action = obs[0][0]
+        text = obs[0][0]
     else :
-        action = obs[0]
-        text = obs[1]
+        action = obs[0][0]
+        text = obs[1][0]
+    action = eval.eval_str(action, ctxt, actor=act)
+    text = eval.eval_str(text, ctxt, actor=act)
     return [make_action_link(text, action)]
 
 
@@ -500,7 +528,7 @@ def _str_eval_reword(eval, actor, ctxt, *args) :
     cap - capitalizes word (useful for start of sentences)
     obj - makes "bob" be the object of a sentence"""
 
-    word = args[0]
+    word = args[0][0]
     flags = args[1:]
     is_me = (ctxt.actor == actor)
     capitalized = word[0] in string.uppercase

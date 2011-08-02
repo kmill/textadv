@@ -459,10 +459,9 @@ quickdef(world, "fishing_rod", "fishing rod", {
         })
 world.activity.put_in("fishing_rod", "half hut")
 
-@when(Going(actor, "north") <= Contains("room_village", actor))
-def _when_going_to_jungle_from_village(actor, ctxt) :
-    ctxt.write("""The underbrush is almost completely unlike a stone
-    wall.  You succeed in passing to make your way to...""")
+world[WhenGoMessage("room_village", "north")] = """The underbrush is
+almost completely unlike a stone wall.  You succeed in passing to make
+your way to..."""
 
 ##
 ## Well
@@ -848,9 +847,8 @@ world.activity.connect_rooms("room_clearing", "down", "manhole")
 
 parser.understand("go down/up [object manhole]", Entering(actor, "manhole"))
 
-@when(Going(actor, "down") <= Contains("room_clearing", actor))
-def _when_going_down_manhole(actor, ctxt) :
-    ctxt.write("You climb some ways down a ladder into...")
+world[WhenGoMessage("room_clearing", "down")] = """You climb some ways
+down a ladder into..."""
 
 @when(UnlockingWith(actor, "manhole", "driftwood"))
 def _when_unlock_manhole(actor, ctxt) :
@@ -991,9 +989,7 @@ world.activity.put_in("ladder", "room_power_station")
 def _before_climb_ladder(actor, ctxt) :
     raise DoInstead(Going(actor, "up"), suppress_message=True)
 
-@when(Going(actor, "up") <= Contains("room_power_station", actor))
-def _when_going_up_manhole(actor, ctxt) :
-    ctxt.write("You climb up the ladder to...")
+world[WhenGoMessage("room_power_station", "up")] = "You climb up the ladder to..."
 
 quickdef(world, "steam_generator", "thing", {
         Name : "steam turbine",

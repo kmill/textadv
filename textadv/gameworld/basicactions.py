@@ -399,8 +399,8 @@ def verify_going_make_real_direction_more_logical(actor, direction, ctxt) :
     if direction in ctxt.world.activity.get_room_exit_directions(loc) :
         return VeryLogicalOperation()
 
-@before(Going(actor, direction), wants_event=True)
-def before_going_setup_variables(action, actor, direction, ctxt) :
+@trybefore(Going(actor, direction), wants_event=True)
+def trybefore_going_setup_variables(action, actor, direction, ctxt) :
     """Sets up some important variables such as where the destination
     is as well as through what one is getting there.  Also checks that
     there is an exit in that particular direction, and issues the
@@ -413,7 +413,7 @@ def before_going_setup_variables(action, actor, direction, ctxt) :
     if ctxt.world[IsA(action.going_to, "door")] :
         action.going_to = ctxt.world.activity.door_other_side_from(action.going_to, action.going_from)
 
-@before(Going(actor, direction), wants_event=True, insert_after=before_going_setup_variables)
+@before(Going(actor, direction), wants_event=True)
 def before_going_check_door(action, actor, direction, ctxt) :
     """Checks that the going_via is open if it is an openable door."""
     if ctxt.world[IsA(action.going_via, "door")] :
@@ -422,7 +422,7 @@ def before_going_check_door(action, actor, direction, ctxt) :
             if not ctxt.world[IsOpen(action.going_via)] :
                 raise AbortAction(ctxt.world[NoGoMessage(action.going_from, direction)])
 
-@before(Going(actor, direction), wants_event=True, insert_after=before_going_setup_variables)
+@before(Going(actor, direction), wants_event=True)
 def before_going_leave_enterables(action, actor, direction, ctxt) :
     """If currently in or on something which isn't action.going_from,
     try exiting first.  If we do exit, then we restart Going so that
@@ -455,10 +455,12 @@ def when_going_default(action, actor, direction, ctxt) :
 
 @report(Going(actor, direction), wants_event=True)
 def report_going_default(action, actor, direction, ctxt) :
-    """There is nothing to report: the change in player location will
-    make step_turn want to describe the location."""
-    pass
-
+    """We report the WhenGoMessage property, if it's not None.  Other
+    than that, there's nothing to report: the change in player
+    location will make step_turn want to describe the location."""
+    msg = ctxt.world[WhenGoMessage(action.going_from, direction)]
+    if msg :
+        ctxt.write(msg)
 
 ##
 # GoingTo

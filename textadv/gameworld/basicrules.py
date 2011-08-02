@@ -259,6 +259,19 @@ class NoGoMessage(Property) :
 
 world[NoGoMessage(X, direction) <= IsA(X, "room")] = "{Bob|cap} can't go that way."
 
+##
+# Property: WhenGoMessage
+##
+
+@world.define_property
+class WhenGoMessage(Property) :
+    """Takes a (room, direction) pair and gives a message for
+    reporting going that way."""
+    numargs = 2
+
+world[WhenGoMessage(X, direction) <= IsA(X, "room")] = None
+
+
 ###
 ### Defining: thing
 ###

@@ -314,7 +314,7 @@ quickdef(world, "broken sconce", "thing", {
 
 @before(Eiting(actor, "chandelier"))
 def before_eiting_chandelier(actor, ctxt) :
-    raise AbortAction("The chandelier is too high up for you to eit it.")
+    raise AbortAction("The chandelier is too high up for you to eit.  Maybe there's something you could eit it with.")
 @before(Eiting(actor, "broken chandelier"))
 def before_eiting_brokenchandelier(actor, ctxt) :
     raise AbortAction("The chandelier looks well eited already.")
@@ -337,6 +337,7 @@ def when_eiting_chandelier_with_stupidball(actor, ctxt) :
     ctxt.world.activity.remove_obj("chandelier")
     ctxt.world.activity.put_in("broken chandelier", "The Center Room")
     ctxt.world.activity.put_in("broken sconce", "The Center Room")
+    ctxt.world.activity.put_in("ex_ball", "The Center Room")
 @report(EitingWith(actor, "chandelier", "ex_ball"))
 def report_eiting_chandelier(actor, ctxt) :
     ctxt.write("""Good plan.  You kick the large green exercise ball
@@ -466,6 +467,9 @@ can see a ladder to a room above this closet."""
 world.activity.connect_rooms("22", "northwest", "The Closet in 22")
 world.activity.connect_rooms("The Closet in 22", "up", "The Batcave")
 
+world[WhenGoMessage("The Closet in 22", "up")] = """With some
+difficulty, you climb the ladder into..."""
+
 ###
 ### The Batcave
 ###
@@ -481,6 +485,11 @@ quickdef(world, "The Batcave", "room", {
         closet in 32."""
         })
 world.activity.connect_rooms("The Batcave", "up", "The Closet in 32")
+
+world[WhenGoMessage("The Batcave", "up")] = """You squeeze through the
+hole in the floor and make your way to..."""
+world[WhenGoMessage("The Batcave", "down")] = """You carefully climb
+down the ladder into..."""
 
 # the complexity is because I want the door to be different in each
 # room, and there's no support for this in the engine, yet.
@@ -620,6 +629,9 @@ quickdef(world, "The Closet in 32", "room", {
         })
 world[DirectionDescription("The Closet in 32", "down")] = """Looking down,
 you can see a passageway into a room below this closet."""
+
+world[WhenGoMessage("The Closet in 32", "down")] = """You squeeze
+through a small opening in the floor to get into...""" # goes to batcave
 
 world.activity.connect_rooms("32", "northwest", "The Closet in 32")
 world.activity.connect_rooms("The Closet in 32", "down", "The Batcave")

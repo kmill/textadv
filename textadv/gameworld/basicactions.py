@@ -534,7 +534,7 @@ def before_going_to_intermediate_walk(actor, x, ctxt) :
             raise AbortAction(str_with_objs("{Bob} {is} confused and {stops} trying to go to [get DefiniteName $x]", x=x),
                               actor=actor)
         elif nextloc != nextlocp : # uh-oh, we're off the charted path
-            print i, nextloc, nextlocp, path[i+1], path
+            #print i, nextloc, nextlocp, path[i+1], path
             if nextlocp != path[i+1] : # hmm, we didn't go through a door.
                 # we need to make a new path
                 raise DoInstead(GoingTo(actor, x), suppress_message=True)
@@ -620,7 +620,7 @@ class Entering(BasicAction) :
     gerund = "entering"
     numargs = 2
 parser.understand("enter [something x]", Entering(actor, X))
-parser.understand("get/go in/on/through [something x]", Entering(actor, X))
+parser.understand("get/go/stand/sit in/on/through [something x]", Entering(actor, X))
 
 require_xobj_visible(actionsystem, Entering(actor, X))
 
@@ -733,6 +733,14 @@ def report_entering_describe_contents(actor, x, ctxt) :
         ctxt.activity.describe_location(actor, x, vis_cont, disable=[describe_location_Heading, describe_location_Description])
         ctxt.world[Global("describe_location_ascend_locations")] = True
 
+@report(Entering(actor, X))
+def report_entering_locale_description(actor, x, ctxt) :
+    """Prints a room description if there is a LocaleDescription for
+    the enterable."""
+    if ctxt.world[LocaleDescription(x)] :
+        ctxt.write("[newline]")
+        ctxt.activity.describe_current_location(actor)
+
 @report(Entering(actor, X) <= IsA(X, "container"))
 def report_entering_container(actor, x, ctxt) :
     """Explains entering a container."""
@@ -742,7 +750,6 @@ def report_entering_container(actor, x, ctxt) :
 def report_entering_supporter(actor, x, ctxt) :
     """Explains entering a supporter."""
     ctxt.write(str_with_objs("{Bob|cap} {gets} on [the $x].", x=x), actor=actor)
-
 
 ##
 # Exiting

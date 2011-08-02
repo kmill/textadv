@@ -96,8 +96,12 @@ class PlayingStupidball(BasicAction) :
     numargs = 1
 parser.understand("play stupidball", PlayingStupidball(actor))
 
+@before(PlayingStupidball(actor))
+def before_stupidball_take_ex_ball(actor, ctxt) :
+    if not (actor == ctxt.world[Owner("ex_ball")] and ctxt.world[AccessibleTo("ex_ball", actor)]) :
+        ctxt.actionsystem.do_first(Taking(actor, "ex_ball"), ctxt, silently=True)
 @before(PlayingStupidball(actor) <= PNot(AccessibleTo(actor, "ex_ball")))
-def before_stupidball_need_ball(actor, ctxt) :
+def before_stupidball_need_ball_accessible(actor, ctxt) :
     raise AbortAction("{Bob} {doesn't} see anything around {him} with which {he} can play stupidball.", actor=actor)
 @when(PlayingStupidball(actor))
 def when_playing_stupidball(actor, ctxt) :
@@ -319,9 +323,10 @@ def before_eiting_chandelier(actor, ctxt) :
 def before_eiting_brokenchandelier(actor, ctxt) :
     raise AbortAction("The chandelier looks well eited already.")
 
-quickdef(world, "ex_ball", "thing", {
+quickdef(world, "ex_ball", "supporter", {
         Name : "large green exercise ball",
         Words : ["big", "large", "green", "exercise", "@ball"],
+        IsEnterable : True,
         Description : """This is a large green exercise ball that is
         used to play [ask stupidball]."""
         }, put_in="The Center Room")
@@ -642,7 +647,7 @@ quickdef(world, "33", "room", {
         hanging in the room, and a collection of [ob <bad ties>]."""
         })
 
-quickdef(world, "authentic Free Willy net", "container", {
+quickdef(world, "Free Willy net", "container", {
         Words : ["large", "red", "purple", "authentic", "Free", "Willy", "fishing", "@net"],
         IsEnterable : True,
         Scenery : True,
@@ -664,7 +669,11 @@ quickdef(world, "authentic Free Willy net", "container", {
         It's said that the net is limited by volume, and not weight.
         There was one time when there were over thirty people in the
         net at once!  It's also said that once you enter the net, you
-        never want to leave, so be careful."""
+        never want to leave, so be careful.""",
+        LocaleDescription : """Hanging near you right outside the net
+        is a collection of [ob <bad ties>].  Although you really don't
+        want to, since you're quite comfortable where you are, you can
+        [action <get out>] of the net."""
         }, put_in="33")
 
 quickdef(world, "bad tie collection", "thing", {

@@ -348,8 +348,11 @@ sessions_timer = {}
 sessions_lock = threading.Semaphore(1)
 
 if __name__ == "__main__":
+    port = 8888
+    if len(sys.argv) > 1 :
+        port = int(sys.argv[1])
     watchdog = WatchdogThread()
     watchdog.daemon = True
     watchdog.start()
-    application.listen(8888)
+    application.listen(port)
     tornado.ioloop.IOLoop.instance().start()

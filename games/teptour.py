@@ -219,14 +219,14 @@ quickdef(world, "The Center Room", "room", {
         like it has seen better days.  Looking up, you can see the
         skylight and the [ob <center stairwell>]. You can go [dir
         south] to the front room, [dir north] to the dining room, [dir
-        upstairs] to the second floor, [dir downstairs] to the
-        basement, or [dir southeast] back to the foyer."""
+        upstairs] to the second floor, [dir northeast] to the back
+        stairwell, or [dir southeast] back to the foyer."""
         })
 world[DirectionDescription("The Center Room", "up")] = "Looking up, you see the [ob <center stairwell>]."
 world.activity.connect_rooms("The Center Room", "up", "The Second Landing")
-world.activity.connect_rooms("The Center Room", "down", "Basement")
 world.activity.connect_rooms("The Center Room", "south", "The Front Room")
 world.activity.connect_rooms("The Center Room", "north", "The Dining Room")
+world.activity.connect_rooms("The Center Room", "northeast", "back_stairwell_1")
 
 quickdef(world, "chandelier", "thing", {
         Scenery : True,
@@ -263,7 +263,40 @@ quickdef(world, "The Front Room", "room", {
 ### Dining room
 ###
 
-quickdef(world, "The Dining Room", "room")
+quickdef(world, "The Dining Room", "room", {
+        Visited : True,
+        Description : """This is the dining room.  Where tEps eat.  To
+        the [dir south] is the center room, and to the [dir east] is
+        the upstairs kitchen."""
+        })
+world.activity.connect_rooms("The Dining Room", "east", "The Upstairs Kitchen")
+
+###
+### First floor of the back stairwell
+###
+
+quickdef(world, "back_stairwell_1", "room", {
+        Name : "First Floor of the Back Stairwell",
+        Visited : True,
+        Description : """You are in the back stairwell.  You can go
+        [dir upstairs] to the second floor, [dir southwest] to the
+        center room, [dir north] to the upstairs kitchen, or [dir
+        downstairs] into the basement."""
+        })
+
+world.activity.connect_rooms("back_stairwell_1", "down", "Basement")
+world.activity.connect_rooms("back_stairwell_1", "north", "The Upstairs Kitchen")
+world.activity.connect_rooms("back_stairwell_1", "up", "back_stairwell_2")
+
+###
+### Upstairs Kitchen
+###
+
+quickdef(world, "The Upstairs Kitchen", "room", {
+        Description : """This is the upstairs kitchen.  To the [dir
+        north] is the dining room, and to the [dir south] is the back
+        stairwell."""
+        })
 
 ####################
 ### Second floor ###
@@ -273,20 +306,28 @@ quickdef(world, "The Second Landing", "room", {
         Visited : True,
         Description : """[img 2nd_landing_small.jpg left]This is the
         second landing.  You can go [dir southeast] to 21, [dir south]
-        to 22, [dir north] to 23, [dir northeast] to 24, [dir
-        upstairs], and [dir downstairs].  The bathrooms are to the
-        [dir southwest] and [dir west]."""
+        to 22, [dir north] to 23, [dir northeast] to the back
+        stairwell, [dir upstairs], and [dir downstairs].  The
+        bathrooms are to the [dir southwest] and [dir west]."""
         })
 world.activity.connect_rooms("The Second Landing", "southeast", "21")
 world.activity.connect_rooms("The Second Landing", "south", "22")
 world.activity.connect_rooms("The Second Landing", "north", "23")
-world.activity.connect_rooms("The Second Landing", "northeast", "24")
+world.activity.connect_rooms("The Second Landing", "northeast", "back_stairwell_2")
 world.activity.connect_rooms("The Second Landing", "southwest", "Second Front")
 world.activity.connect_rooms("The Second Landing", "west", "Second Back")
 world.activity.connect_rooms("The Second Landing", "up", "The Third Landing")
 
-quickdef(world, "21", "room")
+###
+### 21
+###
+quickdef(world, "21", "room", {
+        Visited : True,
+        })
 
+###
+### 22
+###
 quickdef(world, "22", "room", {
         Visited : True,
         Description : """This is 22.  You can see some [ob
@@ -294,16 +335,31 @@ quickdef(world, "22", "room", {
         second landing."""
         })
 
-quickdef(world, "Closet in 22", "room", {
+quickdef(world, "22_lights", "thing", {
+        Name : "color-changing lights",
+        Scenery: True,
+        Description : """[img 22_lights_small.jpg left]Known as
+        "candyland," these are ethernet-controlled lights which can
+        cycle through colors or follow music for a lightshow."""
+        },
+         put_in="22")
+
+##
+## The Closet in 22
+##
+quickdef(world, "The Closet in 22", "room", {
         Description : """It's a closet.  You can go [dir southeast]
         into 22."""
         })
-world[DirectionDescription("Closet in 22", "up")] = """Looking up, you
+world[DirectionDescription("The Closet in 22", "up")] = """Looking up, you
 can see a ladder to a room above this closet."""
 
-world.activity.connect_rooms("22", "northwest", "Closet in 22")
-world.activity.connect_rooms("Closet in 22", "up", "The Batcave")
+world.activity.connect_rooms("22", "northwest", "The Closet in 22")
+world.activity.connect_rooms("The Closet in 22", "up", "The Batcave")
 
+###
+### The Batcave
+###
 quickdef(world, "The Batcave", "room", {
         Description : """This is one of the secret rooms of tEp.  It's
         a room built into the interstitial space between the second
@@ -315,8 +371,10 @@ quickdef(world, "The Batcave", "room", {
         You can go [dir down] to the closet in 22 or [dir up] to the
         closet in 32."""
         })
-world.activity.connect_rooms("The Batcave", "up", "Closet in 32")
+world.activity.connect_rooms("The Batcave", "up", "The Closet in 32")
 
+# the complexity is because I want the door to be different in each
+# room, and there's no support for this in the engine, yet.
 quickdef(world, "batcave_shelves", "door", {
         Name : """[if [== [get Location [current_actor_is]] <The
         Batcave>]]small shelves[else]small panel[endif]""",
@@ -337,18 +395,40 @@ quickdef(world, "batcave_shelves", "door", {
 world.activity.connect_rooms("The Batcave", "north", "batcave_shelves")
 world.activity.connect_rooms("batcave_shelves", "north", "2f_interstitial")
 
-quickdef(world, "22_lights", "thing", {
-        Name : "color-changing lights",
-        Scenery: True,
-        Description : """[img 22_lights_small.jpg left]Known as
-        "candyland," these are ethernet-controlled lights which can
-        cycle through colors or follow music for a lightshow."""
-        },
-         put_in="22")
+###
+### 23
+###
+quickdef(world, "23", "room", {
+        Visited : True,
+        })
 
-quickdef(world, "23", "room")
-quickdef(world, "24", "room")
+###
+### Second floor of the back stairwell
+###
 
+quickdef(world, "back_stairwell_2", "room", {
+        Name : "Second Floor of the Back Stairwell",
+        Visited : True,
+        Description : """You are in the back stairwell.  You can go
+        [dir upstairs] to the third floor, [dir southwest] to second
+        landing, [dir north] to 24, or [dir downstairs] to the first
+        floor."""
+        })
+
+world.activity.connect_rooms("back_stairwell_2", "down", "back_stairwell_1")
+world.activity.connect_rooms("back_stairwell_2", "north", "24")
+world.activity.connect_rooms("back_stairwell_2", "up", "back_stairwell_3")
+
+###
+### 24
+###
+quickdef(world, "24", "room", {
+        Visited : True,
+        })
+
+###
+### Second Front
+###
 quickdef(world, "Second Front", "room", {
         Description : """This is second front, a bathroom named for
         its presence on the second floor and closer to the front of
@@ -370,6 +450,9 @@ quickdef(world, "2f_ceiling_door", "door", {
 world.activity.connect_rooms("Second Front", "up", "2f_ceiling_door")
 world.activity.connect_rooms("2f_ceiling_door", "up", "2f_interstitial")
 
+###
+### The Second Front Interstitial Space
+###
 quickdef(world, "2f_interstitial", "room", {
         Name : "The Second Front Interstitial Space",
         Description : """This is the interstitial space above second
@@ -404,8 +487,8 @@ quickdef(world, "The Third Landing", "room", {
         Visited : True,
         Description : """[img 3rd_landing_small.jpg left]This is the
         third landing.  You can go [dir southeast] to 31, [dir south]
-        to 32, [dir north] to 33, [dir northeast] to 34, [dir
-        upstairs], and [dir downstairs]."""
+        to 32, [dir north] to 33, [dir northeast] to the back
+        stairwell, [dir upstairs], and [dir downstairs]."""
         })
 world.activity.connect_rooms("The Third Landing", "southeast", "31")
 world.activity.connect_rooms("The Third Landing", "south", "32")
@@ -413,24 +496,128 @@ world.activity.connect_rooms("The Third Landing", "north", "33")
 world.activity.connect_rooms("The Third Landing", "northeast", "34")
 world.activity.connect_rooms("The Third Landing", "up", "The Fourth Landing")
 
-quickdef(world, "31", "room")
+quickdef(world, "31", "room", {
+        Visited : True,
+        })
 
 quickdef(world, "32", "room", {
+        Visited : True,
         Description : """It's a room.  To the [dir northwest] is a
         closet, and you can go [dir north] to the third landing."""
         })
 
-quickdef(world, "Closet in 32", "room", {
+quickdef(world, "The Closet in 32", "room", {
         Description : """It's a closet.  You can go [dir southeast] into 32."""
         })
-world[DirectionDescription("Closet in 32", "down")] = """Looking down,
+world[DirectionDescription("The Closet in 32", "down")] = """Looking down,
 you can see a passageway into a room below this closet."""
 
-world.activity.connect_rooms("32", "northwest", "Closet in 32")
-world.activity.connect_rooms("Closet in 32", "down", "The Batcave")
+world.activity.connect_rooms("32", "northwest", "The Closet in 32")
+world.activity.connect_rooms("The Closet in 32", "down", "The Batcave")
 
-quickdef(world, "33", "room")
-quickdef(world, "34", "room")
+quickdef(world, "33", "room", {
+        Visited : True,
+        Description : """This is a room.  You see a [ob <large net>]
+        hanging in the room, and a collection of [ob <bad ties>]."""
+        })
+
+quickdef(world, "authentic Free Willy net", "container", {
+        Words : ["large", "red", "purple", "authentic", "Free", "Willy", "fishing", "@net"],
+        IsEnterable : True,
+        Scenery : True,
+        Description : """This large fishing net is one of the nets
+        from the movie Free Willy.  It was purchased on eBay for about
+        two-hundred twenty-two dollars some time ago, and installed in
+        this room at the advice of a fisherman over at the wharf.
+        There was a failed attempt to die the net purple, and it ended
+        up being a reddish color instead.
+        [newline]
+        While this net was from the production of Free Willy, it never
+        actually touched the whale; rather, it was the spare.  When
+        the idea of buying the net came up at a house meeting, the
+        house vegans were outraged at the idea of putting a net that
+        touched the whale in the house.  That, and the fact that the
+        spare net was much cheaper than the primary net, led to this
+        net hanging in 33.
+        [newline]
+        It's said that the net is limited by volume, and not weight.
+        There was one time when there were over thirty people in the
+        net at once!  It's also said that once you enter the net, you
+        never want to leave, so be careful."""
+        }, put_in="33")
+
+quickdef(world, "bad tie collection", "thing", {
+        Words : ["bad", "tie", "ties", "collection"],
+        Scenery : True,
+        Description : """This is a collection of many remarkably bad
+        ties.  They've been used successfully for a couple of Google
+        interviews to land tEps jobs."""
+        }, put_in="33")
+
+
+###
+### Third floor of the back stairwell
+###
+
+quickdef(world, "back_stairwell_3", "room", {
+        Name : "Third Floor of the Back Stairwell",
+        Visited : True,
+        Description : """You are in the back stairwell.  You can go
+        [dir upstairs] to the fourth floor, [dir southwest] to third
+        landing, [dir north] to 34, or [dir downstairs] to the second
+        floor."""
+        })
+world[DirectionDescription("back_stairwell_3", "east")] = """Looking
+[dir east], you see a [ob <closet door> door] into a closet."""
+
+world.activity.connect_rooms("back_stairwell_3", "down", "back_stairwell_2")
+world.activity.connect_rooms("back_stairwell_3", "north", "34")
+world.activity.connect_rooms("back_stairwell_3", "up", "back_stairwell_4")
+
+quickdef(world, "34", "room", {
+        Visited : True,
+        })
+
+###
+### Porn closet
+###
+quickdef(world, "porn_closet_door", "door", {
+        Name : "closet door",
+        Reported : False,
+        Description : """It's a wooden door, around which are dinosaur
+        figures possibly depicting various sexual positions.  It is
+        currently [get IsOpenMsg porn_closet_door]."""
+        })
+world.activity.connect_rooms("back_stairwell_3", "east", "porn_closet_door")
+world.activity.connect_rooms("porn_closet_door", "east", "The Porn Closet")
+
+quickdef(world, "The Porn Closet", "room", {
+        Description : """This is a closet full of study materials for
+        introductory classes at MIT.  There is surprisingly little
+        porn in this closet."""
+        })
+world[DirectionDescription("The Porn Closet", "up")] = """There's a
+[ob ladder] going up."""
+world[DirectionDescription("The Porn Closet", "north")] = """You see a
+[ob ladder] here going up."""
+world.activity.connect_rooms("The Porn Closet", "up", "porn_closet_ladder")
+
+quickdef(world, "porn_closet_ladder", "door", {
+        Name : "wood ladder",
+        Reported : False,
+        Description : """This is a ladder going from the porn closet
+        [dir up] into the reading room."""
+        })
+world.activity.connect_rooms("porn_closet_ladder", "up", "The Reading Room")
+
+###
+### The Reading Room
+###
+quickdef(world, "The Reading Room", "room", {
+        Description : """This is the reading room, a secret room of
+        tEp.  You can go back [dir down] [ob <the ladder>] to the porn
+        closet."""
+        })
 
 ####################
 ### Fourth floor ###
@@ -438,21 +625,49 @@ quickdef(world, "34", "room")
 
 quickdef(world, "The Fourth Landing", "room", {
         Visited : True,
-        Description : """[img 4th_landing_small.jpg]This is the
-        fourth landing.  You can go [dir southeast] to 41, [dir south]
-        to 42, [dir north] to 43, [dir northeast] to 44, [dir
-        upstairs], and [dir downstairs]."""
+        Description : """[img 4th_landing_small.jpg]This is the fourth
+        landing.  You can go [dir southeast] to 41, [dir south] to 42,
+        [dir north] to 43, [dir northeast] to the back stairwell, and
+        [dir downstairs]."""
         })
 world.activity.connect_rooms("The Fourth Landing", "southeast", "41")
 world.activity.connect_rooms("The Fourth Landing", "south", "42")
 world.activity.connect_rooms("The Fourth Landing", "north", "43")
-world.activity.connect_rooms("The Fourth Landing", "northeast", "44")
-world.activity.connect_rooms("The Fourth Landing", "up", "The Fifth Landing")
+world.activity.connect_rooms("The Fourth Landing", "northeast", "back_stairwell_4")
+world[NoGoMessage("The Fourth Landing", "up")] = """There aren't any
+more stairs up from here.  You'll have to first go [dir northeast] to
+the back stairwell."""
 
-quickdef(world, "41", "room")
-quickdef(world, "42", "room")
-quickdef(world, "43", "room")
-quickdef(world, "44", "room")
+quickdef(world, "41", "room", {
+        Visited : True,
+        })
+quickdef(world, "42", "room", {
+        Visited : True,
+        })
+quickdef(world, "43", "room", {
+        Visited : True,
+        })
+
+###
+### Third floor of the back stairwell
+###
+
+quickdef(world, "back_stairwell_4", "room", {
+        Name : "Fourth Floor of the Back Stairwell",
+        Visited : True,
+        Description : """You are in the back stairwell.  You can go
+        [dir upstairs] to the fifth floor, [dir southwest] to fourth
+        landing, [dir north] to 44, or [dir downstairs] to the third
+        floor."""
+        })
+
+world.activity.connect_rooms("back_stairwell_4", "down", "back_stairwell_3")
+world.activity.connect_rooms("back_stairwell_4", "north", "44")
+world.activity.connect_rooms("back_stairwell_4", "up", "The Fifth Landing")
+
+quickdef(world, "44", "room", {
+        Visited : True,
+        })
 
 ###################
 ### Fifth floor ###
@@ -471,10 +686,18 @@ world.activity.connect_rooms("The Fifth Landing", "northwest", "53")
 world.activity.connect_rooms("The Fifth Landing", "north", "54")
 world.activity.connect_rooms("The Fifth Landing", "northeast", "55")
 
-quickdef(world, "51", "room")
-quickdef(world, "53", "room")
-quickdef(world, "54", "room")
-quickdef(world, "55", "room")
+quickdef(world, "51", "room", {
+        Visited : True,
+        })
+quickdef(world, "53", "room", {
+        Visited : True,
+        })
+quickdef(world, "54", "room", {
+        Visited : True,
+        })
+quickdef(world, "55", "room", {
+        Visited : True,
+        })
 
 quickdef(world, "The Study Room", "room", {
         Visited : True,

@@ -468,13 +468,19 @@ class GoingTo(BasicAction) :
     verb = "go to"
     gerund = "going to"
     numargs = 2
+    def gerund_form(self, ctxt) :
+        return "going to %s" % str_with_objs("[get DefiniteName $x]", x=self.get_do())
+    def infinitive_form(self, ctxt) :
+        return "go to %s" % str_with_objs("[get DefiniteName $x]", x=self.get_do())
 parser.understand("go to [somewhere x]", GoingTo(actor, X))
 parser.understand("goto [somewhere x]", GoingTo(actor, X))
 
 @verify(GoingTo(actor, X))
 def verify_going_default(actor, x, ctxt) :
     """It's not logical to go somewhere one hasn't visited or doesn't know about."""
-    if ctxt.world[Visited(x)] :
+    if x == ctxt.world[ContainingRoom(actor)] :
+        return IllogicalOperation(as_actor("{Bob} {is} already there.", actor=actor))
+    elif ctxt.world[Visited(x)] :
         return LogicalOperation()
     else :
         adjacent = ctxt.world.query_relation(Adjacent(x, Y), var=Y)
@@ -497,8 +503,6 @@ def before_going_to_intermediate_walk(actor, x, ctxt) :
             return True
         else :
             return False
-    if x == ctxt.world[ContainingRoom(actor)] :
-        raise AbortAction("{Bob} {is} already there.", actor=actor)
     path = ctxt.world.r_path_to(Adjacent, ctxt.world[ContainingRoom(actor)], x,
                                 predicate=is_going_to_able)
     if not path :
@@ -556,6 +560,9 @@ parser.understand("enter [somewhere x]", GoingInto(actor, X))
 @verify(GoingInto(actor, X))
 def verify_going_into_nearby(actor, x, ctxt) :
     """Makes sure that the thing to be entered is nearby."""
+    if x == ctxt.world[ContainingRoom(actor)] :
+        return IllogicalOperation(as_actor("{Bob} {is} already there.", actor=actor))
+    
     def is_going_into_able(a) :
         """Something is going-into-able if it is a door, if it is
         actually visited, or if it is the destination (we want to make
@@ -567,17 +574,17 @@ def verify_going_into_nearby(actor, x, ctxt) :
         else :
             return False
     if not ctxt.world[Visited(x)] :
-        return IllogicalNotVisible("{Bob} {knows} of no such place.", actor=actor)
+        return IllogicalNotVisible(as_actor("{Bob} {doesn't} see that place around here.", actor=actor))
     currloc = ctxt.world[ContainingRoom(actor)]
     path = ctxt.world.r_path_to(Adjacent, currloc, x,
                                 predicate=is_going_into_able)
     if not path :
-        return IllogicalNotVisible("{Bob} can't get there from here.", actor=actor)
+        return IllogicalNotVisible(as_actor("{Bob} can't get there from here.", actor=actor))
     dest = path[1]
     if ctxt.world[IsA(path[1], "door")] :
         dest = path[2]
     if dest != x :
-        return IllogicalNotVisible("{Bob} can't get there from here.", actor=actor)
+        return IllogicalNotVisible(as_actor("{Bob} can't get there from here.", actor=actor))
 
 
 @before(GoingInto(actor, X))

@@ -224,6 +224,7 @@ class Examining(BasicAction) :
     gerund = "examining"
     numargs = 2
 parser.understand("examine/x/read [something x]", Examining(actor, X))
+parser.understand("look at [something x]", Examining(actor, X))
 
 require_xobj_visible(actionsystem, Examining(actor, X))
 
@@ -240,7 +241,7 @@ class Taking(BasicAction) :
     verb = "take"
     gerund = "taking"
     numargs = 2
-parser.understand("take/get [something x]", Taking(actor, X))
+parser.understand("take/get/pickup [something x]", Taking(actor, X))
 parser.understand("pick up [something x]", Taking(actor, X))
 
 require_xobj_accessible(actionsystem, Taking(actor, X))
@@ -1738,6 +1739,23 @@ parser.understand("jump", Jumping(actor))
 def report_jumping_default(actor, ctxt) :
     """Reports a default message."""
     ctxt.write("{Bob} {jumps} in place.", actor=actor)
+
+
+##
+# Greeting
+##
+
+class Greeting(BasicAction) :
+    """Greeting(actor) for the actor saying hi."""
+    verb = "greet"
+    gerund = "greeting"
+    numargs = 1
+parser.understand("greet/hi/hello", Greeting(actor))
+
+@report(Greeting(actor))
+def report_greeting_default(actor, ctxt) :
+    """Reports a default message."""
+    ctxt.write("{Bob} {says} 'hi'.", actor=actor)
 
 
 ##

@@ -64,6 +64,8 @@ define_direction("northeast", ["northeast", "ne"])
 define_direction("southeast", ["southeast", "se"])
 define_direction("up", ["up", "u"])
 define_direction("down", ["down", "d"])
+define_direction("in", ["in"])
+define_direction("out", ["out"])
 
 
 ###

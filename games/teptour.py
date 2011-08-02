@@ -54,13 +54,71 @@ def _str_eval_img(eval, act, ctxt, *obs) :
     return ["<img class=\""+css_class+"\" width=\""+str(width)+"\" height=\""+str(height)+"\" src=\"teptour/"+filename+"\">"]
 
 ###
+### Eiting
+###
+
+class Eiting(BasicAction) :
+    """Eiting(actor, x) for the actor eiting x."""
+    verb = "eit"
+    gerund = "eiting"
+    numargs = 2
+parser.understand("eit [something x]", Eiting(actor, X))
+
+require_xobj_accessible(actionsystem, Eiting(actor, X))
+
+@before(Eiting(actor, X))
+def before_eiting_default(actor, x, ctxt) :
+    raise AbortAction("{Bob} {doesn't} think it would be wise to eit that.", actor=actor)
+
+
+class EitingWith(BasicAction) :
+    """EitingWith(actor, x, y) for the actor eiting x with y."""
+    verb = ("eit", "with")
+    gerund = ("eiting", "with")
+    numargs = 3
+parser.understand("eit [something x] with [something y]", EitingWith(actor, X, Y))
+
+require_xobj_accessible(actionsystem, EitingWith(actor, X, Y))
+require_xobj_held(actionsystem, EitingWith(actor, Z, X))
+
+@before(EitingWith(actor, X, Y))
+def before_eiting_default(actor, x, y, ctxt) :
+    raise AbortAction(str_with_objs("{Bob} {doesn't} think it would be wise to eit [the $x] that.", x=x),
+                      actor=actor)
+
+###
+### Playing stupidball
+###
+
+class PlayingStupidball(BasicAction) :
+    verb = "play stupidball"
+    gerund = "playing stupidball"
+    numargs = 1
+parser.understand("play stupidball", PlayingStupidball(actor))
+
+@before(PlayingStupidball(actor) <= PNot(AccessibleTo(actor, "ex_ball")))
+def before_stupidball_need_ball(actor, ctxt) :
+    raise AbortAction("{Bob} {doesn't} see anything around {him} with which {he} can play stupidball.", actor=actor)
+@when(PlayingStupidball(actor))
+def when_playing_stupidball(actor, ctxt) :
+    ctxt.world.activity.put_in("ex_ball", ctxt.world[Location(actor)])
+@report(PlayingStupidball(actor))
+def report_playing_stupidball(actor, ctxt) :
+    ctxt.write("""A couple of teps come out to join you as you throw
+    [the ex_ball] around the room, and you nearly break a couple of
+    things as the ball whizzes through the air at high velocities.
+    After much merriment, you all get bored of the game, and put the
+    ball down.""")
+
+###
 ### Irving Q. Tep
 ###
 
-world.activity.put_in("player", "253 Commonwealth Ave.")
+world.activity.put_in("player", "253 Commonwealth Ave")
 
 parser.understand("upstairs", "up", dest="direction")
 parser.understand("downstairs", "down", dest="direction")
+parser.understand("inside", "in", dest="direction")
 
 quickdef(world, "Irving Q. Tep", "person", {
         Gender : "male",
@@ -85,7 +143,7 @@ def _str_eval_ob(eval, act, ctxt, *obs) :
     else :
         topic = obs[0]
         text = obs[1]
-    return [make_action_link(text, "ask Irving Q. Tep about "+topic)]
+    return [make_action_link(text[0], "ask Irving Q. Tep about "+topic[0])]
 
 # See section "Consulting Irving Q. Tep..." for adding things one can
 # ask him about
@@ -114,10 +172,10 @@ quickdef(world, "The Bike Room", "room")
 ###################
 
 ###
-### In front of tep (253 Commonwealth Ave.)
+### In front of tep (253 Commonwealth Ave)
 ###
 
-quickdef(world, "253 Commonwealth Ave.", "room", {
+quickdef(world, "253 Commonwealth Ave", "room", {
         Description : """[img front_small.jpg left]You are standing
         outside the illustrious Tau Epsilon Phi (Xi chapter), the
         veritable purple palace.  It is a hundred-year-old brownstone
@@ -132,7 +190,7 @@ quickdef(world, "purple tree", "thing", {
         only purple tree along the entire avenue.  It's very
         purple."""
         },
-         put_in="253 Commonwealth Ave.")
+         put_in="253 Commonwealth Ave")
 
 quickdef(world, "park bench", "supporter", {
         Scenery : True,
@@ -141,7 +199,7 @@ quickdef(world, "park bench", "supporter", {
         park bench wrought from steel, built by a previous tEp.  After
         a few years of use, it's been bent quite out of whack."""
         },
-         put_in="253 Commonwealth Ave.")
+         put_in="253 Commonwealth Ave")
 parser.understand("sit on [object park bench]", Entering(actor, "park bench"))
 
 @report(Entering(actor, "park bench"))
@@ -157,8 +215,12 @@ quickdef(world, "front door", "door", {
         can see blinking LED lights hanging from the stairwell."""
         })
 world[NoLockMessages("front door", "no_open")] = "It's locked.  Perhaps you should ring the [ob doorbell]."
-world.activity.connect_rooms("253 Commonwealth Ave.", "north", "front door")
+world.activity.connect_rooms("253 Commonwealth Ave", "north", "front door")
 world.activity.connect_rooms("front door", "northwest", "The Foyer")
+
+@before(Going(actor, "in") <= PEquals(ContainingRoom(actor), "253 Commonwealth Ave"))
+def rewrite_going_in_tep(actor, ctxt) :
+    raise DoInstead(Going(actor, "north"), suppress_message=True)
 
 quickdef(world, "doorbell", "thing", {
         Words : ["@doorbell", "door", "@bell"],
@@ -167,7 +229,7 @@ quickdef(world, "doorbell", "thing", {
         didn't notice it.  It turns out the FedEx guy enjoys this
         doorbell."""
         },
-         put_in="253 Commonwealth Ave.")
+         put_in="253 Commonwealth Ave")
 parser.understand("ring [object doorbell]", Pushing(actor, "doorbell"))
 
 @before(Pushing(actor, "doorbell"))
@@ -184,7 +246,7 @@ def report_pushing_doorbell(actor, ctxt) :
     virtual house tour from [ob <Irving Q. Tep>]," he says.  "Those
     are really good."  Before running off, he brings you to...[break]""")
 
-@before(Going(actor, "north") <= PEquals("253 Commonwealth Ave.", Location(actor)))
+@before(Going(actor, "north") <= PEquals("253 Commonwealth Ave", Location(actor)))
 def ring_doorbell_instead(actor, ctxt) :
     ctxt.write("The door is locked.  Looking around the door, you find a doorbell, and you ring that instead.[newline]")
     raise DoInstead(Pushing(actor, "doorbell"), suppress_message=True)
@@ -238,6 +300,53 @@ quickdef(world, "chandelier", "thing", {
         a sight to see."""
         },
          put_in="The Center Room")
+
+quickdef(world, "broken chandelier", "thing", {
+        Scenery : True,
+        Description : """This chandelier, which is affixed to the
+        center of the ceiling, has been [ask eited], and now half of
+        the lights don't work any more.  Good job."""
+        })
+quickdef(world, "broken sconce", "thing", {
+        Description : """It's half a sconce that fell from the [ask
+        eit eiting] of the [ob chandelier]."""
+        })
+
+@before(Eiting(actor, "chandelier"))
+def before_eiting_chandelier(actor, ctxt) :
+    raise AbortAction("The chandelier is too high up for you to eit it.")
+@before(Eiting(actor, "broken chandelier"))
+def before_eiting_brokenchandelier(actor, ctxt) :
+    raise AbortAction("The chandelier looks well eited already.")
+
+quickdef(world, "ex_ball", "thing", {
+        Name : "large green exercise ball",
+        Words : ["big", "large", "green", "exercise", "@ball"],
+        Description : """This is a large green exercise ball that is
+        used to play [ask stupidball]."""
+        }, put_in="The Center Room")
+@report(Dropping(actor, "ex_ball"))
+def report_dropping_ball(actor, ctxt) :
+    ctxt.write("It bounces a few times before it settles down.")
+
+@before(EitingWith(actor, "chandelier", "ex_ball"))
+def before_eiting_chandelier_with_stupidball(actor, ctxt) :
+    raise ActionHandled()
+@when(EitingWith(actor, "chandelier", "ex_ball"))
+def when_eiting_chandelier_with_stupidball(actor, ctxt) :
+    ctxt.world.activity.remove_obj("chandelier")
+    ctxt.world.activity.put_in("broken chandelier", "The Center Room")
+    ctxt.world.activity.put_in("broken sconce", "The Center Room")
+@report(EitingWith(actor, "chandelier", "ex_ball"))
+def report_eiting_chandelier(actor, ctxt) :
+    ctxt.write("""Good plan.  You kick the large green exercise ball
+    at high velocity into the chandelier, and half the sconces explode
+    in a showering display of broken glass, one of which falls to the
+    ground.  There didn't need to be that much light in this room,
+    anyway.""")
+@before(EitingWith(actor, "broken chandelier", Y))
+def before_eitingwith_brokenchandelier(actor, y, ctxt) :
+    raise AbortAction("The chandelier looks well eited already.")
 
 quickdef(world, "center stairwell", "thing", {
         Scenery : True,
@@ -711,7 +820,7 @@ quickdef(world, "The Poop Deck", "room", {
         Visited : True,
         Description : """This is the roof deck immediately outside the
         study room.  From here you can see a nice view of the mall
-        (which is the grassy area along Commonwealth Ave.).  You can
+        (which is the grassy area along Commonwealth Ave).  You can
         go [dir south] back into the study room, or [dir up] to the
         roof."""
         })

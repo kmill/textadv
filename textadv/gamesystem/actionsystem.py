@@ -168,6 +168,11 @@ class ActionSystem(object) :
         newat.action_before = self.action_before.copy()
         newat.action_when = self.action_when.copy()
         newat.action_report = self.action_report.copy()
+        newat.verify = make_rule_decorator(newat.action_verify)
+        newat.trybefore = make_rule_decorator(newat.action_trybefore)
+        newat.before = make_rule_decorator(newat.action_before)
+        newat.when = make_rule_decorator(newat.action_when)
+        newat.report = make_rule_decorator(newat.action_report)
         return newat
     def make_documentation(self, escape, heading_level=1) :
         hls = str(heading_level)

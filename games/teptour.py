@@ -95,6 +95,7 @@ class PlayingStupidball(BasicAction) :
     gerund = "playing stupidball"
     numargs = 1
 parser.understand("play stupidball", PlayingStupidball(actor))
+parser.understand("kick/throw [object ex_ball]", PlayingStupidball(actor))
 
 @before(PlayingStupidball(actor))
 def before_stupidball_take_ex_ball(actor, ctxt) :
@@ -108,7 +109,7 @@ def when_playing_stupidball(actor, ctxt) :
     ctxt.world.activity.put_in("ex_ball", ctxt.world[Location(actor)])
 @report(PlayingStupidball(actor))
 def report_playing_stupidball(actor, ctxt) :
-    ctxt.write("""A couple of teps come out to join you as you throw
+    ctxt.write("""A couple of teps come out to join you as you kick
     [the ex_ball] around the room, and you nearly break a couple of
     things as the ball whizzes through the air at high velocities.
     After much merriment, you all get bored of the game, and put the
@@ -354,14 +355,56 @@ def report_eiting_chandelier(actor, ctxt) :
 def before_eitingwith_brokenchandelier(actor, y, ctxt) :
     raise AbortAction("The chandelier looks well eited already.")
 
-quickdef(world, "center stairwell", "thing", {
-        Scenery : True,
+@report(Jumping(actor) <= PEquals("ex_ball", Location(actor)))
+def report_jumping_when_on_ball(actor, ctxt) :
+    ctxt.write("""You hop around on the ball awhile, and you surprise
+    yourself with your skill.""")
+    raise ActionHandled()
+
+parser.understand("drop/throw [something x] down/into [object center stairwell]", InsertingInto(actor, X, "center stairwell"))
+@trybefore(InsertingInto(actor, X, "center stairwell") <= PEquals(actor, X))
+def override_trybefore_drop_self_down_stairwell(actor, x, ctxt) :
+    raise ActionHandled()
+@before(InsertingInto(actor, X, "center stairwell") <= AccessibleTo("center stairwell", actor))
+def before_insertinginto_stairwell(actor, x, ctxt) :
+    if ctxt.world[Contains("r_center_stairs", ctxt.world[ContainingRoom(actor)])] :
+        if x == actor :
+            raise AbortAction("The RA comes out and stops {bob},\
+            \"remember the zeroth [ask <rules of tep> <rule of tep>]! Don't die!\"", actor=actor)
+        else :
+            raise ActionHandled()
+    else :
+        raise AbortAction("""{Bob} {needs} to go to a higher floor to
+        drop anything down the center stairwell.""", actor=actor)
+@when(InsertingInto(actor, X, "center stairwell"))
+def when_insertinginto_stairwell(actor, x, ctxt) :
+    ctxt.world.activity.put_in(x, "The Center Room")
+    raise ActionHandled()
+@report(InsertingInto(actor, X, "center stairwell"))
+def report_dropping_down_stairwell(actor, x, ctxt) :
+    ctxt.write(str_with_objs("\"[cap [get Name $x]] drop!!!\" {bob} {yells} down\
+    the stairwell, as {he} {drops} [the $x] down into the center room, where [he $x] then\
+    bounces and makes a large ruckus before finally settling down.", x=x), actor=actor)
+    raise ActionHandled()
+
+###
+### Center stairwell region
+###
+
+quickdef(world, "r_center_stairs", "region", {
+        Name : "center stairwell region",
+        })
+world.activity.put_in("The Second Landing", "r_center_stairs")
+world.activity.put_in("The Third Landing", "r_center_stairs")
+world.activity.put_in("The Fourth Landing", "r_center_stairs")
+
+quickdef(world, "center stairwell", "backdrop", {
         Description : """[img center_stairwell_small.jpg left]The
         center stairwell is three flights of stairs, capped by a
         skylight. The color-changing lights illuminate it
-        dramatically."""
-        },
-         put_in="The Center Room")
+        dramatically.""",
+        BackdropLocations : ["The Center Room", "r_center_stairs"]
+        })
 
 ###
 ### Front room
@@ -842,7 +885,7 @@ quickdef(world, "The Poop Deck", "room", {
         Description : """This is the roof deck immediately outside the
         study room.  From here you can see a nice view of the mall
         (which is the grassy area along Commonwealth Ave).  You can
-        go [dir south] back into the study room, or [dir up] to the
+        go [dir north] back into the study room, or [dir up] to the
         roof."""
         })
 world.activity.connect_rooms("The Poop Deck", "up", "The Roof")
@@ -965,7 +1008,7 @@ quickdef(world, "lore: eit", "lore", {
 
 quickdef(world, "lore: rules of tep", "lore", {
         Name : "rules of tEp",
-        Words : ["rules", "of", "tep", "@rules"],
+        Words : ["rule", "rules", "of", "tep", "@rules"],
         Description : """The rules of tEp are threefold:[break]
         0. Don't die;[break]
         1. Hobart is not a dishwasher;[break]

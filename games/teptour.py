@@ -694,30 +694,41 @@ quickdef(world, "Free Willy net", "container", {
         Words : ["large", "red", "purple", "authentic", "Free", "Willy", "fishing", "@net"],
         IsEnterable : True,
         Scenery : True,
-        Description : """This large fishing net is one of the nets
-        from the movie Free Willy.  It was purchased on eBay for about
-        two-hundred twenty-two dollars some time ago, and installed in
-        this room at the advice of a fisherman over at the wharf.
-        There was a failed attempt to die the net purple, and it ended
-        up being a reddish color instead.
-        [newline]
-        While this net was from the production of Free Willy, it never
-        actually touched the whale; rather, it was the spare.  When
-        the idea of buying the net came up at a house meeting, the
-        house vegans were outraged at the idea of putting a net that
-        touched the whale in the house.  That, and the fact that the
-        spare net was much cheaper than the primary net, led to this
-        net hanging in 33.
-        [newline]
-        It's said that the net is limited by volume, and not weight.
-        There was one time when there were over thirty people in the
-        net at once!  It's also said that once you enter the net, you
-        never want to leave, so be careful.""",
+        Description : """This large fishing net is from the movie Free
+        Willy.  It was purchased on eBay with a bid of exactly
+        two-hundred twenty-two dollars and forty-seven cents some time
+        ago from a stagehand who took the net home as a collectable
+        (likely overestimating its eventual value).  There was a
+        failed attempt to die the net purple, and it ended up being a
+        reddish color instead.
+
+        [newline]While this net was from the production of Free Willy,
+        it never actually touched the whale; rather, it was the
+        spare. When the idea of buying the net came up at a house
+        meeting, the house vegans were outraged at the idea of
+        installing a net that had imprisoned an animal, shouting
+        "Immanentize the eschaton!" (we're still not sure what they
+        meant). That and the fact that the spare net was much cheaper
+        than the primary net led to the net now hanging in 33.
+
+        [newline]The net has proven through robust scientifical
+        testing to be limited by volume and not weight. There was one
+        time when there were over thirty people in the net
+        simultaneously!  It's been said that once you enter the net,
+        you never want to leave, so be careful.""",
         LocaleDescription : """Hanging near you right outside the net
         is a collection of [ob <bad ties>].  Although you really don't
         want to, since you're quite comfortable where you are, you can
         [action <get out>] of the net."""
         }, put_in="33")
+
+# alternative middle paragraph:
+# # While this net was from the production of Free Willy,
+#         it never actually touched the whale; rather, it was the spare.
+#         When the idea of buying a net that touched a whale came up at
+#         a house meeting, the house vegans were outraged.  That, and
+#         the fact that the spare net was much cheaper than the primary
+#         net led to this net hanging in 33.
 
 quickdef(world, "bad tie collection", "thing", {
         Words : ["bad", "tie", "ties", "collection"],

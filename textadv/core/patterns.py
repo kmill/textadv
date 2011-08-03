@@ -19,10 +19,24 @@ class NoMatchException(Exception) :
     pass
 
 ###
+### Metaclass
+###
+
+class ClassHashByName(type) :
+    def __hash__(self) :
+        return hash("ClassHashByName "+self.__name__)
+    def __eq__(self, b) :
+        return self.__name__ == b.__name__
+    def __ne__(self, b) :
+        return self.__name__ != b.__name__
+
+
+###
 ### Patterns
 ###
 
 class AbstractPattern(object) :
+    __metaclass__ = ClassHashByName
     def __init__(self) :
         raise NotImplementedError("AbstractPattern is abstract (no __init__)")
     def match(self, input, matches=None, data=None) :
@@ -82,7 +96,7 @@ class BasicPattern(AbstractPattern) :
         self.args = args
     def match(self, input, matches=None, data=None) :
         if matches == None : matches = dict()
-        if self.__class__ is not input.__class__ :
+        if type(self) != type(input) :
             raise NoMatchException(self, input)
         if len(self.args) != len(input.args) :
             raise NoMatchException(self, input)
@@ -109,6 +123,8 @@ class BasicPattern(AbstractPattern) :
         return "%s(%s)" % (self.__class__.__name__, ",".join(repr(a) for a in self.args))
     def __eq__(self, other) :
         return type(other) == type(self) and self.args == other.args
+    def __hash__(self) :
+        return hash("BasicPattern "+self.__repr__())
 
 class PatternRequires(AbstractPattern) :
     def __init__(self, pattern, support) :

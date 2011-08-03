@@ -90,7 +90,8 @@ class PropertyTable(object) :
             return f
         return __handler
     def dump(self) :
-        for props in self.properties.itervalues() :
+        for filed_under, props in self.properties.iteritems() :
+            print "hash of",filed_under,"is",hash(filed_under)
             for item, value, call in props :
                 if call :
                     print repr(item)+" calls "+repr(value)

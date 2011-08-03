@@ -872,8 +872,9 @@ def when_GettingOff_default(event, actor, ctxt) :
 def report_GettingOff_default(event, actor, ctxt) :
     """Describes what happened, and describes the new location (if the actor is the actor of the context)."""
     ctxt.write(str_with_objs("{Bob|cap} {gets} off of [the $z].", z=event.get_off_from), actor=actor)
-    if actor == ctxt.actor :
-        ctxt.activity.describe_current_location(actor)
+    #if actor == ctxt.actor :
+    #    ctxt.write("[newline]")
+    #    ctxt.activity.describe_current_location(actor)
 
 
 ##

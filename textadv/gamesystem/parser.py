@@ -284,7 +284,7 @@ class Parser(object) :
                 subparsers = dict()
                 for part in subobjects :
                     if type(part) is Matched :
-                        score += part.score
+                        score += part.score # score is accumulation of all subscores
                         if part.var :
                             matches[part.var] = part.value
                             if part.subparser == "action" :
@@ -310,8 +310,8 @@ class Parser(object) :
             return out
 
     def transform_text_to_words(self, text) :
-        text = text.replace(",", " , ")
-        return text.split()
+        text = text.replace(",", " , ").replace("?", " ? ")
+        return text.strip().split()
 
     def handle_all(self, input, ctxt, action_verifier) :
         words = self.transform_text_to_words(input)
@@ -322,6 +322,7 @@ class Parser(object) :
         if not results :
             # then maybe we didn't know one of the words
             for word in words :
+                word = word.lower()
                 if word not in self.KNOWN_WORDS and not self.__is_word_for_thing(word) :
                     raise NoSuchWord(word)
             raise NoUnderstand()

@@ -118,6 +118,7 @@ class ActorContext(GameContext) :
         newstuff = [self.stringeval.eval_str(s, self) for s in stuff]
         self.io.write(*newstuff)
     def run(self, input=None, action=None) :
+        self.world.set_property("Global", "inhibit_location_description_when_moved", value=False)
         if not self.world.get_property("Global", "game_started") :
             self.activity.start_game()
             self.io.set_status_var("headline", self.stringeval.eval_str(self.activity.make_current_location_headline(self.actor), self))
@@ -138,6 +139,7 @@ class ActorContext(GameContext) :
                     else :
                         self.actionsystem.run_action(action, self)
                 except AbortAction as ab :
+                    self.world.set_property("Global", "inhibit_location_description_when_moved", value=True)
                     if len(ab.args) > 0 : # the AbortAction may contain a message
                         self.write(*ab.args, **ab.kwargs)
                 if self.world.get_property("Global", "end_game_message") :
@@ -182,7 +184,7 @@ class DisambiguationContext(GameContext) :
         self.parent = parent
         self.amb = amb
     def run(self) :
-        repl = dict()
+        repla = dict()
         if len(self.amb.options) > 1 :
             self.parent.write("I'm a bit confused by what you meant in a couple of places.")
         for var, opts in self.amb.options.iteritems() :
@@ -197,9 +199,9 @@ class DisambiguationContext(GameContext) :
             if len(res) == 0 : # let the parent parse it instead.
                 return (self.parent, {"input" : input})
             elif len(res) == 1 :
-                repl[var] = res[0][0].value
+                repla[var] = res[0][0].value
             else :
                 self.parent.write("That didn't help me out at all.")
                 return (self.parent, dict())
-        return (self.parent, {"action" : self.amb.pattern.expand_pattern(repl)})
+        return (self.parent, {"action" : self.amb.pattern.expand_pattern(repla)})
 

@@ -77,16 +77,20 @@ def act_player_has_moved_update_backdrops(ctxt) :
     current_location = ctxt.world[VisibleContainer(ctxt.world[Location(ctxt.actor)])]
     ctxt.world.activity.move_backdrops(current_location)
 
+world[Global("inhibit_location_description_when_moved")] = False
+
 @actoractivities.to("player_has_moved")
 def act_player_has_moved_describe_location(ctxt) :
     """Describes the current location after the player has moved, if
     the last described location isn't the current location."""
-    current_location = ctxt.world[VisibleContainer(ctxt.world[Location(ctxt.actor)])]
-    last_light = ctxt.world[Global("last_light")]
-    currently_lit = ctxt.world[ContainsLight(current_location)]
-    if ctxt.world[Global("current_described_location")] != current_location or last_light != currently_lit :
-        ctxt.write("[newline]")
-        ctxt.activity.describe_current_location(ctxt.actor)
+    if not ctxt.world[Global("inhibit_location_description_when_moved")] :
+        current_location = ctxt.world[VisibleContainer(ctxt.world[Location(ctxt.actor)])]
+        last_light = ctxt.world[Global("last_light")]
+        currently_lit = ctxt.world[ContainsLight(current_location)]
+        if ctxt.world[Global("current_described_location")] != current_location or last_light != currently_lit :
+            ctxt.write("[newline]")
+            ctxt.activity.describe_current_location(ctxt.actor)
+    ctxt.world[Global("inhibit_location_description_when_moved")] = False
 
 
 actoractivities.define_activity("end_game_saying",

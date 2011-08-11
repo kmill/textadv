@@ -20,7 +20,10 @@ def add_game_path(path) :
 
 def add_game(package, name, auxfile_dir=None, altindex=None) :
     """altindex is with respect to auxfile_dir, if auxfile_dir is set."""
-    games[name] = __import__(package+"."+name, fromlist=[name])
+    if package == None :
+        games[name] = __import__(name, fromlist=[name])
+    else :
+        games[name] = __import__(package+"."+name, fromlist=[name])
     if auxfile_dir :
         auxfiles[name] = auxfile_dir
     if altindex :
@@ -32,7 +35,10 @@ add_game("games", "testgame")
 add_game("games", "testgame2")
 add_game("games", "continuations")
 add_game("games", "isleadv")
-add_game("games", "teptour", auxfile_dir="games/teptour_files", altindex="tepindex.html")
+#add_game("games", "teptour", auxfile_dir="games/teptour_files", altindex="tepindex.html")
+
+add_game_path("/Users/kyle/Projects/teptour")
+add_game(None, "teptour", auxfile_dir="/Users/kyle/Projects/teptour/teptour_files", altindex="tepindex.html")
 
 class MainHandler(tornado.web.RequestHandler):
     def get(self) :

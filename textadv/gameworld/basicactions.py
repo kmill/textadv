@@ -99,6 +99,34 @@ def hint_xobj_notheld(actionsystem, action) :
 ###
 
 ##
+# Making a mistake (user error)
+##
+class MakingMistake(BasicAction) :
+    """MakingMistake(action, reason) represents the user making a
+    mistake, and the reason for the mistake is the given reason."""
+    verb = "make mistake"
+    gerund = "making mistake"
+    numargs = 2
+    def gerund_form(self, ctxt) :
+        return self.gerund
+    def infinitive_form(self, ctxt) :
+        return self.verb
+
+@before(MakingMistake(actor, X))
+def before_mistaken_action(actor, x, ctxt) :
+    """Returns an IllogicalOperation object using the given reason."""
+    raise AbortAction(as_actor(x, actor=actor))
+
+parser.understand("turn around/left/right/backwards",
+                  MakingMistake(actor, """{Bob|cap} {isn't} facing
+                  any particular direction, so turning around makes no
+                  sense."""))
+parser.understand("look backwards/left/right",
+                  MakingMistake(actor, """{Bob|cap} {isn't} facing
+                  any particular direction, so it's not clear which
+                  direction to look."""))
+
+##
 # Help
 ##
 
@@ -181,8 +209,8 @@ def when_looking_default(actor, ctxt) :
 class LookingToward(BasicAction) :
     """LookingToward(actor, direction) for the actor looking in the
     specified direction."""
-    verb = "look to the"
-    gerund = "looking to the"
+    verb = "look"
+    gerund = "looking"
     numargs = 2
     dereference_dobj = False
 parser.understand("look/l [direction direction]", LookingToward(actor, direction))
@@ -224,7 +252,11 @@ class Examining(BasicAction) :
     gerund = "examining"
     numargs = 2
 parser.understand("examine/x/read [something x]", Examining(actor, X))
-parser.understand("look at [something x]", Examining(actor, X))
+parser.understand("look at/inside [something x]", Examining(actor, X))
+
+#mistake_examining=MakingMistake(actor, """You need to examine something in particular.""")
+#parser.understand("examine/x/read", mistake_examining)
+#parser.understand("look at/inside", mistake_examining)
 
 require_xobj_visible(actionsystem, Examining(actor, X))
 
@@ -407,11 +439,13 @@ def trybefore_going_setup_variables(action, actor, direction, ctxt) :
     appropriate NoGoMessage."""
     action.going_from = ctxt.world[VisibleContainer(ctxt.world[Location(actor)])]
     if direction not in ctxt.world.activity.get_room_exit_directions(action.going_from) :
-        raise AbortAction(ctxt.world[NoGoMessage(action.going_from, direction)])
-    action.going_via = ctxt.world.query_relation(Exit(action.going_from, direction, Y), var=Y)[0]
-    action.going_to = action.going_via
-    if ctxt.world[IsA(action.going_to, "door")] :
-        action.going_to = ctxt.world.activity.door_other_side_from(action.going_to, action.going_from)
+        action.going_via = None
+        action.going_to = None
+    else :
+        action.going_via = ctxt.world.query_relation(Exit(action.going_from, direction, Y), var=Y)[0]
+        action.going_to = action.going_via
+        if ctxt.world[IsA(action.going_to, "door")] :
+            action.going_to = ctxt.world.activity.door_other_side_from(action.going_to, action.going_from)
 
 @before(Going(actor, direction), wants_event=True)
 def before_going_check_door(action, actor, direction, ctxt) :
@@ -446,6 +480,12 @@ def before_going_leave_enterables(action, actor, direction, ctxt) :
         # It's cleaner for some rules if we can assume that we are going from a room.
         raise DoInstead(Going(actor, direction), suppress_message=True)
 
+@before(Going(actor, direction), wants_event=True)
+def before_going_check_destination(action, actor, direction, ctxt) :
+    """Checks that there is a destination for the going action.  If
+    there isn't one, then it issues the NoGoMessage."""
+    if not action.going_to :
+        raise AbortAction(ctxt.world[NoGoMessage(action.going_from, direction)])
 
 @when(Going(actor, direction), wants_event=True)
 def when_going_default(action, actor, direction, ctxt) :
@@ -557,7 +597,7 @@ class GoingInto(BasicAction) :
     verb = "go into"
     gerund = "going into"
     numargs = 2
-parser.understand("go into [somewhere x]", GoingInto(actor, X))
+parser.understand("go/get in/into [somewhere x]", GoingInto(actor, X))
 parser.understand("enter [somewhere x]", GoingInto(actor, X))
 
 @verify(GoingInto(actor, X))
@@ -570,19 +610,18 @@ def verify_going_into_nearby(actor, x, ctxt) :
         """Something is going-into-able if it is a door, if it is
         actually visited, or if it is the destination (we want to make
         sure the planned path doesn't go through unvisited rooms!)"""
-        if ctxt.world[IsA(a, "door")] or ctxt.world[Visited(a)] :
+        if ctxt.world[IsA(a, "door")] or ctxt.world[Visited(x)] :
             return True
         elif a == x :
             return True
         else :
             return False
-    if not ctxt.world[Visited(x)] :
-        return IllogicalNotVisible(as_actor("{Bob} {doesn't} see that place around here.", actor=actor))
     currloc = ctxt.world[ContainingRoom(actor)]
     path = ctxt.world.r_path_to(Adjacent, currloc, x,
                                 predicate=is_going_into_able)
     if not path :
-        return IllogicalNotVisible(as_actor("{Bob} can't get there from here.", actor=actor))
+        #if not ctxt.world[Visited(x)] :
+        return IllogicalNotVisible(as_actor("{Bob} {doesn't} see that place around here.", actor=actor))
     dest = path[1]
     if ctxt.world[IsA(path[1], "door")] :
         dest = path[2]
@@ -620,7 +659,8 @@ class Entering(BasicAction) :
     gerund = "entering"
     numargs = 2
 parser.understand("enter [something x]", Entering(actor, X))
-parser.understand("get/go/stand/sit in/on/through [something x]", Entering(actor, X))
+parser.understand("get/go/stand/sit in/into/on/through [something x]", Entering(actor, X))
+parser.understand("get on top of [something x]", Entering(actor, X))
 
 require_xobj_visible(actionsystem, Entering(actor, X))
 
@@ -842,6 +882,7 @@ class GettingOff(BasicAction) :
         else :
             return "get off"
 parser.understand("get off", GettingOff(actor))
+parser.understand("climb down", GettingOff(actor))
 
 @before(GettingOff(actor), wants_event=True)
 def before_GettingOff_set_get_off_from(event, actor, ctxt) :
@@ -1087,8 +1128,12 @@ def when_opening(actor, x, ctxt) :
 
 @report(Opening(actor, X))
 def report_opening(actor, x, ctxt) :
-    """Writes 'Opened.'"""
-    ctxt.write("Opened.")
+    """Writes 'you open the blah.'"""
+    contents = [str_with_objs("[a $c]", c=c) for c in ctxt.world[Contents(x)] if c!=actor and ctxt.world[Reported(c)]]
+    if ctxt.world[IsA(x, "container")] and contents :
+        ctxt.write(str_with_objs("You open [the $x], revealing ", x=x)+serial_comma(contents)+".")
+    else :
+        ctxt.write(str_with_objs("You open [the $x].", x=x))
 
 
 ##
@@ -1127,7 +1172,7 @@ def when_closing(actor, x, ctxt) :
 @report(Closing(actor, X))
 def report_closing(actor, x, ctxt) :
     """Writes 'Closed.'"""
-    ctxt.write("Closed.")
+    ctxt.write(str_with_objs("You close [the $x].", x=x))
 
 
 ##

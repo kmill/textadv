@@ -59,7 +59,7 @@ class BasicAction(BasicPattern) :
             if self.dereference_iobj :
                 iobj = str_with_objs("[the $x]", x=self.args[2])
             else :
-                iobj = self.args[1]
+                iobj = self.args[2]
             return (self.gerund[0] + " " + dobj + " " + self.gerund[1] + " " + iobj)
         else :
             raise Exception("Default gerund form only works with 1-3 args")

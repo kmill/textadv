@@ -17,7 +17,9 @@ def join(xs) :
 
 def serial_comma(nouns, conj="and", comma=",", force_comma=False) :
     conj = " " + conj + " "
-    if len(nouns) == 1 :
+    if len(nouns) == 0 :
+        return "nothing"
+    elif len(nouns) == 1 :
         return nouns[0]
     elif len(nouns) == 2 :
         if force_comma :
@@ -58,12 +60,33 @@ def docstring(s) :
         return f
     return _docstring
 
+
+html_escape_table = {
+    "&": "&amp;",
+    '"': "&quot;",
+    "'": "&apos;",
+    ">": "&gt;",
+    "<": "&lt;",
+    }
+
+def html_escape(text):
+    """Produce entities within text."""
+    if text :
+        return "".join(html_escape_table.get(c,c) for c in text)
+    else :
+        return None
+
+
 ###
 ### Web interface stuff
 ###
 
-def make_action_link(text, action) :
-    return '<a class="action" href="" onclick="return run_action(\'%s\');">%s</a>' % (action, text)
+def make_action_link(text, action, tag=None) :
+    action = action.replace("'", "\\'")
+    if tag :
+        return '<a class="action" href="" onclick="return run_action(\'%s\');">%s&nbsp;%s</a>' % (action, tag, text)
+    else :
+        return '<a class="action" href="" onclick="return run_action(\'%s\');">%s</a>' % (action, text)
 
 def wrap_examine(eval, act, obj, text, ctxt) :
     return make_action_link(eval.eval_str(text, ctxt, actor=act), "examine "+eval.eval_str(ctxt.world.get_property("Name", obj), ctxt, actor=act))
@@ -460,6 +483,13 @@ def _str_eval_when(eval, act, ctxt, *obs) :
         ob1, relation, ob2 = obs
     return [ctxt.world.query_relation(ctxt.world.get_relation(relation[0])(ob1[0], ob2[0]))]
 
+@stringeval.add_eval_func("serial_comma")
+def _str_eval_serial_comma(eval, act, ctxt, *obs) :
+    """Concatenates a list of objects, getting indefinite names, using
+    a serial comma (using serial_comma)."""
+    objs = [str_with_objs("[a $o]", o=o) for o in list_append(*obs)]
+    return eval.eval_str(serial_comma(objs), ctxt, actor=act)
+
 @stringeval.add_eval_func("is_are_list")
 def _str_eval_is_are_list(eval, act, ctxt, *obs) :
     """Concatenates a list of objects, getting indefinite names, and
@@ -478,6 +508,18 @@ def _str_eval_dir(eval, act, ctxt, *obs) :
         dir = obs[0][0]
         text = obs[1][0]
     return [make_action_link(text, "go "+dir)]
+
+@stringeval.add_eval_func("look")
+def _str_eval_dir(eval, act, ctxt, *obs) :
+    """Takes a direction and possibly some text, and provides a link
+    to go in that direction."""
+    if len(obs) == 1 :
+        dir = obs[0][0]
+        text = obs[0][0]
+    else :
+        dir = obs[0][0]
+        text = obs[1][0]
+    return [make_action_link(text, "look "+dir, tag="&#9862;")]
 
 @stringeval.add_eval_func("ob")
 def _str_eval_ob(eval, act, ctxt, *obs) :

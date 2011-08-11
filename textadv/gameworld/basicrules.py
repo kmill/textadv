@@ -111,6 +111,16 @@ class Words(Property) :
     but not "ball red")."""
     numargs = 1
 
+@world.define_property
+class AddedWords(Property) :
+    """This represents a list of additional words which can describe
+    the object.  These are used by the default Words handler to add
+    more synonyms to something.  The contents follow the same rules as
+    for Words."""
+    numargs = 1
+
+world[AddedWords(X)] = []
+
 @world.handler(Words(X))
 def default_Words(x, world) :
     """The default handler assumes that the words in Name(x) are
@@ -118,6 +128,7 @@ def default_Words(x, world) :
     noun (so "big red ball" returns ["big", "red", "@ball"])."""
     words = world[Name(x)].split()
     words[-1] = "@"+words[-1]
+    words.extend(world[AddedWords(x)])
     return words
 
 

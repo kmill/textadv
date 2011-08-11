@@ -26,9 +26,15 @@ class ClassHashByName(type) :
     def __hash__(self) :
         return hash("ClassHashByName "+self.__name__)
     def __eq__(self, b) :
-        return self.__name__ == b.__name__
+        if type(b) == str :
+            return False
+        else :
+            return self.__name__ == b.__name__
     def __ne__(self, b) :
-        return self.__name__ != b.__name__
+        if type(b) == str :
+            return True
+        else :
+            return self.__name__ != b.__name__
 
 
 ###

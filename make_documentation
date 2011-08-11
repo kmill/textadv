@@ -6,11 +6,14 @@ docfor=""
 
 if len(sys.argv)>=2 :
     print "Making documentation for "+sys.argv[1]
-    docfor = "_for_"+sys.argv[1].split(".")[0].replace("/","_")
+    docfor = "_for_"+sys.argv[1].replace("/","_").replace(".","_")
     execfile(sys.argv[1])
 else :
     from textadv.basicsetup import *
 
+print "loaded."
+
+__oldout = sys.stdout
 sys.stdout = open("doc/doc"+docfor+".html", "w")
 
 html_escape_table = {
@@ -37,3 +40,6 @@ actoractivities.make_documentation(html_escape, heading_level=1)
 stringeval.make_documentation(html_escape, heading_level=1)
 
 print "</body></html>"
+
+sys.stdout = __oldout
+print "outputted to","doc/doc"+docfor+".html"

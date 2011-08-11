@@ -10,7 +10,7 @@ from textadv.gamesystem.gamecontexts import ActorActivities
 from textadv.gamesystem.basicpatterns import *
 from textadv.gamesystem.utilities import *
 #import textadv.gamesystem.parser as parser
-from textadv.gamesystem.parser import default_parser
+from textadv.gamesystem.parser import default_parser, Ambiguous
 from textadv.gamesystem.actionsystem import BasicAction, DoInstead, verify_instead, ActionSystem
 from textadv.gamesystem.actionsystem import VeryLogicalOperation, LogicalOperation, IllogicalOperation, IllogicalInaccessible, NonObviousOperation, IllogicalNotVisible
 

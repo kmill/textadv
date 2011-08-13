@@ -254,6 +254,17 @@ class Examining(BasicAction) :
 parser.understand("examine/x/read [something x]", Examining(actor, X))
 parser.understand("look at/inside [something x]", Examining(actor, X))
 
+# The following is something I am not sure about, and I'm including it
+# because many people try to look things.  It's not really
+# grammatical, but whatever.
+#
+# The problem is that "look [direction]" also exists, so it's possible
+# that there will be an Examining and LookingToward action matching at
+# the same time.  The disambiguator doesn't know how to handle this...
+# A way out is to make it so that directions are actual objects in the
+# game world, so the something parser will take care of them.
+parser.understand("look [something x]", Examining(actor, X))
+
 #mistake_examining=MakingMistake(actor, """You need to examine something in particular.""")
 #parser.understand("examine/x/read", mistake_examining)
 #parser.understand("look at/inside", mistake_examining)
@@ -354,6 +365,8 @@ class Dropping(BasicAction) :
     gerund = "dropping"
     numargs = 2
 parser.understand("drop [something x]", Dropping(actor, X))
+parser.understand("put/set down [something x]", Dropping(actor, X))
+parser.understand("put/set [something x] down", Dropping(actor, X))
 
 require_xobj_held(actionsystem, Dropping(actor, X), only_hint=True, transitive=True)
 
@@ -419,7 +432,7 @@ class Going(BasicAction) :
             via = str_with_objs("[the $x]", x=self.going_via)
             return "%s via %s" % (out, via)
         return out
-parser.understand("go [direction direction]", Going(actor, direction))
+parser.understand("go/g [direction direction]", Going(actor, direction))
 parser.understand("[direction direction]", Going(actor, direction))
 
 @verify(Going(actor, direction))
@@ -516,7 +529,7 @@ class GoingTo(BasicAction) :
     def infinitive_form(self, ctxt) :
         return "go to %s" % str_with_objs("[get DefiniteName $x]", x=self.get_do())
 parser.understand("go to [somewhere x]", GoingTo(actor, X))
-parser.understand("goto [somewhere x]", GoingTo(actor, X))
+parser.understand("goto/go [somewhere x]", GoingTo(actor, X))
 
 @verify(GoingTo(actor, X))
 def verify_going_default(actor, x, ctxt) :
@@ -766,20 +779,17 @@ def when_entering_container(actor, x, ctxt) :
 def report_entering_describe_contents(actor, x, ctxt) :
     """Describes the contents of the new location if the actor is the
     actor of the context, disabling the location heading and the
-    location description."""
+    location description, unless there is a locale description, in
+    which case a complete room description is given."""
     if ctxt.actor == actor :
-        vis_cont = ctxt.world[VisibleContainer(x)]
-        ctxt.world[Global("describe_location_ascend_locations")] = False
-        ctxt.activity.describe_location(actor, x, vis_cont, disable=[describe_location_Heading, describe_location_Description])
-        ctxt.world[Global("describe_location_ascend_locations")] = True
-
-@report(Entering(actor, X))
-def report_entering_locale_description(actor, x, ctxt) :
-    """Prints a room description if there is a LocaleDescription for
-    the enterable."""
-    if ctxt.world[LocaleDescription(x)] :
-        ctxt.write("[newline]")
-        ctxt.activity.describe_current_location(actor)
+        if ctxt.world[LocaleDescription(x)] :
+            ctxt.write("[newline]")
+            ctxt.activity.describe_current_location(actor)
+        else :
+            vis_cont = ctxt.world[VisibleContainer(x)]
+            ctxt.world[Global("describe_location_ascend_locations")] = False
+            ctxt.activity.describe_location(actor, x, vis_cont, disable=[describe_location_Heading, describe_location_Description])
+            ctxt.world[Global("describe_location_ascend_locations")] = True
 
 @report(Entering(actor, X) <= IsA(X, "container"))
 def report_entering_container(actor, x, ctxt) :
@@ -981,7 +991,7 @@ class InsertingInto(BasicAction) :
     verb = ("insert", "into")
     gerund = ("inserting", "into")
     numargs = 3
-parser.understand("put/insert/drop [something x] in/into [something y]", InsertingInto(actor, X, Y))
+parser.understand("put/place/insert/drop/set [something x] in/into [something y]", InsertingInto(actor, X, Y))
 
 require_xobj_held(actionsystem, InsertingInto(actor, X, Y))
 require_xobj_accessible(actionsystem, InsertingInto(actor, Z, X))
@@ -1001,10 +1011,10 @@ def before_InsertingInto_object_into_own_contents(actor, x, y, ctxt) :
                                             x=x, y=y), actor=actor)
         loc = ctxt.world[Location(loc)]
 
-@before(InsertingInto(actor, X, Y) <= Openable(X) & PNot(IsOpen(X)))
+@before(InsertingInto(actor, X, Y) <= Openable(Y) & PNot(IsOpen(Y)))
 def before_InsertingInto_closed_container(actor, x, y, ctxt) :
     """One can't place something into a closed container."""
-    ctxt.actionsystem.do_first(Opening(actor, Y))
+    ctxt.actionsystem.do_first(Opening(actor, y), ctxt=ctxt)
     if not ctxt.world[IsOpen(Y)] :
         raise AbortAction(str_with_objs("[The $y] is closed.", y=y))
 
@@ -1012,6 +1022,11 @@ def before_InsertingInto_closed_container(actor, x, y, ctxt) :
 def before_InsertingInto_needs_container(actor, x, y, ctxt) :
     """One can only insert things into a container."""
     raise AbortAction(str_with_objs("{Bob|cap} can't put [the $x] into [the $y].", x=x, y=y), actor=actor)
+
+@before(InsertingInto(actor, X, Y) <= IsA(Y, "supporter"))
+def before_InsertingInto_rewrite_supporter(actor, x, y, ctxt) :
+    """Rewrite InsertingInto as PlacingOn for supporters."""
+    raise DoInstead(PlacingOn(actor, x, y))
 
 # @before(InsertingInto(actor, X, Y))
 # def before_InsertingInto_worn_item(actor, x, y, ctxt) :
@@ -1039,7 +1054,7 @@ class PlacingOn(BasicAction) :
     verb = ("place", "on")
     gerund = ("placing", "on")
     numargs = 3
-parser.understand("put/place/drop [something x] on/onto [something y]", PlacingOn(actor, X, Y))
+parser.understand("put/place/drop/set [something x] on/onto [something y]", PlacingOn(actor, X, Y))
 
 require_xobj_held(actionsystem, PlacingOn(actor, X, Y))
 require_xobj_accessible(actionsystem, PlacingOn(actor, Z, X))
@@ -1063,6 +1078,12 @@ def before_PlacingOn_object_onto_own_contents(actor, x, y, ctxt) :
 def before_PlacingOn_needs_supporter(actor, x, y, ctxt) :
     """One can only place things on a supporter."""
     raise AbortAction(str_with_objs("{Bob|cap} can't place [the $x] on [the $y].", x=x, y=y), actor=actor)
+
+@before(PlacingOn(actor, X, Y) <= IsA(Y, "container"))
+def before_PlacingOn_rewrite_container(actor, x, y, ctxt) :
+    """Rewrite PlacingOn as InsertingInto for containers."""
+    raise DoInstead(InsertingInto(actor, x, y))
+
 
 # @before(PlacingOn(actor, X, Y))
 # def before_PlacingOn_worn_item(actor, x, y, ctxt) :
@@ -1129,7 +1150,8 @@ def when_opening(actor, x, ctxt) :
 @report(Opening(actor, X))
 def report_opening(actor, x, ctxt) :
     """Writes 'you open the blah.'"""
-    contents = [str_with_objs("[a $c]", c=c) for c in ctxt.world[Contents(x)] if c!=actor and ctxt.world[Reported(c)]]
+    if ctxt.world[IsA(x, "container")] :
+        contents = [str_with_objs("[a $c]", c=c) for c in ctxt.world[Contents(x)] if c!=actor and ctxt.world[Reported(c)]]
     if ctxt.world[IsA(x, "container")] and contents :
         ctxt.write(str_with_objs("You open [the $x], revealing ", x=x)+serial_comma(contents)+".")
     else :

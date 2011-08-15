@@ -54,6 +54,10 @@ DIRECTION_INVERSES = {"north" : "south",
 def inverse_direction(direction) :
     return DIRECTION_INVERSES[direction]
 
+def add_direction_pair(dir, opp) :
+    DIRECTION_INVERSES[dir] = opp
+    DIRECTION_INVERSES[opp] = dir
+
 def docstring(s) :
     def _docstring(f) :
         f.__doc__ = s

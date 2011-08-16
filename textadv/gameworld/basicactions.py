@@ -123,6 +123,10 @@ def before_mistaken_action(actor, x, ctxt) :
     """Returns an IllogicalOperation object using the given reason."""
     raise AbortAction(as_actor(x, actor=actor))
 
+def all_are_mistakes(parser, mistakes, reason) :
+    for m in mistakes :
+        parser.understand(m, MakingMistake(actor, reason))
+
 parser.understand("turn around/left/right/backwards",
                   MakingMistake(actor, """{Bob|cap} {isn't} facing
                   any particular direction, so turning around makes no
@@ -260,6 +264,9 @@ class Examining(BasicAction) :
 parser.understand("examine/x/read [something x]", Examining(actor, X))
 parser.understand("look at/inside [something x]", Examining(actor, X))
 
+all_are_mistakes(parser, ["examine/x/read", "look at/inside"],
+                 """{Bob} {needs} to be examining something in particular.""")
+
 # The following is something I am not sure about, and I'm including it
 # because many people try to look things.  It's not really
 # grammatical, but whatever.
@@ -292,6 +299,10 @@ class Taking(BasicAction) :
     numargs = 2
 parser.understand("take/get/pickup [something x]", Taking(actor, X))
 parser.understand("pick up [something x]", Taking(actor, X))
+parser.understand("pick [something x] up", Taking(actor, X))
+
+all_are_mistakes(parser, ["take/get/pickup/pick", "pick up"],
+                 """{Bob} {needs} to be taking something in particular.""")
 
 require_xobj_accessible(actionsystem, Taking(actor, X))
 hint_xobj_notheld(actionsystem, Taking(actor, X))
@@ -374,6 +385,9 @@ parser.understand("drop [something x]", Dropping(actor, X))
 parser.understand("put/set down [something x]", Dropping(actor, X))
 parser.understand("put/set [something x] down", Dropping(actor, X))
 
+all_are_mistakes(parser, ["drop/set", "put/set down"],
+                 """{Bob} {needs} to be dropping something in particular.""")
+
 require_xobj_held(actionsystem, Dropping(actor, X), only_hint=True, transitive=True)
 
 @before(Dropping(actor, X) <= PEquals(actor, X))
@@ -440,6 +454,9 @@ class Going(BasicAction) :
         return out
 parser.understand("go/g [direction direction]", Going(actor, direction))
 parser.understand("[direction direction]", Going(actor, direction))
+
+all_are_mistakes(parser, ["go"],
+                 """{Bob} {needs} to be going in particular direction.""")
 
 @verify(Going(actor, direction))
 def verify_going_make_real_direction_more_logical(actor, direction, ctxt) :
@@ -537,6 +554,9 @@ class GoingTo(BasicAction) :
 parser.understand("go to [somewhere x]", GoingTo(actor, X))
 parser.understand("goto/go [somewhere x]", GoingTo(actor, X))
 
+all_are_mistakes(parser, ["go to", "goto"],
+                 """{Bob} {needs} to be going to somewhere in particular.""")
+
 @verify(GoingTo(actor, X))
 def verify_going_default(actor, x, ctxt) :
     """It's not logical to go somewhere one hasn't visited or doesn't know about."""
@@ -627,6 +647,8 @@ class GoingInto(BasicAction) :
 parser.understand("go/get in/into [somewhere x]", GoingInto(actor, X))
 parser.understand("enter [somewhere x]", GoingInto(actor, X))
 
+# no mistakes here because so similar to Entering
+
 @verify(GoingInto(actor, X))
 def verify_going_into_nearby(actor, x, ctxt) :
     """Makes sure that the thing to be entered is nearby."""
@@ -688,6 +710,9 @@ class Entering(BasicAction) :
 parser.understand("enter [something x]", Entering(actor, X))
 parser.understand("get/go/stand/sit in/into/on/through [something x]", Entering(actor, X))
 parser.understand("get on top of [something x]", Entering(actor, X))
+
+all_are_mistakes(parser, ["enter", "get/go/stand/sit in/into/on/through", "get on top", "get on top of"],
+                 """{Bob} {needs} to be entering something in particular.""")
 
 require_xobj_visible(actionsystem, Entering(actor, X))
 
@@ -906,7 +931,7 @@ class GettingOff(BasicAction) :
         else :
             return "get off"
 parser.understand("get off", GettingOff(actor))
-parser.understand("climb down", GettingOff(actor))
+parser.understand("climb/get down", GettingOff(actor))
 
 @before(GettingOff(actor), wants_event=True)
 def before_GettingOff_set_get_off_from(event, actor, ctxt) :
@@ -1007,6 +1032,11 @@ class InsertingInto(BasicAction) :
     numargs = 3
 parser.understand("put/place/insert/drop/set [something x] in/into [something y]", InsertingInto(actor, X, Y))
 
+all_are_mistakes(parser, ["insert"],
+                 """{Bob} {needs} to be inserting something in particular.""")
+all_are_mistakes(parser, ["insert [something x]", "insert [something x] in/into"],
+                 """{Bob} {needs} to be inserting that into something in particular.""")
+
 require_xobj_held(actionsystem, InsertingInto(actor, X, Y))
 require_xobj_accessible(actionsystem, InsertingInto(actor, Z, X))
 
@@ -1070,6 +1100,9 @@ class PlacingOn(BasicAction) :
     numargs = 3
 parser.understand("put/place/drop/set [something x] on/onto [something y]", PlacingOn(actor, X, Y))
 
+all_are_mistakes(parser, ["place/drop/set [something x] on", "put/place/drop/set [something x] onto"],
+                 """{Bob} {needs} to be placing that onto something in particular.""")
+
 require_xobj_held(actionsystem, PlacingOn(actor, X, Y))
 require_xobj_accessible(actionsystem, PlacingOn(actor, Z, X))
 
@@ -1127,6 +1160,9 @@ class Opening(BasicAction) :
     numargs = 2
 parser.understand("open [something x]", Opening(actor, X))
 
+all_are_mistakes(parser, ["open"],
+                 """{Bob} {needs} to be opening something in particular.""")
+
 require_xobj_accessible(actionsystem, Opening(actor, X))
 
 @verify(Opening(actor, X) <= Openable(X))
@@ -1183,6 +1219,9 @@ class Closing(BasicAction) :
     numargs = 2
 parser.understand("close [something x]", Closing(actor, X))
 
+all_are_mistakes(parser, ["close"],
+                 """{Bob} {needs} to be closing something in particular.""")
+
 require_xobj_accessible(actionsystem, Closing(actor, X))
 
 @verify(Closing(actor, X) <= Openable(X))
@@ -1222,6 +1261,9 @@ class UnlockingWith(BasicAction) :
     numargs = 3
 parser.understand("unlock [something x] with [something y]", UnlockingWith(actor, X, Y))
 parser.understand("open [something x] with [something y]", UnlockingWith(actor, X, Y))
+
+all_are_mistakes(parser, ["unlock"],
+                 """{Bob} {needs} to be unlocking something in particular.""")
 
 require_xobj_accessible(actionsystem, UnlockingWith(actor, X, Y))
 require_xobj_held(actionsystem, UnlockingWith(actor, Z, X))
@@ -1264,7 +1306,7 @@ require_xobj_accessible(actionsystem, Unlocking(actor, X))
 @before(Unlocking(actor, X))
 def before_unlocking_fail(actor, x, ctxt) :
     """Unlocking requires a key."""
-    raise AbortAction(str_with_objs("Unlocking requires a key.", x=x), actor=actor)
+    raise AbortAction(str_with_objs("{Bob} {needs} to be unlocking that with a key.", x=x), actor=actor)
 
 
 ##
@@ -1278,6 +1320,9 @@ class LockingWith(BasicAction) :
     numargs = 3
 parser.understand("lock [something x] with [something y]", LockingWith(actor, X, Y))
 parser.understand("close [something x] with [something y]", LockingWith(actor, X, Y))
+
+all_are_mistakes(parser, ["lock"],
+                 """{Bob} {needs} to be locking something in particular.""")
 
 require_xobj_accessible(actionsystem, LockingWith(actor, X, Y))
 require_xobj_held(actionsystem, LockingWith(actor, Z, X))
@@ -1320,7 +1365,7 @@ require_xobj_accessible(actionsystem, Locking(actor, X))
 @before(Locking(actor, X))
 def before_locking_fail(actor, x, ctxt) :
     """Locking requires a key."""
-    raise AbortAction(str_with_objs("Locking requires a key.", x=x), actor=actor)
+    raise AbortAction(str_with_objs("{Bob} {needs} to be unlocking that with a key.", x=x), actor=actor)
 
 
 ##
@@ -1334,6 +1379,9 @@ class Wearing(BasicAction) :
 parser.understand("wear [something x]", Wearing(actor, X))
 parser.understand("put on [something x]", Wearing(actor, X))
 parser.understand("put [something x] on", Wearing(actor, X))
+
+all_are_mistakes(parser, ["wear", "put on"],
+                 """{Bob} {needs} to be putting on something in particular.""")
 
 require_xobj_held(actionsystem, Wearing(actor, X))
 
@@ -1371,6 +1419,9 @@ parser.understand("take off [something x]", TakingOff(actor, X))
 parser.understand("take [something x] off", TakingOff(actor, X))
 parser.understand("remove [something x]", TakingOff(actor, X))
 
+all_are_mistakes(parser, ["take off"],
+                 """{Bob} {needs} to be taking off something in particular.""")
+
 @before(TakingOff(actor, X))
 def before_takingoff_not_worn(actor, x, ctxt) :
     """Clothes must be presently worn to be taken off."""
@@ -1400,6 +1451,9 @@ class SwitchingOn(BasicAction) :
     numargs = 2
 parser.understand("switch/turn on [something x]", SwitchingOn(actor, X))
 parser.understand("switch/turn [something x] on", SwitchingOn(actor, X))
+
+all_are_mistakes(parser, ["switch/turn on"],
+                 """{Bob} {needs} to be switching on something in particular.""")
 
 require_xobj_accessible(actionsystem, SwitchingOn(actor, X))
 
@@ -1440,6 +1494,9 @@ class SwitchingOff(BasicAction) :
 parser.understand("switch/turn off [something x]", SwitchingOff(actor, X))
 parser.understand("switch/turn [something x] off", SwitchingOff(actor, X))
 
+all_are_mistakes(parser, ["switch/turn off"],
+                 """{Bob} {needs} to be switching off something in particular.""")
+
 require_xobj_accessible(actionsystem, SwitchingOff(actor, X))
 
 @verify(SwitchingOff(actor, X) <= Switchable(X))
@@ -1478,6 +1535,9 @@ class Switching(BasicAction) :
     numargs = 2
 parser.understand("switch/turn/toggle [something x]", Switching(actor, X))
 
+all_are_mistakes(parser, ["switch/turn/toggle"],
+                 """{Bob} {needs} to be toggling something in particular.""")
+
 require_xobj_accessible(actionsystem, Switching(actor, X))
 
 @before(Switching(actor, X) <= Switchable(X))
@@ -1511,6 +1571,11 @@ class AskingFor(BasicAction) :
     numargs = 3
 parser.understand("ask [something x] for [something y]", AskingFor(actor, X, Y))
 
+all_are_mistakes(parser, ["ask"],
+                 """{Bob} {needs} to be asking someone in particular.""")
+all_are_mistakes(parser, ["ask [something x]", "ask [something x] for/to/about"], # also handles AskingTo & AskingAbout
+                 """{Bob} {needs} to be asking for or about something in particular.""")
+
 require_xobj_accessible(actionsystem, AskingFor(actor, X, Y))
 require_xobj_visible(actionsystem, AskingFor(actor, Z, X))
 
@@ -1540,6 +1605,8 @@ class AskingTo(BasicAction) :
         return self.verb[0] + " " + dobj + " to " + comm
 parser.understand("ask [something x] to [action y]", AskingTo(actor, X, Y))
 parser.understand("[something x] , [action y]", AskingTo(actor, X, Y))
+
+# see AskingFor for mistakes
 
 require_xobj_accessible(actionsystem, AskingTo(actor, X, Y))
 
@@ -1575,6 +1642,11 @@ class GivingTo(BasicAction) :
     numargs = 3
 parser.understand("give [something x] to [something y]", GivingTo(actor, X, Y))
 parser.understand("give [something y] [something x]", GivingTo(actor, X, Y))
+
+all_are_mistakes(parser, ["give"],
+                 """{Bob} {needs} to be giving something in particular.""")
+all_are_mistakes(parser, ["give [something x]", "give [something x] to"],
+                 """{Bob} {needs} to be giving that to someone in particular.""")
 
 require_xobj_held(actionsystem, GivingTo(actor, X, Y))
 require_xobj_accessible(actionsystem, GivingTo(actor, Z, X))
@@ -1622,6 +1694,9 @@ class Attacking(BasicAction) :
     numargs = 2
 parser.understand("attack/kill [something x]", Attacking(actor, X))
 
+all_are_mistakes(parser, ["attack/kill"],
+                 """{Bob} {needs} to be attacking something in particular.""")
+
 require_xobj_accessible(actionsystem, Attacking(actor, X))
 
 @before(Attacking(actor, X))
@@ -1638,6 +1713,9 @@ class Eating(BasicAction) :
     gerund = "eating"
     numargs = 2
 parser.understand("eat [something x]", Eating(actor, X))
+
+all_are_mistakes(parser, ["eat"],
+                 """{Bob} {needs} to be eating something in particular.""")
 
 require_xobj_held(actionsystem, Eating(actor, X))
 
@@ -1696,6 +1774,9 @@ class Cutting(BasicAction) :
     numargs = 2
 parser.understand("cut [something x]", Cutting(actor, X))
 
+all_are_mistakes(parser, ["cut"],
+                 """{Bob} {needs} to be cutting something in particular.""")
+
 require_xobj_accessible(actionsystem, Cutting(actor, X))
 
 @before(Cutting(actor, X))
@@ -1709,6 +1790,9 @@ class CuttingWith(BasicAction) :
     gerund = ("cutting", "with")
     numargs = 3
 parser.understand("cut [something x] with [something y]", CuttingWith(actor, X, Y))
+
+all_are_mistakes(parser, ["cut [something x] with"],
+                 """{Bob} {needs} to be cutting that with something in particular.""")
 
 require_xobj_accessible(actionsystem, CuttingWith(actor, X, Y))
 require_xobj_held(actionsystem, CuttingWith(actor, Z, X))
@@ -1735,6 +1819,9 @@ class Climbing(BasicAction) :
     numargs = 2
 parser.understand("climb [something x]", Climbing(actor, X))
 
+all_are_mistakes(parser, ["climb"],
+                 """{Bob} {needs} to be climbing something in particular.""")
+
 require_xobj_accessible(actionsystem, Climbing(actor, X))
 
 @before(Climbing(actor, X))
@@ -1752,6 +1839,9 @@ class Pushing(BasicAction) :
     gerund = "pushing"
     numargs = 2
 parser.understand("push/press [something x]", Pushing(actor, X))
+
+all_are_mistakes(parser, ["push/press"],
+                 """{Bob} {needs} to be pushing something in particular.""")
 
 require_xobj_accessible(actionsystem, Pushing(actor, X))
 
@@ -1774,6 +1864,8 @@ class AskingAbout(BasicAction) :
     dereference_iobj = False
     numargs = 3
 parser.understand("ask [something x] about [text y]", AskingAbout(actor, X, Y))
+
+# mistakes handled in AskingFor
 
 require_xobj_accessible(actionsystem, AskingAbout(actor, X, Y))
 
@@ -1875,6 +1967,9 @@ class Using(BasicAction) :
     gerund = "using"
     numargs = 2
 parser.understand("use [something x]", Using(actor, X))
+
+all_are_mistakes(parser, ["use"],
+                 """{Bob} {needs} to be using something in particular.""")
 
 require_xobj_accessible(actionsystem, Using(actor, X))
 

@@ -313,7 +313,7 @@ class Parser(object) :
             return out
 
     def transform_text_to_words(self, text) :
-        text = text.replace(",", " , ").replace("?", " ? ")
+        text = text.replace(",", " , ").replace("?", " ? ").replace("!", " ! ")
         return text.strip().split()
 
     def handle_all(self, input, ctxt, action_verifier) :
@@ -479,7 +479,7 @@ def default_parse_thing(parser, subparser, var, name, words, input, i, ctxt, nex
             if input[i2].lower() in nouns :
                 # already a match because input[i2] is one of the nouns.
                 m2 = 1
-                if parser.current_names[subparser][name] == " ".join(input[i:i2+1]) :
+                if parser.current_names[subparser][name].lower() == " ".join(input[i:i2+1]).lower() :
                     m2 += 0.5
                 poss.extend(product([[Matched(input[i:i2+1], name, 2*multiplier*m2, subparser, var=var)]],
                                     next(i2+1)))

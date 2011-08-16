@@ -94,6 +94,12 @@ def hint_xobj_notheld(actionsystem, action) :
         if not ctxt.world.query_relation(Has(actor, x)) :
             return VeryLogicalOperation()
 
+def reset_action_handler(handler, action) :
+    @handler(action)
+    @docstring("Raises ActionHandled for "+repr(action)+". Added by reset_action_handler.")
+    def _reset_action_handler(**kwargs) :
+        raise ActionHandled()
+
 ###
 ### Action definitions
 ###
@@ -302,7 +308,7 @@ def before_taking_check_ownership(actor, x, ctxt) :
     """You can't take what is owned by anyone else."""
     owner = ctxt.world[Owner(x)]
     if owner and owner != actor :
-        raise AbortAction("That is not {bob's} to take.", actor=actor)
+        raise AbortAction("That is not {his} to take.", actor=actor)
 
 @before(Taking(actor, X))
 def before_taking_check_fixedinplace(actor, x, ctxt) :
@@ -535,7 +541,11 @@ parser.understand("goto/go [somewhere x]", GoingTo(actor, X))
 def verify_going_default(actor, x, ctxt) :
     """It's not logical to go somewhere one hasn't visited or doesn't know about."""
     if x == ctxt.world[ContainingRoom(actor)] :
-        return IllogicalOperation(as_actor("{Bob} {is} already there.", actor=actor))
+        ## reason for change: if someone accidentally says to go to a
+        ## room they are already in, but there is another similarly
+        ## named room, they'll end up going to the other room.
+        #return IllogicalOperation(as_actor("{Bob} {is} already there.", actor=actor))
+        return LogicalOperation()
     elif ctxt.world[Visited(x)] :
         return LogicalOperation()
     else :
@@ -549,6 +559,10 @@ def verify_going_default(actor, x, ctxt) :
 def before_going_to_intermediate_walk(actor, x, ctxt) :
     """Find a path from the current location to the destination x,
     only visiting already visited rooms."""
+    ### moved the following two lines from verify_going_default
+    if x == ctxt.world[ContainingRoom(actor)] :
+        raise AbortAction("{Bob} {is} already there.", actor=actor)
+    
     def is_going_to_able(a) :
         """Something is going-to-able if it is a door, if it is
         actually visited, or if it is the destination (we want to make
@@ -1850,6 +1864,44 @@ parser.understand("wait/z", Waiting(actor))
 def report_waiting_default(actor, ctxt) :
     """Reports a default message."""
     ctxt.write("Time passes.", actor=actor)
+
+##
+# Using
+##
+
+class Using(BasicAction) :
+    """Using(actor, thing) for the generic do something with thing."""
+    verb = "use"
+    gerund = "using"
+    numargs = 2
+parser.understand("use [something x]", Using(actor, X))
+
+require_xobj_accessible(actionsystem, Using(actor, X))
+
+@before(Using(actor, X))
+def before_using_default(actor, x, ctxt) :
+    """By default, you can't use things."""
+    raise AbortAction(str_with_objs("""{Bob} {tries} to figure out how
+    to use [the $x], but {bob} can't figure out what to do with it.""", x=x), actor=actor)
+
+
+### The following are in an arbitrary order.
+
+@before(Using(actor, X) <= IsEnterable(X))
+def before_using_enterable(actor, x, ctxt) :
+    raise DoInstead(Entering(actor, x))
+
+@before(Using(actor, X) <= Openable(X) & IsOpen(X))
+def before_using_open_openable(actor, x, ctxt) :
+    raise DoInstead(Closing(actor, x))
+
+@before(Using(actor, X) <= Openable(X) & PNot(IsOpen(X)))
+def before_using_closed_openable(actor, x, ctxt) :
+    raise DoInstead(Opening(actor, x))
+
+@before(Using(actor, X) <= Switchable(X))
+def before_using_switchable(actor, x, ctxt) :
+    raise DoInstead(Switching(actor, x))
 
 
 ###

@@ -612,12 +612,15 @@ def _reword(word, flags, world, actor, is_me) :
                 return world.get_property("ObjectPronounIfMe", actor)
             else :
                 return world.get_property("SubjectPronounIfMe", actor)
-        elif word == "bob's" :
+        elif word == "his" :
             return world.get_property("PossessivePronounIfMe", actor)
         elif _reword_replacements.has_key(word) :
             return _reword_replacements[word]
-        else : # assume it's a verb, and take off s
-            return word[0:-1]
+        else : # assume it's a verb
+            if len(word)>3 and word[-3:]=="ies" :
+                return word[0:-3]+"y"
+            else : # take off the s
+                return word[0:-1]
     else :
         if word == "he" :
             return world.get_property("SubjectPronoun", actor)
@@ -627,7 +630,7 @@ def _reword(word, flags, world, actor, is_me) :
             return world.get_property("ReflexivePronoun", actor)
         elif word == "bob" :
             return world.get_property("DefiniteName", actor)
-        elif word == "bob's" :
+        elif word == "his" :
             return world.get_property("PossessivePronoun", actor)
         else : # we assume the word should stay as-is
             return word

@@ -2,7 +2,7 @@
 #
 # This is the basic library for how the world works.
 
-from textadv.core.patterns import VarPattern, BasicPattern, PNot, PEquals
+from textadv.core.patterns import VarPattern, BasicPattern, PNot, PEquals, PIn
 from textadv.core.rulesystem import handler_requires, ActionHandled, MultipleResults, NotHandled, AbortAction, make_rule_decorator
 from textadv.gamesystem.relations import *
 from textadv.gamesystem.world import *

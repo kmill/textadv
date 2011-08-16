@@ -18,6 +18,11 @@ class NoMatchException(Exception) :
     """Raised if a matched cannot be made."""
     pass
 
+class ExpansionException(Exception) :
+    """Raised if an expansion cannot be made, not due to a KeyError,
+    but due to failed support."""
+    pass
+
 ###
 ### Metaclass
 ###
@@ -50,7 +55,7 @@ class AbstractPattern(object) :
         with the variables bound.  Assume that the "matches" argument
         will be modified."""
         raise NotImplementedError("AbstractPattern is abstract (no match)", self)
-    def expand_pattern(self, replacements) :
+    def expand_pattern(self, replacements, data=None) :
         """Try to use the replacements dictionary to modify the
         pattern.  By default returns self."""
         return self
@@ -81,7 +86,7 @@ class VarPattern(AbstractPattern) :
         if self.pattern is not None :
             matches = self.pattern.match(input, matches=matches, data=data)
         return matches
-    def expand_pattern(self, replacements) :
+    def expand_pattern(self, replacements, data=None) :
         if self.varName in replacements :
             return replacements[self.varName]
         else :
@@ -113,13 +118,13 @@ class BasicPattern(AbstractPattern) :
                 if not (myarg == inputarg) :
                     raise NoMatchException(myarg, inputarg)
         return matches
-    def expand_pattern(self, replacements) :
+    def expand_pattern(self, replacements, data=None) :
         """Expands a basic pattern by reinstantiating itself with
         expanded arguments."""
         newargs = []
         for arg in self.args :
             if isinstance(arg, AbstractPattern) :
-                newargs.append(arg.expand_pattern(replacements))
+                newargs.append(arg.expand_pattern(replacements, data=data))
             else :
                 newargs.append(arg)
         return type(self)(*newargs)
@@ -139,11 +144,18 @@ class PatternRequires(AbstractPattern) :
     def match(self, input, matches=None, data=None) :
         matches = self.pattern.match(input, matches, data)
         try :
-            if not self.support.expand_pattern(matches).test(data["world"]) :
+            if not self.support.expand_pattern(matches, data=data).test(data["world"]) :
                 raise NoMatchException(self, self.support)
             return matches
         except KeyError :
             raise NoMatchException(self, self.support)
+    def expand_pattern(self, replacements, data=None) :
+        """Like match, except returns the expanded pattern after
+        trying to expand the support."""
+        if data is not None :
+            if not self.support.expand_pattern(replacements, data=data).test(data["world"]) :
+                raise ExpansionException(self)
+        return self.pattern.expand_pattern(replacements, data=data)
     def file_under(self) :
         return self.pattern.file_under()
     def __repr__(self) :
@@ -154,8 +166,8 @@ class PatternConjunction(AbstractPattern) :
         self.support = support
     def test(self, world) :
         return all(s.test(world) for s in self.support)
-    def expand_pattern(self, matches) :
-        return PatternConjunction(*[s.expand_pattern(matches) for s in self.support])
+    def expand_pattern(self, matches, data=None) :
+        return PatternConjunction(*[s.expand_pattern(matches, data=data) for s in self.support])
     def __and__(self, b) :
         if not isinstance(b, AbstractPattern) :
             raise Exception("Not anding with a BasicPattern")
@@ -168,8 +180,8 @@ class PNot(AbstractPattern) :
         self.to_not = to_not
     def test(self, world) :
         return not self.to_not.test(world)
-    def expand_pattern(self, matches) :
-        return PNot(self.to_not.expand_pattern(matches))
+    def expand_pattern(self, matches, data=None) :
+        return PNot(self.to_not.expand_pattern(matches, data=data))
     def __repr__(self) :
         return "PNot(%r)" % self.to_not
 
@@ -180,12 +192,26 @@ class PEquals(AbstractPattern) :
         a = self.a.test(world) if isinstance(self.a, AbstractPattern) else self.a
         b = self.b.test(world) if isinstance(self.b, AbstractPattern) else self.b
         return (a==b)
-    def expand_pattern(self, matches) :
-        a = self.a.expand_pattern(matches) if isinstance(self.a, AbstractPattern) else self.a
-        b = self.b.expand_pattern(matches) if isinstance(self.b, AbstractPattern) else self.b
+    def expand_pattern(self, matches, data=None) :
+        a = self.a.expand_pattern(matches, data=data) if isinstance(self.a, AbstractPattern) else self.a
+        b = self.b.expand_pattern(matches, data=data) if isinstance(self.b, AbstractPattern) else self.b
         return PEquals(a, b)
     def __repr__(self) :
         return "PEquals(%r, %r)" % (self.a, self.b)
+
+class PIn(AbstractPattern) :
+    def __init__(self, a, bs) :
+        self.a, self.bs = a, bs
+    def test(self, world) :
+        a = self.a.test(world) if isinstance(self.a, AbstractPattern) else self.a
+        bs = [b.test(world) if isinstance(b, AbstractPattern) else b for b in self.bs]
+        return (a in bs)
+    def expand_pattern(self, matches, data=None) :
+        a = self.a.expand_pattern(matches, data=data) if isinstance(self.a, AbstractPattern) else self.a
+        bs = [b.expand_pattern(matches, data=data) if isinstance(b, AbstractPattern) else b for b in self.bs]
+        return PIn(a, bs)
+    def __repr__(self) :
+        return "PIn(%r, %r)" % (self.a, self.bs)
 
 ###
 ### Tests

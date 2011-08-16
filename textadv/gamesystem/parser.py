@@ -24,7 +24,7 @@
 import string
 import re
 import itertools
-from textadv.core.patterns import VarPattern, AbstractPattern
+from textadv.core.patterns import VarPattern, AbstractPattern, ExpansionException
 from textadv.core.rulesystem import ActivityTable, ActionHandled
 from textadv.gamesystem.utilities import list_append, docstring
 from textadv.gamesystem.basicpatterns import *
@@ -298,8 +298,11 @@ class Parser(object) :
                     if type(result) == str :
                         value = result
                     elif isinstance(result, AbstractPattern) :
-                        value = result.expand_pattern(matches)
-                        supdata = result.expand_pattern(subparsers)
+                        try :
+                            value = result.expand_pattern(matches, data={"world":ctxt.world})
+                            supdata = result.expand_pattern(subparsers)
+                        except ExpansionException :
+                            continue # just skip it!
                     else :
                         value = result(**matches)
                 else :

@@ -1,3 +1,5 @@
+print "Starting server..."
+
 import tornado.ioloop
 import tornado.web
 from tornado.escape import json_encode, url_unescape, url_escape
@@ -8,6 +10,7 @@ import time
 import stat
 import mimetypes
 import email
+import datetime
 
 sys.path.append(os.path.join(os.path.dirname(__file__), "../.."))
 
@@ -29,6 +32,8 @@ def add_game(package, name, auxfile_dir=None, altindex=None) :
     if altindex :
         alt_indices[name] = altindex
 
+print "Loading games..."
+
 add_game_path(os.path.join(os.path.dirname(__file__), "../.."))
 add_game("games", "cloak")
 add_game("games", "testgame")
@@ -39,6 +44,8 @@ add_game("games", "isleadv")
 
 add_game_path("/Users/kyle/Projects/teptour")
 add_game(None, "teptour", auxfile_dir="/Users/kyle/Projects/teptour/teptour_files", altindex="tepindex.html")
+
+print "Loaded."
 
 class MainHandler(tornado.web.RequestHandler):
     def get(self) :
@@ -64,7 +71,7 @@ class GameHandler(tornado.web.RequestHandler):
             prefix = os.path.commonprefix([auxfile_path, root_path])
             if prefix != root_path :
                 raise tornado.web.HTTPError(403)
-            print auxfile_path
+            print " ->",auxfile_path
             if not os.path.isfile(auxfile_path) :
                 raise tornado.web.HTTPError(404)
 
@@ -226,7 +233,7 @@ application = tornado.web.Application(
 import threading
 
 class TornadoGameIO(object) :
-    def __init__(self, outfile) :
+    def __init__(self, outfile, frontispiece=None) :
         self.main_lock = threading.BoundedSemaphore(1)
         self.input_lock = threading.Semaphore(0)
         self.to_flush = []
@@ -236,6 +243,7 @@ class TornadoGameIO(object) :
         self.status_vars = {"prompt" : ">"}
         self.die = False
         self.outfile = outfile
+        self.frontispiece = frontispiece
     def register_wants_output(self, callback) :
         self.main_lock.acquire()
         if self.to_output :
@@ -266,6 +274,8 @@ class TornadoGameIO(object) :
         if self.die :
             raise SystemExit("Thread death due to self.die.")
         command = self.commands.pop()
+        if self.frontispiece :
+            print "[%s %s] %s" % (datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),self.frontispiece,command)
         self.main_lock.acquire()
         if self.outfile :
             self.outfile.write("\n\n<p><b>"+self.status_vars["prompt"] + " "+command+"</b></p>")
@@ -324,7 +334,7 @@ class GameThread(threading.Thread) :
         if not os.path.exists(dirname) :
             os.mkdir(dirname)
         logfile = open(os.path.join(dirname, gamename+"_"+url_escape(session)+".html"), "w")
-        self.game_context = self.game.make_actorcontext_with_io(TornadoGameIO(logfile))
+        self.game_context = self.game.make_actorcontext_with_io(TornadoGameIO(logfile, frontispiece=session[0:8]))
         self.session = session
         threading.Thread.__init__(self)
     def run(self) :
@@ -361,4 +371,5 @@ if __name__ == "__main__":
     watchdog.daemon = True
     watchdog.start()
     application.listen(port)
+    print "Running loop."
     tornado.ioloop.IOLoop.instance().start()

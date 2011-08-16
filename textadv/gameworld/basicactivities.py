@@ -25,10 +25,13 @@ def default_move_backdrops(curr_loc, world) :
     """Moves all relevant backdrops to curr_loc."""
     for backdrop in world.activity.objects_of_kind("backdrop") :
         locations = world[BackdropLocations(backdrop)]
-        for loc in locations :
-            if world[Contains(loc, curr_loc)] : # for handling regions
-                world.activity.put_in(backdrop, curr_loc)
-                break
+        if locations == "everywhere" :
+            world.activity.put_in(backdrop, curr_loc)
+        else :
+            for loc in locations :
+                if world[Contains(loc, curr_loc)] : # for handling regions
+                    world.activity.put_in(backdrop, curr_loc)
+                    break
 
 ##
 ## Activity: get the doors in a room

@@ -1,0 +1,51 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<html> <head>
+<title>Status of textadv tornado server</title>
+</head>
+
+<body>
+<h1>Status</h1>
+
+<p><a href="./">Refresh</a></p>
+
+{% raw result %}
+
+<p>{{ len(sessions) }} session(s).</p>
+
+<ul>
+  {% for n,s in sessions %}
+    <li>{{ escape(n) }} playing {{ s.gamename }}
+      {% if s.logfile_name %}
+        <a href="log?session={{url_escape(n)}}">Log</a>
+      {% end %}
+      <br>
+      <form method="get" action="message">
+      <input type="hidden" name="session" value="{{url_escape(n)}}"/>
+      <label>Message:</label> <input type="textbox" name="message" />
+      </form>
+  
+      <form method="get" action="getprop">
+      <input type="hidden" name="session" value="{{url_escape(n)}}"/>
+      <label>Get property:</label> <input type="textbox" name="property" />
+      <label>Comma-separated arguments:</label> <input type="textbox" name="arguments" />
+      <input type="submit"/>
+      </form>
+       <form method="get" action="setprop">
+      <input type="hidden" name="session" value="{{url_escape(n)}}"/>
+      <label>Set property:</label> <input type="textbox" name="property" />
+      <label>Comma-separated arguments:</label> <input type="textbox" name="arguments" />
+      <label>Value:</label> <input type="textbox" name="value" />
+      <input type="submit"/>
+      </form>
+
+      <form method="get" action="wactivity">
+      <input type="hidden" name="session" value="{{url_escape(n)}}"/>
+      <label>World activity:</label> <input type="textbox" name="activity" />
+      <label>Comma-separated arguments:</label> <input type="textbox" name="arguments" />
+      <input type="submit"/>
+      </form>
+    </li>
+  {% end %}
+</ul>
+
+</body> </html>

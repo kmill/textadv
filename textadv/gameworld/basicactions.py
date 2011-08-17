@@ -124,6 +124,8 @@ def before_mistaken_action(actor, x, ctxt) :
     raise AbortAction(as_actor(x, actor=actor))
 
 def all_are_mistakes(parser, mistakes, reason) :
+    if not isinstance(mistakes, list) :
+        raise Exception("The mistakes list must be a list.")
     for m in mistakes :
         parser.understand(m, MakingMistake(actor, reason))
 
@@ -261,10 +263,10 @@ class Examining(BasicAction) :
     verb = "examine"
     gerund = "examining"
     numargs = 2
-parser.understand("examine/x/read [something x]", Examining(actor, X))
+parser.understand("examine/x/read/inspect [something x]", Examining(actor, X))
 parser.understand("look at/inside [something x]", Examining(actor, X))
 
-all_are_mistakes(parser, ["examine/x/read", "look at/inside"],
+all_are_mistakes(parser, ["examine/x/read/inspect", "look at/inside"],
                  """{Bob} {needs} to be examining something in particular.""")
 
 # The following is something I am not sure about, and I'm including it
@@ -1059,7 +1061,7 @@ def before_InsertingInto_object_into_own_contents(actor, x, y, ctxt) :
 def before_InsertingInto_closed_container(actor, x, y, ctxt) :
     """One can't place something into a closed container."""
     ctxt.actionsystem.do_first(Opening(actor, y), ctxt=ctxt)
-    if not ctxt.world[IsOpen(Y)] :
+    if not ctxt.world[IsOpen(y)] :
         raise AbortAction(str_with_objs("[The $y] is closed.", y=y))
 
 @before(InsertingInto(actor, X, Y) <= PNot(IsA(Y, "container")))
@@ -1884,7 +1886,7 @@ class Laughing(BasicAction) :
     verb = "laugh"
     gerund = "laughing"
     numargs = 1
-parser.understand("laugh/lol", Laughing(actor))
+parser.understand("laugh/lol/ha/haha/hahaha/hahahaha", Laughing(actor))
 
 @report(Laughing(actor))
 def report_laughing_default(actor, ctxt) :

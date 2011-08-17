@@ -2,7 +2,7 @@ print "Starting server..."
 
 import tornado.ioloop
 import tornado.web
-from tornado.escape import json_encode, url_unescape, url_escape
+from tornado.escape import json_encode, url_unescape, url_escape, xhtml_escape
 import os
 import os.path
 import sys
@@ -115,7 +115,7 @@ class GameHandler(tornado.web.RequestHandler):
             self.write("No such game")
             return
 
-        session = base64.b64encode(uuid.uuid4().bytes + uuid.uuid4().bytes)
+        session = base64.b64encode(uuid.uuid4().bytes + uuid.uuid4().bytes).replace("+", "_")
 
         if self.get_argument("reload", False) :
             import textadv.gameworld.basiclibrary
@@ -124,7 +124,10 @@ class GameHandler(tornado.web.RequestHandler):
         else :
             the_game = games[game]
         
-        t = GameThread(game, the_game, session=session)
+        if self.get_argument("nolog", False) :
+            t = GameThread(game, the_game, session=session, nolog=True)
+        else :
+            t = GameThread(game, the_game, session=session)
         t.daemon = True
         t.start()
         sessions_lock.acquire()
@@ -212,7 +215,6 @@ class PingHandler(tornado.web.RequestHandler) :
         if (not session) or (session not in sessions):
             print "ignoring ping from non-session"
             self.write("Error")
-            self.finish()
             sessions_lock.release()
             return
         else :
@@ -221,12 +223,99 @@ class PingHandler(tornado.web.RequestHandler) :
             sessions_lock.release()
             print "handled ping"
 
+class StatusHandler(tornado.web.RequestHandler) :
+    def get(self, args) :
+        args = args.split("/")
+        result = ""
+        if len(args) > 0 :
+            if args[0] == "message" :
+                s = url_unescape(self.get_argument("session", ""))
+                m = url_unescape(self.get_argument("message", ""))
+                print "messaging",s,"with",m
+                sessions_lock.acquire()
+                if m and s in sessions :
+                    try :
+                        sessions[s].game_context.io.write("<p><b>From admin:</b> %s</p>" % (m,))
+                        sessions[s].game_context.io.flush()
+                        result += "<p>Messaged %s with \"%s\"</p>" % (xhtml_escape(s), xhtml_escape(m))
+                    except Exception as x :
+                        result += "<p>Exception %r</p>" % (x,)
+                sessions_lock.release()
+            elif args[0] == "wactivity" :
+                s = url_unescape(self.get_argument("session", ""))
+                a = url_unescape(self.get_argument("activity", ""))
+                args = [str(s2).strip() for s2 in url_unescape(self.get_argument("arguments", "")).split(",")]
+                sessions_lock.acquire()
+                print a,s,args
+                if a and s in sessions :
+                    try :
+                        world = sessions[s].game_context.world
+                        if a in world._activities :
+                            world.call_activity(a, *args)
+                            result += "<p>Called %s with args %r for %s.</p>" % (xhtml_escape(a), args, xhtml_escape(s))
+                        else :
+                            result += "<p>No such world activity %s.</p>" % (xhtml_escape(a))
+                    except Exception as x :
+                        result += "<p>Exception %r</p>" % (x,)
+                sessions_lock.release()
+            elif args[0] == "getprop" :
+                s = url_unescape(self.get_argument("session", ""))
+                p = url_unescape(self.get_argument("property", ""))
+                args = [str(s2).strip() for s2 in url_unescape(self.get_argument("arguments", "")).split(",")]
+                sessions_lock.acquire()
+                print p,s,args
+                if p and s in sessions :
+                    try :
+                        world = sessions[s].game_context.world
+                        result += "<p>%s(%s) = %r</p>" % (p,",".join([repr(a) for a in args]),world.get_property(p, *args))
+                    except Exception as x :
+                        result += "<p>Exception %r</p>" % (x,)
+                sessions_lock.release()
+            elif args[0] == "setprop" :
+                s = url_unescape(self.get_argument("session", ""))
+                p = url_unescape(self.get_argument("property", ""))
+                args = [str(s2).strip() for s2 in url_unescape(self.get_argument("arguments", "")).split(",")]
+                v = str(url_unescape(self.get_argument("value", "")))
+                if v == "None" : v = None
+                if v == "True" : v = True
+                if v == "False" : v = False
+                sessions_lock.acquire()
+                print p,s,args
+                if p and s in sessions :
+                    try :
+                        world = sessions[s].game_context.world
+                        world.set_property(p, *args, value=v)
+                        result += "<p>set %s(%s) = %r</p>" % (p,",".join([repr(a) for a in args]),v)
+                    except Exception as x :
+                        result += "<p>Exception %r</p>" % (x,)
+                sessions_lock.release()
+            elif args[0] == "log" :
+                s = url_unescape(self.get_argument("session", ""))
+                print "log for",s
+                sessions_lock.acquire()
+                if s in sessions :
+                    try :
+                        fn = sessions[s].logfile_name
+                        print fn
+                        with open(fn, "r") as f :
+                            self.write(f.read())
+                            sessions_lock.release()
+                            return
+                    except Exception as x :
+                        result += "<p>Exception %r</p>" % (x,)
+                sessions_lock.release()
+        sessions_lock.acquire()
+        the_sessions = sessions.items()
+        sessions_lock.release()
+        self.render("static/status.html", result=result, sessions=the_sessions)
+
 application = tornado.web.Application(
     [(r"/", MainHandler),
      (r"/game/(.+)", GameHandler),
      (r"/input", InputHandler),
      (r"/output", OutputHandler),
      (r"/ping", PingHandler),
+     (r"/status/(.*)", StatusHandler),
      ],
     static_path=os.path.join(os.path.dirname(__file__), "static"))
 
@@ -328,12 +417,18 @@ class TornadoGameIO(object) :
         self.main_lock.release()
 
 class GameThread(threading.Thread) :
-    def __init__(self, gamename, game, session) :
+    def __init__(self, gamename, game, session, nolog=False) :
+        self.gamename = gamename
         self.game = game
         dirname = os.path.join(os.path.dirname(__file__), "logs")
         if not os.path.exists(dirname) :
             os.mkdir(dirname)
-        logfile = open(os.path.join(dirname, gamename+"_"+url_escape(session)+".html"), "w")
+        if nolog :
+            logfile = None
+            self.logfile_name = None
+        else :
+            self.logfile_name = os.path.abspath(os.path.join(dirname, gamename+"_"+url_escape(session)+".html"))
+            logfile = open(self.logfile_name, "w")
         self.game_context = self.game.make_actorcontext_with_io(TornadoGameIO(logfile, frontispiece=session[0:8]))
         self.session = session
         threading.Thread.__init__(self)

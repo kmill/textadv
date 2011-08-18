@@ -1,0 +1,56 @@
+#!/usr/bin/env python
+#
+# checks a game for gross errors
+#
+
+import sys
+if len(sys.argv) < 2 :
+    print "Usage: startgame gamefile"
+else :
+    execfile(sys.argv[1])
+    from textadv.terminalgame import TerminalGameIO
+    game_context = make_actorcontext_with_io(TerminalGameIO())
+    
+    #basic_begin_game(game_context)
+    game_context.world.set_game_defined()
+
+    objects = game_context.world.query_relation(IsA(X,Y), var=X)
+    print "%r game objects" % len(objects)
+    print objects
+
+    # check descriptions
+    for o in objects :
+        try :
+            desc = game_context.world[Description(o)]
+        except KeyError :
+            desc = None
+        if desc is None :
+            print "(%r has no description)" % o
+        else :
+            print "Checking Description(%r)" % o,
+            if desc is None :
+                print "  No description!"
+            else :
+                game_context.stringeval.eval_str(desc, game_context)
+                print "  ok"
+        
+    # check direction descriptions for rooms
+    for o in objects :
+        if game_context.world[IsA(o, "room")] :
+            for d in DIRECTION_INVERSES :
+                print "Checking DirectionDescription(%r, %r)" % (o, d),
+                dd = game_context.world[DirectionDescription(o, d)]
+                if dd is None :
+                    print "  No direction description!"
+                else :
+                    game_context.stringeval.eval_str(dd, game_context)
+                    print "  ok"
+                                        
+    # checking locale descriptions for enterables
+    for o in objects :
+        if game_context.world[IsA(o, "thing")] and game_context.world[IsEnterable(o)] :
+            ld = game_context.world[LocaleDescription(o)]
+            if ld :
+                print "Checking LocaleDescription(%r)" % o,
+                game_context.stringeval.eval_str(ld, game_context)
+                print "  ok"

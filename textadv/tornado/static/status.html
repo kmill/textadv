@@ -38,6 +38,15 @@
       <input type="submit"/>
       </form>
 
+      <form method="get" action="manirel">
+      <input type="hidden" name="session" value="{{url_escape(n)}}"/>
+      <label>Relation:</label> <input type="textbox" name="relation" />
+      <label>Comma-separated arguments:</label> <input type="textbox" name="arguments" />
+      <input type="submit" name="query" value="Query"/>
+      <input type="submit" name="add" value="Add"/>
+      <input type="submit" name="remove" value="Remove"/> 
+      </form>
+
       <form method="get" action="wactivity">
       <input type="hidden" name="session" value="{{url_escape(n)}}"/>
       <label>World activity:</label> <input type="textbox" name="activity" />

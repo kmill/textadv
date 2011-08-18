@@ -11,6 +11,7 @@ import stat
 import mimetypes
 import email
 import datetime
+from textadv.core.patterns import VarPattern
 
 sys.path.append(os.path.join(os.path.dirname(__file__), "../.."))
 
@@ -235,7 +236,7 @@ class StatusHandler(tornado.web.RequestHandler) :
                 sessions_lock.acquire()
                 if m and s in sessions :
                     try :
-                        sessions[s].game_context.io.write("<p><b>From admin:</b> %s</p>" % (m,))
+                        sessions[s].game_context.io.write("<p><b>From admin:</b> %s</p>" % (xhtml_escape(m),))
                         sessions[s].game_context.io.flush()
                         result += "<p>Messaged %s with \"%s\"</p>" % (xhtml_escape(s), xhtml_escape(m))
                     except Exception as x :
@@ -286,6 +287,31 @@ class StatusHandler(tornado.web.RequestHandler) :
                         world = sessions[s].game_context.world
                         world.set_property(p, *args, value=v)
                         result += "<p>set %s(%s) = %r</p>" % (p,",".join([repr(a) for a in args]),v)
+                    except Exception as x :
+                        result += "<p>Exception %r</p>" % (x,)
+                sessions_lock.release()
+            elif args[0] == "manirel" :
+                s = url_unescape(self.get_argument("session", ""))
+                r = url_unescape(self.get_argument("relation", ""))
+                args = [str(s2).strip() for s2 in url_unescape(self.get_argument("arguments", "")).split(",")]
+                for i in xrange(0, len(args)) :
+                    if args[i] in "XYZ" :
+                        args[i] = VarPattern(args[i].lower())
+                sessions_lock.acquire()
+                if r and s in sessions :
+                    print s,r,args
+                    try :
+                        world = sessions[s].game_context.world
+                        q = world.get_relation(r)(*args)
+                        if self.get_argument("query", False) :
+                            res = world.query_relation(q)
+                            result += "<p>Queried %r got <pre>%s</pre></p>" % (q, "\n".join(repr(a) for a in res))
+                        elif self.get_argument("add", False) :
+                            world.add_relation(q)
+                            result += "<p>Added %r</p>" % (q,)
+                        elif self.get_argument("remove", False) :
+                            world.remove_relation(q)
+                            result += "<p>Removed %r</p>" % (q,)
                     except Exception as x :
                         result += "<p>Exception %r</p>" % (x,)
                 sessions_lock.release()

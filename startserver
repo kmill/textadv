@@ -1,2 +1,2 @@
 #!/bin/bash
-python -m textadv.tornado.server $1
+python -m textadv.web.server $1

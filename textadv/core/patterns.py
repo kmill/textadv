@@ -129,7 +129,8 @@ class BasicPattern(AbstractPattern) :
                 newargs.append(arg)
         return type(self)(*newargs)
     def test(self, world) :
-        return world[self]
+        targs = [a.test(world) if isinstance(a, AbstractPattern) else a for a in self.args]
+        return world[type(self)(*targs)]
     def __repr__(self) :
         return "%s(%s)" % (self.__class__.__name__, ",".join(repr(a) for a in self.args))
     def __eq__(self, other) :

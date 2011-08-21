@@ -712,6 +712,7 @@ class Entering(BasicAction) :
 parser.understand("enter [something x]", Entering(actor, X))
 parser.understand("get/go/stand/sit in/into/on/through [something x]", Entering(actor, X))
 parser.understand("get on top of [something x]", Entering(actor, X))
+parser.understand("sit down on [something x]", Entering(actor, X))
 
 all_are_mistakes(parser, ["enter", "get/go/stand/sit in/into/on/through", "get on top", "get on top of"],
                  """{Bob} {needs} to be entering something in particular.""")
@@ -934,6 +935,7 @@ class GettingOff(BasicAction) :
             return "get off"
 parser.understand("get off", GettingOff(actor))
 parser.understand("climb/get down", GettingOff(actor))
+parser.understand("stand/get up", GettingOff(actor))
 
 @before(GettingOff(actor), wants_event=True)
 def before_GettingOff_set_get_off_from(event, actor, ctxt) :
@@ -1010,6 +1012,9 @@ class GettingOffParticular(BasicAction) :
     gerund = "getting off"
     numargs = 2
 parser.understand("get off [something x]", GettingOffParticular(actor, X))
+parser.understand("climb/get down [something x]", GettingOffParticular(actor, X))
+parser.understand("climb/get down from [something x]", GettingOffParticular(actor, X))
+parser.understand("stand/get up from [something x]", GettingOffParticular(actor, X))
 
 require_xobj_visible(actionsystem, GettingOffParticular(actor, X))
 

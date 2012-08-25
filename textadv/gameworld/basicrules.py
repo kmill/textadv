@@ -1001,7 +1001,7 @@ class ReflexivePronounIfMe(Property) :
 
 world[SubjectPronounIfMe(X) <= IsA(X, "person")] = "you"
 world[ObjectPronounIfMe(X) <= IsA(X, "person")] = "you"
-world[PossessivePronounIfMe(X) <= IsA(X, "person")] = "your"
+world[PossessivePronounIfMe(X) <= IsA(X, "person")] = "yours"
 world[ReflexivePronounIfMe(X) <= IsA(X, "person")] = "yourself"
 
 #

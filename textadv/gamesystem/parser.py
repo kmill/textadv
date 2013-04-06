@@ -466,15 +466,18 @@ default_parser = Parser()
 def default_parse_thing(parser, subparser, var, name, words, input, i, ctxt, next, multiplier=1) :
     """Given a set of words and a name, tries to find a subsequence by
     using the grammar [art]? [adjs]* [noun]?, where there is at least
-    one adjective or noun."""
-    def match_adjs_nouns(curr_adjs, i2) :
+    one adjective or noun.  The require_another flag is set to True
+    when parsing an adjective which is also a noun to prevent
+    duplication (don't want to interpret a single word in two ways: as
+    an adjective and as a noun)."""
+    def match_adjs_nouns(curr_adjs, i2, require_another=False) :
         poss = []
         if i2 < len(input) :
             # try adding another adjective
             if input[i2].lower() in adjs :
                 new_adjs = curr_adjs + [input[i2].lower()]
                 if parser_valid_description(new_adjs, [], adjs, nouns) :
-                    poss.extend(match_adjs_nouns(new_adjs, i2+1))
+                    poss.extend(match_adjs_nouns(new_adjs, i2+1, require_another=input[i2].lower() in nouns))
             # or try concluding with a noun
             if input[i2].lower() in nouns :
                 # already a match because input[i2] is one of the nouns.
@@ -484,7 +487,7 @@ def default_parse_thing(parser, subparser, var, name, words, input, i, ctxt, nex
                 poss.extend(product([[Matched(input[i:i2+1], name, 2*multiplier*m2, subparser, var=var)]],
                                     next(i2+1)))
         # or just try concluding
-        if len(curr_adjs) > 0 :
+        if len(curr_adjs) > 0 and not require_another :
             # already a match
             m2 = 1
             if parser.current_names[subparser][name] == " ".join(input[i:i2]) :

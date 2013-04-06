@@ -34,6 +34,17 @@ class GameContext(object) :
         current context."""
         raise NotImplementedError("GameContext is abstract.")
 
+class SwitchContext(Exception) :
+    """An exception to throw to cause a context to switch to a new
+    context."""
+    def __init__(self, context, **kwargs) :
+        self.context = context
+        self.kwargs = kwargs
+    def construct(self, parent) :
+        kwargs = self.kwargs.copy()
+        kwargs.update({"parent" : parent})
+        return self.context(**kwargs)
+
 ## the io object for ActorContext must implement "get_input" which
 ## functions as "raw_input", and "write" which functions as "print x,"
 
@@ -153,13 +164,15 @@ class ActorContext(GameContext) :
                 self.io.set_status_var("headline", self.stringeval.eval_str(self.activity.make_current_location_headline(self.actor), self))
             except parser.NoSuchWord as ex :
                 esc = escape_str(ex.word)
-                self.write("I don't know what you mean by '%s'." % esc)
+                self.write("[char 91]I don't know what you mean by '%s'.[char 93]" % esc)
             except parser.NoUnderstand :
-                self.write("Huh?")
+                self.write("[char 91]I don't understand what you mean.[char 93]")
             except parser.NoInput :
                 pass
             except parser.Ambiguous as ex :
                 return (DisambiguationContext(self, ex), dict())
+            except SwitchContext as sc :
+                return (sc.construct(self), dict())
             return (self, dict())
         except Exception :
             import traceback

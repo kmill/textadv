@@ -95,8 +95,10 @@ class World(object) :
             self._activities[name].add_handler(f, **kwargs)
             return f
         return _to
-    def call_activity(self, name, *args) :
-        return self._activities[name].notify(args, {"world" : self})
+    def call_activity(self, name, *args, **kwargs) :
+        data = {"world" : self}
+        data.update(kwargs)
+        return self._activities[name].notify(args, data)
     def activity_table(self, name) :
         """Gets the action table of the given name."""
         return self._activities[name]

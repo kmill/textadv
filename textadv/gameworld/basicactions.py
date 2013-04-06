@@ -264,7 +264,7 @@ class Examining(BasicAction) :
     gerund = "examining"
     numargs = 2
 parser.understand("examine/x/read/inspect [something x]", Examining(actor, X))
-parser.understand("look at/inside [something x]", Examining(actor, X))
+parser.understand("look at/inside/in/toward [something x]", Examining(actor, X))
 
 all_are_mistakes(parser, ["examine/x/read/inspect", "look at/inside"],
                  """{Bob} {needs} to be examining something in particular.""")

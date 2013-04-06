@@ -401,6 +401,13 @@ def _str_eval_the(eval, act, ctxt, ob) :
     ob = ob[0]
     return [wrap_examine(eval, act, ob, eval.eval_str(ctxt.world.get_property("DefiniteName", ob), ctxt, actor=act), ctxt)]
 
+@stringeval.add_eval_func("the_")
+def _str_eval_the_(eval, act, ctxt, ob) :
+    """Gets DefiniteName of the supplied object, but doesn't wrap it in an examination tag."""
+    ob = ob[0]
+    return [eval.eval_str(ctxt.world.get_property("DefiniteName", ob), ctxt, actor=act)]
+
+
 @stringeval.add_eval_func("a")
 def _str_eval_a(eval, act, ctxt, ob) :
     """Gets IndefiniteName of the supplied object."""
@@ -538,6 +545,20 @@ def _str_eval_ob(eval, act, ctxt, *obs) :
     ob = eval.eval_str(ob, ctxt, actor=act)
     text = eval.eval_str(text, ctxt, actor=act)
     return [make_action_link(text, "examine "+ob)]
+
+@stringeval.add_eval_func("goto")
+def _str_eval_goto(eval, act, ctxt, *obs) :
+    """Takes a room and possible text, and provides a link to
+    go to that room."""
+    if len(obs) == 1 :
+        ob = obs[0][0]
+        text = obs[0][0]
+    else :
+        ob = obs[0][0]
+        text = obs[1][0]
+    ob = eval.eval_str(ob, ctxt, actor=act)
+    text = eval.eval_str(text, ctxt, actor=act)
+    return [make_action_link(text, "go to "+ob)]
 
 @stringeval.add_eval_func("action")
 def _str_eval_action(eval, act, ctxt, *obs) :

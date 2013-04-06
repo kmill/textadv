@@ -132,6 +132,8 @@ class ActorContext(GameContext) :
         self.world.set_property("Global", "inhibit_location_description_when_moved", value=False)
         if not self.world.get_property("Global", "game_started") :
             self.activity.start_game()
+            vis_cont = self.world.get_property("VisibleContainer", self.world.get_property("Location", self.actor))
+            self.io.set_status_var("visible_container", vis_cont)
             self.io.set_status_var("headline", self.stringeval.eval_str(self.activity.make_current_location_headline(self.actor), self))
         try :
             if input is None and action is None:
@@ -141,7 +143,8 @@ class ActorContext(GameContext) :
                     return (self, {})
             try :
                 if action is None :
-                    action, disambiguated = self.parser.handle_all(input, self, self.actionsystem.verify_action)
+                    action, disambiguated = self.parser.handle_all(input, self, self.actionsystem.verify_action,
+                                                                   allow_period_at_end=True)
                 else :
                     disambiguated = True
                 try :
@@ -161,10 +164,15 @@ class ActorContext(GameContext) :
                         return (None, {})
                 for i in xrange(0, action.num_turns) :
                     self.activity.step_turn()
+                vis_cont = self.world.get_property("VisibleContainer", self.world.get_property("Location", self.actor))
+                self.io.set_status_var("visible_container", vis_cont)
                 self.io.set_status_var("headline", self.stringeval.eval_str(self.activity.make_current_location_headline(self.actor), self))
             except parser.NoSuchWord as ex :
                 esc = escape_str(ex.word)
-                self.write("[char 91]I don't know what you mean by '%s'.[char 93]" % esc)
+                if esc == "." :
+                    self.write("[char 91]I don't understand periods in sentences.[char 93]")
+                else :
+                    self.write("[char 91]I don't know what you mean by '%s'.[char 93]" % esc)
             except parser.NoUnderstand :
                 self.write("[char 91]I don't understand what you mean.[char 93]")
             except parser.NoInput :

@@ -12,6 +12,18 @@ send_command = function () {
   run_action(command)
 };
 
+var visible_container_listeners = Array();
+
+function register_visible_container_listener(f) {
+  visible_container_listeners.push(f);
+}
+
+function call_visible_container_listeners(vis_cont) {
+  for (var i = 0; i < visible_container_listeners.length; i++) {
+    visible_container_listeners[i](vis_cont);
+  }
+}
+
 print_result = function(r) {
   if(r["text"]) {
     $("#content").append(r["text"]);
@@ -21,6 +33,9 @@ print_result = function(r) {
   }
   if(r["headline"]) {
     $("#headline").html(r["headline"]);
+  }
+  if(r["visible_container"]) {
+    call_visible_container_listeners(r["visible_container"]);
   }
   $("input#command").focus();
   container = $("html, body");

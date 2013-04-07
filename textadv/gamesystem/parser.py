@@ -188,12 +188,10 @@ class Parser(object) :
         return _add_subparser
     def run_subparser(self, name, var, input, i, ctxt, actor, next) :
         return self.subparsers[name].notify([self, var, input, i, ctxt, actor, next], {})
-    def run_parser(self, name, input, ctxt, allow_period_at_end=True) :
+    def run_parser(self, name, input, ctxt) :
         """Like run_subparser, but matches the end of input, too."""
         def _end(i) :
             if len(input) == i :
-                return [[]]
-            elif allow_period_at_end and i + 1 == len(input) and input[i] == "." :
                 return [[]]
             else :
                 return []
@@ -316,17 +314,17 @@ class Parser(object) :
 
     def transform_text_to_words(self, text) :
         text = text.replace(",", " , ").replace("?", " ? ").replace("!", " ! ").strip()
-        # hack... allows periods in things like "Irving Q. Tep", but gets terminal periods to be their own token.
-        if text.endswith(".") :
-            text = text[:-1] + " ."
         return text.split()
 
     def handle_all(self, input, ctxt, action_verifier, allow_period_at_end=False) :
+        input = input.strip()
+        if allow_period_at_end and input.endswith(".") :
+            input = input[:-1]
         words = self.transform_text_to_words(input)
         if not words :
             raise NoInput()
         self.init_current_objects(ctxt)
-        results = [r[0] for r in self.run_parser("action", words, ctxt, allow_period_at_end=allow_period_at_end)]
+        results = [r[0] for r in self.run_parser("action", words, ctxt)]
         if not results :
             # then maybe we didn't know one of the words
             for word in words :

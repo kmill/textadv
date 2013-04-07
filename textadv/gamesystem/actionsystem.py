@@ -222,6 +222,10 @@ def VeryLogicalOperation() :
 def LogicalOperation() :
     """For when the operation is logical."""
     return BasicVerify(100, "All good.")
+def BarelyLogicalOperation() :
+    """For when the operation is barely logical because something else
+    may be more logical; intended as a failsafe."""
+    return BasicVerify(90, "Almost not good.")
 def IllogicalAlreadyOperation(reason) :
     """For when the operation is illogical because it's been already
     done."""

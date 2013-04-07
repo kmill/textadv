@@ -554,7 +554,7 @@ class GoingTo(BasicAction) :
     def infinitive_form(self, ctxt) :
         return "go to %s" % str_with_objs("[get DefiniteName $x]", x=self.get_do())
 parser.understand("go to [somewhere x]", GoingTo(actor, X))
-parser.understand("goto/go [somewhere x]", GoingTo(actor, X))
+parser.understand("goto/go/g [somewhere x]", GoingTo(actor, X))
 
 all_are_mistakes(parser, ["go to", "goto"],
                  """{Bob} {needs} to be going to somewhere in particular.""")

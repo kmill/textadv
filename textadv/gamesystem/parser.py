@@ -315,8 +315,11 @@ class Parser(object) :
             return out
 
     def transform_text_to_words(self, text) :
-        text = text.replace(",", " , ").replace("?", " ? ").replace("!", " ! ").replace(".", " . ")
-        return text.strip().split()
+        text = text.replace(",", " , ").replace("?", " ? ").replace("!", " ! ").strip()
+        # hack... allows periods in things like "Irving Q. Tep", but gets terminal periods to be their own token.
+        if text.endswith(".") :
+            text = text[:-1] + " ."
+        return text.split()
 
     def handle_all(self, input, ctxt, action_verifier, allow_period_at_end=False) :
         words = self.transform_text_to_words(input)

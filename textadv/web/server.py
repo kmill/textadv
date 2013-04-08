@@ -41,10 +41,6 @@ add_game("games", "testgame")
 add_game("games", "testgame2")
 add_game("games", "continuations")
 add_game("games", "isleadv")
-#add_game("games", "teptour", auxfile_dir="games/teptour_files", altindex="tepindex.html")
-
-add_game_path("/Users/kyle/Projects/teptour")
-add_game(None, "teptour", auxfile_dir="/Users/kyle/Projects/teptour/teptour_files", altindex="tepindex.html")
 
 print "Loaded."
 

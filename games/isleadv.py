@@ -323,7 +323,7 @@ def before_askingfor_knife(actor, y, ctxt) :
             you if you help me out a bit...'""")
             raise ActionHandled()
         else :
-            ctxt.write("""Isn't it a great knife?  You didn't lose it, did you?""")
+            ctxt.write("""'Isn't it a great knife?  You didn't lose it, did you?'""")
             raise ActionHandled()
     else :
         ctxt.write("""The skeleton seems unmoved by your question.""")
@@ -335,7 +335,7 @@ def before_placingon_fronds(actor, ctxt) :
 
 @actoractivities.to("npc_is_wanting")
 def npc_is_wanting_skeleton_fronds(giver, object, receiver, ctxt) :
-    if object == "good_fronds" and "receiver" == "skeleton" :
+    if object == "good_fronds" and receiver == "skeleton" :
         raise ActionHandled()
 
 @when(GivingTo(actor, "good_fronds", "skeleton"))
@@ -1181,7 +1181,7 @@ def _when_pushing_blue_button(actor, ctxt) :
 def _report_pushing_blue_button(actor, ctxt) :
     ctxt.write("""The red light begins to blink, and, without warning,
     a trap door opens up underneath you and deposits you in...[newline]""")
-    ctxt.activity.describe_current_location()
+    ctxt.activity.describe_current_location(actor)
     ctxt.write("""[newline]You get up and recover from the fall.""")
 
 ##

@@ -321,7 +321,11 @@ def rule_EffectiveContainer_if_thing(x, world) :
     the effective container if it has constituent parts.  With this
     assumption, we then say that the effective container of a thing is
     that of its location."""
-    return world[EffectiveContainer(world[Location(x)])]
+    location = world[Location(x)]
+    if location :
+        return world[EffectiveContainer(location)]
+    else :
+        return x
 
 @world.handler(VisibleContainer(X) <= IsA(X, "thing"))
 def rule_VisibleContainer_if_thing(x, world) :

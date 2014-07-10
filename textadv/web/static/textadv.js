@@ -1,15 +1,15 @@
 // handles communicating with the textadv server
 
 $(document).ready(function() {
-    update_contents();
-    $("input#command").focus();
-    window.setTimeout(send_ping, 10000);
-    $("input#command").keydown(command_key_handler);
-  });
+  update_contents();
+  $("#command").focus();
+  $("#command").keydown(command_key_handler);
+  window.setTimeout(send_ping, 10000);
+});
 
-send_command = function () {
-  command = $("input#command").val();
-  run_action(command)
+function send_command() {
+  var command = $("input#command").val();
+  run_action(command);
 };
 
 var visible_container_listeners = Array();
@@ -24,7 +24,7 @@ function call_visible_container_listeners(vis_cont) {
   }
 }
 
-print_result = function(r) {
+function print_result(r) {
   if(r["text"]) {
     $("#content").append(r["text"]);
   }
@@ -37,13 +37,11 @@ print_result = function(r) {
   if(r["visible_container"]) {
     call_visible_container_listeners(r["visible_container"]);
   }
-  $("input#command").focus();
-  container = $("html, body");
-  scrollTo = $("input#command");
-  container.scrollTop(scrollTo.offset().top - container.offset().top);
+  $("#command").focus();
+  $("#command")[0].scrollIntoView(true);
 };
 
-update_contents = function() {
+function update_contents() {
   $.ajax({
     url: "/output",
     type: "GET",
@@ -57,43 +55,44 @@ update_contents = function() {
       if(errorThrown == "timeout") {
         update_contents();
       } else {
-        print_result("<p><i>Connection lost</i></p>");
+        print_result({text : "<p><i>Connection lost</i></p>"});
       }
     }
   });
 };
 
-send_ping = function() {
+function send_ping() {
   $.ajax({
     url: "/ping",
     type: "POST",
-    dataType: "json",
-    data: {session: $("input#session").val()},
+    data: {session: $("input#session").val()}
+  }).error(function () {
+    print_result({text : "<p><i>Connection lost</i></p>"});
   });
   window.setTimeout(send_ping, 10000);
 };
 
-run_action = function(command) {
-  input_prompt = $("#input_text").text();
-  $("#content").append('<p class="user_response">'+input_prompt+" "+command+"</p>"); // should escape!
+function run_action(command) {
+  var input_prompt = $("#input_text").text();
+  var $response = $('<p class="user_response">').text(input_prompt + " " + command);
+  $("#content").append($response);
   
   $.ajax({
     type: "POST",
     url: "/input",
-    data: {command: command, session: $("input#session").val()},
-    dataType: "json"
+    data: {command: command, session: $("input#session").val()}
+  }).error(function () {
+    console.log(arguments);
+    print_result({text : "<p><i>Connection lost</i></p>"});
   });
 
   history_add(command);
-  $("input#command").val("");
-  $("input#command").focus();
-  container = $("html, body");
-  scrollTo = $("input#command");
-  container.scrollTop(scrollTo.offset().top - container.offset().top);
+  $("#command").val("").focus();
+  $("#command")[0].scrollIntoView(true);
   return false;
 };
 
-command_key_handler = function(event) {
+function command_key_handler(event) {
   if(event.keyCode == 38) {
     history_up();
     event.preventDefault();
@@ -104,32 +103,32 @@ command_key_handler = function(event) {
   }
 };
 
-command_history = new Array();
-command_index = 0;
-current_command = "";
+var command_history = [];
+var command_index = 0;
+var current_command = "";
 
-history_add = function(command) {
+function history_add(command) {
   command_index = command_history.push(command);
-  current_command = ""
+  current_command = "";
 };
 
-history_up = function() {
+function history_up() {
   if(command_index > 0) {
     if(command_index == command_history.length) {
-      current_command = $("input#command").val();
+      current_command = $("#command").val();
     }
     command_index -= 1;
-    $("input#command").val(command_history[command_index]);
+    $("#command").val(command_history[command_index]);
   }
 };
 
-history_down = function() {
+function history_down() {
   if(command_index < command_history.length) {
     command_index += 1;
     if(command_index == command_history.length) {
-      $("input#command").val(current_command);
+      $("#command").val(current_command);
     } else {
-      $("input#command").val(command_history[command_index]);
+      $("#command").val(command_history[command_index]);
     }
   }
 }

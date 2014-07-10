@@ -33,15 +33,8 @@ def add_game(package, name, auxfile_dir=None, altindex=None) :
     if altindex :
         alt_indices[name] = altindex
 
-print "Loading games..."
-
-add_game_path(os.path.join(os.path.dirname(__file__), "../.."))
-add_game("games", "cloak")
-add_game("games", "testgame")
-add_game("games", "testgame2")
-add_game("games", "continuations")
-add_game("games", "isleadv")
-
+print "Loading config file"
+execfile(os.path.join(os.path.dirname(__file__), "../..", "server_config.py"))
 print "Loaded."
 
 class MainHandler(tornado.web.RequestHandler):
